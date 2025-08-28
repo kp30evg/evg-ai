@@ -191,7 +191,7 @@ export default function LiveCommandPlayground() {
   return (
     <section className="relative py-24 overflow-hidden">
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-emerald-50/20 to-white" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-evergreen-light/20 to-white" />
       
       <div className="container relative mx-auto px-4">
         <motion.div
@@ -201,7 +201,7 @@ export default function LiveCommandPlayground() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-evergreen-light text-evergreen rounded-full text-sm font-medium mb-4">
             <Terminal className="w-4 h-4" />
             LIVE COMMAND INTERFACE
           </div>
@@ -222,32 +222,44 @@ export default function LiveCommandPlayground() {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <Card className="p-6 bg-slate-900 border-slate-800 shadow-2xl">
+            <Card className="relative p-8 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-2 border-slate-700/50 shadow-2xl overflow-hidden group">
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-evergreen/10 via-gold/5 to-evergreen/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+              <div className="absolute -inset-1 bg-gradient-to-r from-evergreen/20 to-gold/20 rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-300 pointer-events-none"></div>
+              <div className="relative z-10">
               <form onSubmit={handleSubmit} className="relative">
-                <div className="flex items-center gap-3 text-emerald-400 mb-2">
-                  <Terminal className="w-5 h-5" />
-                  <span className="text-sm font-mono">evergreenOS Terminal v1.0</span>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3 text-evergreen">
+                    <Terminal className="w-6 h-6" />
+                    <span className="text-sm font-mono font-semibold">Evergreen AI Terminal v1.0</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-gradient-to-r from-evergreen to-gold rounded-full animate-pulse shadow-lg"></div>
+                    <span className="text-sm text-slate-400 font-mono">Connected</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-mono">$</span>
+                <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-600/30 backdrop-blur-sm hover:border-evergreen/30 transition-all duration-200 group">
+                  <span className="text-evergreen font-mono text-lg font-bold group-hover:text-gold transition-colors duration-200">$</span>
                   <input
                     ref={inputRef}
                     type="text"
                     value={command}
                     onChange={(e) => setCommand(e.target.value)}
                     placeholder="Type a command... (e.g., 'Show me deals closing this week')"
-                    className="flex-1 bg-transparent text-white placeholder:text-slate-500 outline-none font-mono"
+                    className="flex-1 bg-transparent text-white placeholder:text-slate-400 outline-none font-mono text-lg focus:text-white transition-colors duration-200"
                     disabled={isProcessing}
                   />
                   <button
                     type="submit"
                     disabled={isProcessing || !command.trim()}
-                    className="px-4 py-2 bg-emerald-500 text-white rounded-md hover:bg-emerald-600 transition-colors disabled:opacity-50"
+                    className="px-6 py-3 bg-gradient-to-r from-evergreen to-evergreen/90 text-white rounded-lg hover:from-evergreen/90 hover:to-gold/80 hover:scale-105 hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-gold/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                    <ChevronRight className="w-5 h-5 relative z-10" />
                   </button>
                 </div>
               </form>
+              </div>
 
               {/* Sample Commands */}
               <div className="mt-6 pt-6 border-t border-slate-800">
@@ -260,7 +272,7 @@ export default function LiveCommandPlayground() {
                       className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-md transition-all text-sm text-left group"
                       disabled={isProcessing}
                     >
-                      <cmd.icon className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                      <cmd.icon className="w-4 h-4 text-evergreen group-hover:scale-110 transition-transform" />
                       <span className="truncate">{cmd.text}</span>
                     </button>
                   ))}
@@ -278,10 +290,10 @@ export default function LiveCommandPlayground() {
                 exit={{ opacity: 0, height: 0 }}
                 className="mt-6"
               >
-                <Card className="p-6 bg-white border-emerald-200">
+                <Card className="p-6 bg-white border-evergreen/20">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <div className="w-8 h-8 border-3 border-emerald-200 rounded-full animate-spin border-t-emerald-500" />
+                      <div className="w-8 h-8 border-3 border-evergreen/20 rounded-full animate-spin border-t-evergreen" />
                     </div>
                     <div>
                       <p className="font-semibold text-slate-900">Processing Command...</p>
@@ -304,7 +316,7 @@ export default function LiveCommandPlayground() {
                 className="mt-6 space-y-4"
               >
                 {/* Main Result Card */}
-                <Card className="p-6 bg-white border-emerald-200 shadow-xl">
+                <Card className="p-6 bg-white border-evergreen/20 shadow-xl">
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
@@ -318,14 +330,14 @@ export default function LiveCommandPlayground() {
                       </div>
                       <h3 className="text-2xl font-bold text-slate-900">{result.title}</h3>
                     </div>
-                    <Sparkles className="w-6 h-6 text-emerald-500" />
+                    <Sparkles className="w-6 h-6 text-evergreen" />
                   </div>
 
                   {/* Details */}
                   <div className="space-y-2 mb-6">
                     {result.details.map((detail, idx) => (
                       <div key={idx} className="flex items-start gap-2">
-                        <ChevronRight className="w-4 h-4 text-emerald-500 mt-0.5" />
+                        <ChevronRight className="w-4 h-4 text-evergreen mt-0.5" />
                         <p className="text-slate-700">{detail}</p>
                       </div>
                     ))}
@@ -363,9 +375,9 @@ export default function LiveCommandPlayground() {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: idx * 0.1 }}
-                            className="flex items-center gap-2 text-sm text-slate-600"
+                            className="flex items-center gap-2 text-sm text-gray-medium"
                           >
-                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                            <div className="w-1.5 h-1.5 bg-evergreen rounded-full" />
                             {action}
                           </motion.div>
                         ))}
@@ -385,7 +397,7 @@ export default function LiveCommandPlayground() {
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
                           transition={{ delay: idx * 0.05 }}
-                          className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium"
+                          className="px-2 py-1 bg-evergreen-light text-evergreen rounded text-xs font-medium"
                         >
                           {module}
                         </motion.div>

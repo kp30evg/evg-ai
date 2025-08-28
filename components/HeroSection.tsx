@@ -6,16 +6,16 @@ import { Sparkles, Terminal, ArrowRight, Send, Zap } from 'lucide-react'
 
 export default function HeroSection() {
   const [command, setCommand] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [currentPlaceholder, setCurrentPlaceholder] = useState(0)
 
   const commandExamples = [
-    { text: "Fire unprofitable customers in Texas", time: "0.3s" },
-    { text: "Show me why margins are dropping", time: "0.2s" },
-    { text: "Prepare for Series B fundraise", time: "0.4s" },
-    { text: "Optimize supply chain by 20%", time: "0.3s" },
-    { text: "Why did Customer X churn?", time: "0.2s" },
-    { text: "Schedule follow-ups for all deals closing this month", time: "0.3s" }
+    "Fire unprofitable customers in Texas",
+    "Show me why margins are dropping", 
+    "Prepare for Series B fundraise",
+    "Optimize supply chain by 20%",
+    "Why did Customer X churn?",
+    "Schedule follow-ups for all deals closing this month"
   ]
 
   useEffect(() => {
@@ -25,391 +25,179 @@ export default function HeroSection() {
     return () => clearInterval(interval)
   }, [])
 
-  const colors = {
-    evergreen: '#1D5238',
-    white: '#FFFFFF',
-    charcoal: '#222B2E',
-    mediumGray: '#6B7280',
-    lightGray: '#E5E7EB',
-    softGreen: '#E6F4EC',
-    gold: '#FFD600'
-  }
-
-  const styles = {
-    section: {
-      minHeight: '100vh',
-      paddingTop: '120px',
-      paddingBottom: '80px',
-      background: `linear-gradient(180deg, ${colors.white} 0%, ${colors.softGreen}20 50%, ${colors.white} 100%)`,
-      position: 'relative' as const
-    },
-    container: {
-      maxWidth: '1200px',
-      margin: '0 auto',
-      padding: '0 24px'
-    },
-    badge: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '8px',
-      padding: '8px 20px',
-      borderRadius: '24px',
-      backgroundColor: colors.softGreen,
-      border: `1px solid ${colors.evergreen}30`,
-      color: colors.evergreen,
-      fontSize: '14px',
-      fontWeight: '600',
-      marginBottom: '32px'
-    },
-    headline: {
-      fontSize: 'clamp(3rem, 7vw, 5rem)',
-      fontWeight: '700',
-      lineHeight: 1.05,
-      letterSpacing: '-0.03em',
-      color: colors.charcoal,
-      marginBottom: '24px',
-      maxWidth: '900px'
-    },
-    subheadline: {
-      fontSize: 'clamp(1.25rem, 2.5vw, 1.5rem)',
-      color: colors.mediumGray,
-      lineHeight: 1.5,
-      marginBottom: '48px',
-      maxWidth: '700px',
-      fontWeight: '400'
-    },
-    commandDemo: {
-      backgroundColor: colors.white,
-      borderRadius: '20px',
-      padding: '40px',
-      maxWidth: '900px',
-      margin: '0 auto',
-      boxShadow: '0 10px 40px rgba(0, 0, 0, 0.08)',
-      border: `1px solid ${colors.lightGray}50`,
-      position: 'relative' as const,
-      overflow: 'hidden'
-    },
-    glow: {
-      position: 'absolute' as const,
-      top: '-50%',
-      left: '-50%',
-      right: '-50%',
-      bottom: '-50%',
-      background: `radial-gradient(circle, ${colors.evergreen}05 0%, transparent 70%)`,
-      pointerEvents: 'none' as const,
-      animation: 'pulse 4s ease-in-out infinite'
-    },
-    commandHeader: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '24px'
-    },
-    commandLabel: {
-      fontSize: '12px',
-      fontWeight: '600',
-      color: colors.mediumGray,
-      textTransform: 'uppercase' as const,
-      letterSpacing: '0.5px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px'
-    },
-    statusIndicator: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px'
-    },
-    statusDot: {
-      width: '8px',
-      height: '8px',
-      borderRadius: '50%',
-      backgroundColor: '#10B981',
-      animation: 'pulse 2s ease-in-out infinite'
-    },
-    commandInput: {
-      backgroundColor: '#FAFBFC',
-      borderRadius: '12px',
-      padding: '20px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '16px',
-      border: `1px solid ${colors.lightGray}`,
-      transition: 'all 120ms ease-out'
-    },
-    input: {
-      flex: 1,
-      backgroundColor: 'transparent',
-      border: 'none',
-      outline: 'none',
-      fontSize: '16px',
-      color: colors.charcoal,
-      fontFamily: 'Inter, -apple-system, sans-serif'
-    },
-    sendButton: {
-      padding: '10px 20px',
-      backgroundColor: colors.evergreen,
-      color: colors.white,
-      border: 'none',
-      borderRadius: '10px',
-      fontSize: '14px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      transition: 'all 120ms ease-out'
-    },
-    responsePreview: {
-      marginTop: '24px',
-      padding: '20px',
-      backgroundColor: '#FAFBFC',
-      borderRadius: '12px',
-      border: `1px solid ${colors.lightGray}`
-    },
-    metrics: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-      gap: '16px',
-      marginTop: '24px'
-    },
-    metric: {
-      textAlign: 'center' as const
-    },
-    metricValue: {
-      fontSize: '24px',
-      fontWeight: '600',
-      color: colors.evergreen
-    },
-    metricLabel: {
-      fontSize: '11px',
-      color: colors.mediumGray,
-      textTransform: 'uppercase' as const,
-      letterSpacing: '0.5px',
-      marginTop: '4px'
-    },
-    ctaContainer: {
-      display: 'flex',
-      gap: '16px',
-      marginTop: '48px',
-      flexWrap: 'wrap' as const
-    },
-    primaryCta: {
-      padding: '16px 32px',
-      backgroundColor: colors.gold,
-      color: colors.charcoal,
-      border: 'none',
-      borderRadius: '14px',
-      fontSize: '16px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '8px',
-      boxShadow: '0 4px 16px rgba(255, 214, 0, 0.3)',
-      transition: 'all 120ms ease-out'
-    },
-    secondaryCta: {
-      padding: '16px 32px',
-      backgroundColor: 'transparent',
-      color: colors.evergreen,
-      border: `2px solid ${colors.evergreen}`,
-      borderRadius: '14px',
-      fontSize: '16px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      transition: 'all 120ms ease-out'
+  const handleExecute = () => {
+    if (command.trim()) {
+      setIsProcessing(true)
+      setTimeout(() => setIsProcessing(false), 1500)
     }
   }
-
-  const pulseAnimation = `
-    @keyframes pulse {
-      0%, 100% { opacity: 0.8; }
-      50% { opacity: 1; }
-    }
-  `
 
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: pulseAnimation }} />
-      <section style={styles.section}>
-        <div style={styles.container}>
+    <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-b from-white via-evergreen-light/20 to-white">
+      {/* Container with proper max-width and padding */}
+      <div className="w-full max-w-6xl mx-auto px-4">
+        <div className="flex flex-col items-center justify-center text-center">
+          {/* Launch Badge */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            style={{ textAlign: 'center' }}
+            className="inline-flex items-center gap-2 px-3 py-2 mb-8 bg-evergreen-light border border-evergreen/20 rounded-full"
           >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              style={styles.badge}
-            >
-              <Sparkles size={16} />
-              <span>Launching September 19, 2025</span>
-            </motion.div>
-
-            <h1 style={styles.headline}>
-              Run Your Entire Business
-              <br />
-              <span style={{ color: colors.evergreen }}>
-                By Typing Commands
-              </span>
-            </h1>
-
-            <p style={styles.subheadline}>
-              The AI OS that replaces 130+ business tools with one unified platform.
-              <br />
-              Natural language commands control everything.
-            </p>
+            <Sparkles className="w-4 h-4 text-evergreen" />
+            <span className="text-sm font-semibold text-evergreen">
+              Launching September 19, 2025
+            </span>
           </motion.div>
 
+          {/* Main Headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-5xl md:text-6xl lg:text-7xl font-bold text-charcoal leading-tight mb-8"
+          >
+            Run Your Entire<br />
+            <span className="text-evergreen">Business</span><br />
+            <span className="text-evergreen">By Typing Commands</span>
+          </motion.h1>
+
+          {/* Subheadline */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-lg md:text-xl text-gray-medium max-w-3xl mx-auto mb-10 leading-relaxed"
+          >
+            The AI OS that replaces <span className="text-charcoal font-semibold">130+ business tools</span> with one unified platform.<br />
+            <span className="text-evergreen font-semibold">Natural language commands control everything.</span>
+          </motion.p>
+
+          {/* Command Demo Box */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            style={styles.commandDemo}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="w-full max-w-4xl mb-10"
           >
-            <div style={styles.glow} />
-            
-            <div style={styles.commandHeader}>
-              <div style={styles.commandLabel}>
-                <Terminal size={16} />
-                LIVE COMMAND CENTER
+            <div className="bg-white rounded-xl shadow-card border border-gray-light/50 p-8">
+              {/* Terminal Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Terminal className="w-5 h-5 text-evergreen" />
+                  <span className="text-sm font-semibold text-charcoal uppercase tracking-wide">
+                    Live Command Center
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-evergreen rounded-full animate-pulse" />
+                  <span className="text-sm text-gray-medium">Ready</span>
+                </div>
               </div>
-              <div style={styles.statusIndicator}>
-                <div style={styles.statusDot} />
-                <span style={{ fontSize: '12px', color: colors.mediumGray }}>
-                  Ready
-                </span>
-              </div>
-            </div>
 
-            <div 
-              style={styles.commandInput}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.05)'
-                e.currentTarget.style.borderColor = `${colors.evergreen}30`
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = 'none'
-                e.currentTarget.style.borderColor = colors.lightGray
-              }}
-            >
-              <Zap size={20} color={colors.evergreen} />
-              <input
-                type="text"
-                value={command}
-                onChange={(e) => setCommand(e.target.value)}
-                placeholder={commandExamples[currentPlaceholder].text}
-                style={styles.input}
-                onFocus={() => setIsTyping(true)}
-                onBlur={() => setIsTyping(false)}
-              />
-              <button 
-                style={styles.sendButton}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-1px)'
-                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(29, 82, 56, 0.2)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                Execute
-                <Send size={14} />
-              </button>
-            </div>
-
-            <AnimatePresence mode="wait">
-              {!isTyping && (
-                <motion.div
-                  key={currentPlaceholder}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  style={styles.responsePreview}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <div style={{ ...styles.statusDot, backgroundColor: colors.evergreen }} />
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: colors.evergreen }}>
-                      AI Processing
+              {/* Command Input */}
+              <div className="relative">
+                <div className="flex items-center gap-4 p-6 bg-gradient-to-r from-gray-50/80 to-evergreen-light/20 rounded-xl border border-gray-light/40 shadow-subtle transition-all duration-120 hover:shadow-card hover:border-evergreen/30 group">
+                  <Zap className="w-6 h-6 text-evergreen flex-shrink-0 group-hover:text-gold transition-colors duration-120" />
+                  <input
+                    type="text"
+                    value={command}
+                    onChange={(e) => setCommand(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleExecute()}
+                    placeholder={commandExamples[currentPlaceholder]}
+                    className="flex-1 bg-transparent text-charcoal placeholder:text-gray-medium outline-none text-lg font-medium"
+                  />
+                  <button
+                    onClick={handleExecute}
+                    className="px-6 py-3 bg-evergreen text-white rounded-xl hover:bg-evergreen/90 hover:shadow-lg hover:scale-105 transition-all duration-120 flex items-center gap-2 font-semibold relative overflow-hidden group"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-gold/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-120"></div>
+                    <span className="relative z-10 flex items-center gap-2">
+                      Execute
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform duration-120" />
                     </span>
-                    <span style={{ fontSize: '12px', color: colors.mediumGray }}>
-                      • Response time: {commandExamples[currentPlaceholder].time}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '14px', color: colors.mediumGray, margin: 0 }}>
-                    Analyzing data across 20 integrated modules...
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </button>
+                </div>
+              </div>
 
-            <div style={styles.metrics}>
-              <div style={styles.metric}>
-                <div style={styles.metricValue}>0.3s</div>
-                <div style={styles.metricLabel}>Response</div>
-              </div>
-              <div style={styles.metric}>
-                <div style={styles.metricValue}>130+</div>
-                <div style={styles.metricLabel}>Tools Replaced</div>
-              </div>
-              <div style={styles.metric}>
-                <div style={styles.metricValue}>100%</div>
-                <div style={styles.metricLabel}>Natural</div>
-              </div>
-              <div style={styles.metric}>
-                <div style={styles.metricValue}>48hr</div>
-                <div style={styles.metricLabel}>Migration</div>
+              {/* Processing State */}
+              <AnimatePresence>
+                {isProcessing && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="mt-4 p-4 bg-evergreen-light/50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-evergreen rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 bg-evergreen rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 bg-evergreen rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-evergreen">AI Processing</p>
+                        <p className="text-xs text-gray-medium">• Response time: 0.3s</p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-charcoal mt-2">
+                      Analyzing data across 20 integrated modules...
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-light">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-charcoal">0.3s</div>
+                  <div className="text-xs text-gray-medium">Response</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-charcoal">130+</div>
+                  <div className="text-xs text-gray-medium">Tools Replaced</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-charcoal">100%</div>
+                  <div className="text-xs text-gray-medium">Natural</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-charcoal">48hr</div>
+                  <div className="text-xs text-gray-medium">Migration</div>
+                </div>
               </div>
             </div>
           </motion.div>
 
+          {/* CTA Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            style={{ textAlign: 'center' }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <div style={styles.ctaContainer}>
-              <button 
-                style={styles.primaryCta}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(255, 214, 0, 0.4)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(255, 214, 0, 0.3)'
-                }}
-              >
-                Join Waitlist
-                <ArrowRight size={18} />
-              </button>
-              <button 
-                style={styles.secondaryCta}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = colors.softGreen
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
-              >
-                Watch Demo
-              </button>
-            </div>
-
-            <p style={{ marginTop: '24px', fontSize: '14px', color: colors.mediumGray }}>
-              <strong style={{ color: colors.evergreen }}>10,847</strong> companies waiting • 
-              <strong style={{ color: colors.evergreen }}> $73M</strong> costs eliminated
-            </p>
+            <button className="px-8 py-4 bg-evergreen text-white rounded-xl font-semibold hover:bg-evergreen/90 transition-all duration-120 shadow-subtle flex items-center justify-center gap-2">
+              Join Waitlist
+              <ArrowRight className="w-5 h-5" />
+            </button>
+            <button className="px-8 py-4 bg-white text-charcoal border border-gray-light rounded-xl font-semibold hover:bg-gray-50 transition-all duration-120 flex items-center justify-center">
+              Watch Demo
+            </button>
           </motion.div>
+
+          {/* Social Proof */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="text-sm text-gray-medium mt-6"
+          >
+            <strong className="text-charcoal">10,847</strong> companies waiting • 
+            <strong className="text-charcoal"> $73M</strong> costs eliminated
+          </motion.p>
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   )
 }

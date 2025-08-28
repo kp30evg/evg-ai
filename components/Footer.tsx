@@ -53,23 +53,23 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <Terminal className="w-8 h-8 text-emerald-400" />
-              <span className="text-xl font-bold">evergreenOS</span>
+              <Terminal className="w-8 h-8 text-evergreen" />
+              <span className="text-xl font-bold">Evergreen AI</span>
             </div>
             <p className="text-slate-400 text-sm mb-6">
-              The unified operating system for business. Command everything.
+              The AI OS that replaces 130+ business tools. Command everything.
             </p>
             <div className="flex gap-3">
-              <a href="#" className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center hover:bg-slate-700 transition-colors">
+              <a href="#" className="w-10 h-10 bg-gray-light/20 rounded-lg flex items-center justify-center hover:bg-evergreen/20 transition-all duration-120">
                 <Twitter className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center hover:bg-slate-700 transition-colors">
+              <a href="#" className="w-10 h-10 bg-gray-light/20 rounded-lg flex items-center justify-center hover:bg-evergreen/20 transition-all duration-120">
                 <Linkedin className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center hover:bg-slate-700 transition-colors">
+              <a href="#" className="w-10 h-10 bg-gray-light/20 rounded-lg flex items-center justify-center hover:bg-evergreen/20 transition-all duration-120">
                 <Github className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center hover:bg-slate-700 transition-colors">
+              <a href="#" className="w-10 h-10 bg-gray-light/20 rounded-lg flex items-center justify-center hover:bg-evergreen/20 transition-all duration-120">
                 <Mail className="w-5 h-5" />
               </a>
             </div>
@@ -82,7 +82,7 @@ export default function Footer() {
               <ul className="space-y-2">
                 {footerLinks.product.map((link) => (
                   <li key={link.label}>
-                    <a href={link.href} className="text-slate-400 hover:text-emerald-400 transition-colors text-sm">
+                    <a href={link.href} className="text-gray-medium hover:text-evergreen transition-all duration-120 text-sm">
                       {link.label}
                     </a>
                   </li>
@@ -94,7 +94,7 @@ export default function Footer() {
               <ul className="space-y-2">
                 {footerLinks.company.map((link) => (
                   <li key={link.label}>
-                    <a href={link.href} className="text-slate-400 hover:text-emerald-400 transition-colors text-sm">
+                    <a href={link.href} className="text-gray-medium hover:text-evergreen transition-all duration-120 text-sm">
                       {link.label}
                     </a>
                   </li>
@@ -106,7 +106,7 @@ export default function Footer() {
               <ul className="space-y-2">
                 {footerLinks.resources.map((link) => (
                   <li key={link.label}>
-                    <a href={link.href} className="text-slate-400 hover:text-emerald-400 transition-colors text-sm">
+                    <a href={link.href} className="text-gray-medium hover:text-evergreen transition-all duration-120 text-sm">
                       {link.label}
                     </a>
                   </li>
@@ -118,7 +118,7 @@ export default function Footer() {
               <ul className="space-y-2">
                 {footerLinks.support.map((link) => (
                   <li key={link.label}>
-                    <a href={link.href} className="text-slate-400 hover:text-emerald-400 transition-colors text-sm">
+                    <a href={link.href} className="text-gray-medium hover:text-evergreen transition-all duration-120 text-sm">
                       {link.label}
                     </a>
                   </li>
@@ -139,9 +139,9 @@ export default function Footer() {
               <input
                 type="email"
                 placeholder="Enter your email"
-                className="flex-1 px-4 py-3 bg-slate-800 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="flex-1 px-4 py-3 bg-slate-800 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-evergreen"
               />
-              <button className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium">
+              <button className="px-6 py-3 bg-evergreen text-white rounded-lg hover:bg-evergreen/90 transition-colors font-medium">
                 Subscribe
               </button>
             </div>
@@ -152,10 +152,10 @@ export default function Footer() {
         <div className="border-t border-slate-800 pt-8">
           <div className="grid lg:grid-cols-2 gap-4">
             <div className="flex flex-wrap gap-6 text-sm text-slate-400">
-              <span>© {currentYear} evergreenOS Inc.</span>
-              <a href="#" className="hover:text-emerald-400 transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-emerald-400 transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-emerald-400 transition-colors">Cookie Policy</a>
+              <span>© {currentYear} Evergreen AI Inc.</span>
+              <a href="#" className="hover:text-evergreen transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-evergreen transition-colors">Terms of Service</a>
+              <a href="#" className="hover:text-evergreen transition-colors">Cookie Policy</a>
             </div>
             <div className="flex items-center gap-6 lg:justify-end text-sm text-slate-400">
               <div className="flex items-center gap-1">
@@ -176,17 +176,17 @@ export default function Footer() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="mt-8 p-4 bg-gradient-to-r from-emerald-600/20 to-blue-600/20 rounded-lg border border-emerald-500/30"
+          className="mt-8 p-4 bg-gradient-to-r from-evergreen/20 to-blue-600/20 rounded-lg border border-evergreen/30"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <div className="w-2 h-2 bg-evergreen rounded-full animate-pulse" />
               <span className="text-sm">
-                <span className="text-emerald-400 font-semibold">LAUNCHING SEPTEMBER 19, 2025</span>
+                <span className="text-evergreen font-semibold">LAUNCHING SEPTEMBER 19, 2025</span>
                 <span className="text-slate-400 ml-2">· Join 10,847 companies on the waitlist</span>
               </span>
             </div>
-            <a href="#waitlist" className="text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors">
+            <a href="#waitlist" className="text-evergreen hover:text-evergreen/80 text-sm font-medium transition-colors">
               Reserve Your Spot →
             </a>
           </div>
