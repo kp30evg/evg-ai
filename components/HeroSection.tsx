@@ -170,19 +170,28 @@ export default function HeroSection() {
             </div>
           </motion.div>
 
-          {/* CTA Buttons */}
+          {/* Watch Demo Button - Centered */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.35 }}
+            className="flex justify-center mb-8"
+          >
+            <button className="px-8 py-4 bg-white text-charcoal border border-gray-light rounded-xl font-semibold hover:bg-gray-50 transition-all duration-120 flex items-center justify-center">
+              Watch Demo
+            </button>
+          </motion.div>
+
+          {/* Join Waitlist Button */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
+            className="flex justify-center"
           >
             <button className="px-8 py-4 bg-evergreen text-white rounded-xl font-semibold hover:bg-evergreen/90 transition-all duration-120 shadow-subtle flex items-center justify-center gap-2">
               Join Waitlist
               <ArrowRight className="w-5 h-5" />
-            </button>
-            <button className="px-8 py-4 bg-white text-charcoal border border-gray-light rounded-xl font-semibold hover:bg-gray-50 transition-all duration-120 flex items-center justify-center">
-              Watch Demo
             </button>
           </motion.div>
 
