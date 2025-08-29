@@ -182,7 +182,7 @@ export default function Header() {
                 e.currentTarget.style.background = `linear-gradient(135deg, ${colors.evergreen} 0%, ${colors.evergreen}dd 100%)`
               }}
             >
-              Get Started
+              Apply for Beta
             </button>
           </nav>
 
@@ -215,7 +215,7 @@ export default function Header() {
             <button 
               style={{ ...styles.ctaButton, width: '100%' }}
             >
-              Get Started
+              Apply for Beta
             </button>
           </motion.div>
         )}

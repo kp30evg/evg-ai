@@ -65,7 +65,7 @@ export default function ConversionSection() {
   }
 
   return (
-    <section className="relative py-24 overflow-hidden bg-gradient-to-b from-white via-emerald-50/30 to-slate-50">
+    <section className="relative py-16 md:py-24 overflow-hidden bg-gradient-to-b from-white via-evergreen-light/30 to-slate-50">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0" style={{
@@ -82,15 +82,15 @@ export default function ConversionSection() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium mb-4">
-            <Rocket className="w-4 h-4" />
-            LIMITED AVAILABILITY
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gold/20 text-evergreen border-2 border-gold/50 rounded-full text-sm font-bold mb-4 animate-pulse">
+            <Rocket className="w-4 h-4 text-gold" />
+            EXCLUSIVE BETA ACCESS - APPLY NOW
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-            Join 10,847 Companies Already Waiting
+            Only 100 Beta Spots Available
           </h2>
           <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-            First 10,000 companies get founder pricing. Position #{position.toLocaleString()} available now.
+            <span className="text-evergreen font-bold">47 spots remaining.</span> Get exclusive early access, shape the product, and lock in lifetime founder pricing.
           </p>
         </motion.div>
 
@@ -102,7 +102,7 @@ export default function ConversionSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
           >
-            <Card className="p-8 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-2xl relative overflow-hidden">
+            <Card className="p-8 bg-gradient-to-br from-evergreen to-evergreen-dark text-white shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32" />
               <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24" />
               
@@ -110,8 +110,8 @@ export default function ConversionSection() {
                 <div className="flex items-center gap-2 mb-6">
                   <Trophy className="w-8 h-8" />
                   <div>
-                    <h3 className="text-2xl font-bold">Reserve Your Position</h3>
-                    <p className="text-emerald-100">Get founder pricing forever</p>
+                    <h3 className="text-2xl font-bold">Apply for Beta Access</h3>
+                    <p className="text-white">Join the exclusive beta program</p>
                   </div>
                 </div>
 
@@ -131,16 +131,16 @@ export default function ConversionSection() {
                       <Button 
                         type="submit"
                         disabled={isSubmitting}
-                        className="w-full bg-white text-emerald-600 hover:bg-emerald-50 h-12 font-semibold"
+                        className="w-full bg-white text-evergreen hover:bg-evergreen-light h-12 font-semibold"
                       >
                         {isSubmitting ? (
                           <span className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-emerald-600 rounded-full animate-spin border-t-transparent" />
+                            <div className="w-4 h-4 border-2 border-evergreen rounded-full animate-spin border-t-transparent" />
                             Securing Position...
                           </span>
                         ) : (
                           <span className="flex items-center gap-2">
-                            Reserve Position #{position.toLocaleString()}
+                            Apply for Beta Access Now
                             <ArrowRight className="w-4 h-4" />
                           </span>
                         )}
@@ -150,19 +150,19 @@ export default function ConversionSection() {
                     <div className="mt-6 space-y-3">
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle className="w-4 h-4" />
-                        <span>90% lower than enterprise pricing</span>
+                        <span>Exclusive beta access before public launch</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle className="w-4 h-4" />
-                        <span>48-hour white-glove migration</span>
+                        <span>Direct access to founding team</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle className="w-4 h-4" />
-                        <span>Lifetime price lock guarantee</span>
+                        <span>Shape the product with your feedback</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle className="w-4 h-4" />
-                        <span>Direct founder support channel</span>
+                        <span>Lifetime founder pricing (90% off)</span>
                       </div>
                     </div>
                   </>
@@ -173,9 +173,9 @@ export default function ConversionSection() {
                     className="text-center py-8"
                   >
                     <CheckCircle className="w-16 h-16 mx-auto mb-4" />
-                    <h4 className="text-2xl font-bold mb-2">You're In!</h4>
-                    <p className="text-emerald-100 mb-4">
-                      Position #{position.toLocaleString()} secured
+                    <h4 className="text-2xl font-bold mb-2">Application Received!</h4>
+                    <p className="text-white mb-4">
+                      We'll review your application within 24 hours
                     </p>
                     <Button
                       onClick={() => {/* Share logic */}}
@@ -200,7 +200,7 @@ export default function ConversionSection() {
           >
             <Card className="p-8 bg-white shadow-xl">
               <div className="flex items-center gap-2 mb-6">
-                <Calculator className="w-8 h-8 text-emerald-600" />
+                <Calculator className="w-8 h-8 text-evergreen" />
                 <div>
                   <h3 className="text-2xl font-bold text-slate-900">Calculate Your Savings</h3>
                   <p className="text-slate-600">See your exact ROI with evergreenOS</p>
@@ -234,7 +234,7 @@ export default function ConversionSection() {
                 </div>
                 <Button 
                   onClick={calculateROI}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 h-12"
+                  className="w-full bg-evergreen hover:bg-evergreen-dark h-12"
                 >
                   Calculate Savings
                 </Button>
@@ -246,11 +246,11 @@ export default function ConversionSection() {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="mt-6 p-6 bg-emerald-50 rounded-lg"
+                    className="mt-6 p-6 bg-evergreen-light rounded-lg"
                   >
                     <div className="text-center">
-                      <p className="text-sm text-emerald-700 mb-2">Annual Savings with evergreenOS</p>
-                      <p className="text-4xl font-bold text-emerald-600">{formatNumber(savings)}</p>
+                      <p className="text-sm text-evergreen mb-2">Annual Savings with evergreenOS</p>
+                      <p className="text-4xl font-bold text-evergreen">{formatNumber(savings)}</p>
                       <p className="text-sm text-slate-600 mt-2">
                         Plus unmeasurable gains in efficiency and growth
                       </p>
@@ -289,12 +289,12 @@ export default function ConversionSection() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-5 h-5 text-emerald-600" />
+                    <Zap className="w-5 h-5 text-evergreen" />
                     <h4 className="font-semibold text-slate-900">Try Live Demo</h4>
                   </div>
                   <p className="text-sm text-slate-600">Experience the magic yourself</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-evergreen transition-colors" />
               </div>
             </Card>
 
@@ -302,12 +302,12 @@ export default function ConversionSection() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-5 h-5 text-emerald-600" />
+                    <Clock className="w-5 h-5 text-evergreen" />
                     <h4 className="font-semibold text-slate-900">Book Demo</h4>
                   </div>
                   <p className="text-sm text-slate-600">15-min personalized walkthrough</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-evergreen transition-colors" />
               </div>
             </Card>
 
@@ -315,12 +315,12 @@ export default function ConversionSection() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
-                    <Mail className="w-5 h-5 text-emerald-600" />
+                    <Mail className="w-5 h-5 text-evergreen" />
                     <h4 className="font-semibold text-slate-900">Get Whitepaper</h4>
                   </div>
                   <p className="text-sm text-slate-600">Technical architecture deep-dive</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-evergreen transition-colors" />
               </div>
             </Card>
           </div>

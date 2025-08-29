@@ -189,11 +189,11 @@ export default function LiveCommandPlayground() {
   }
 
   return (
-    <section className="relative py-24 overflow-hidden">
+    <section className="relative py-16 md:py-24 overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-evergreen-light/20 to-white" />
       
-      <div className="container relative mx-auto px-4">
+      <div className="container relative mx-auto px-6 max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}

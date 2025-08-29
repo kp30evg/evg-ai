@@ -45,8 +45,8 @@ export default function OpportunitySection() {
   ]
 
   return (
-    <section className="relative py-16 md:py-20 bg-gray-50">
-      <div className="container max-w-6xl mx-auto px-4">
+    <section className="relative py-16 md:py-24 bg-gradient-to-b from-white via-evergreen-light/20 to-white">
+      <div className="container max-w-6xl mx-auto px-6">
         {/* Header */}
         <div className="text-center mb-12 md:mb-16">
           <motion.div
@@ -55,13 +55,13 @@ export default function OpportunitySection() {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-light rounded-full text-sm font-medium text-gray-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-2 bg-evergreen-light border-2 border-evergreen/30 rounded-full text-sm font-medium text-evergreen mb-6">
               <TrendingUp className="w-4 h-4" />
               THE OPPORTUNITY
             </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-charcoal leading-tight mb-6">
-              The $2 Trillion Problem<br />
-              <span className="text-evergreen">We're Solving</span>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+              <span className="text-charcoal">The $2 Trillion Problem</span><br />
+              <span className="bg-gradient-to-r from-evergreen to-evergreen-dark bg-clip-text text-transparent">We're Solving</span>
             </h2>
             <p className="text-lg md:text-xl text-gray-medium max-w-3xl mx-auto">
               Business software is broken. 130+ tools. Zero integration. 
@@ -83,10 +83,10 @@ export default function OpportunitySection() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1, duration: 0.5 }}
                 className={`
-                  bg-white rounded-xl p-8 border transition-all duration-120 cursor-pointer hover:-translate-y-1 hover:shadow-hover
+                  bg-white rounded-xl p-8 border-2 transition-all duration-120 cursor-pointer hover:-translate-y-1 hover:shadow-xl hover:border-evergreen/30
                   ${opp.highlight 
-                    ? 'md:col-span-2 lg:col-span-1 bg-gradient-to-br from-evergreen-light via-white to-white border-evergreen/20' 
-                    : 'border-gray-light/50'
+                    ? 'md:col-span-2 lg:col-span-1 bg-gradient-to-br from-evergreen-light/40 via-white to-evergreen-light/20 border-evergreen/40' 
+                    : 'border-evergreen/10 hover:bg-evergreen-light/10'
                   }
                 `}
               >

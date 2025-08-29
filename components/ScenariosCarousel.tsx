@@ -150,7 +150,7 @@ export default function ScenariosCarousel() {
         impact: '€12M pipeline',
         accuracy: '97%'
       },
-      color: '#10B981'
+      color: colors.evergreen
     }
   ]
 

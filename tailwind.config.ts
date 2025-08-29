@@ -15,7 +15,7 @@ const config: Config = {
         evergreen: {
           DEFAULT: "#1D5238", // Primary Evergreen Green
           light: "#E6F4EC",   // Soft Green Tint
-          dark: "#0F172A",    // Dark background
+          dark: "#0D2B19",    // Darker green for gradients
         },
         charcoal: "#222B2E",   // Primary text
         gray: {
