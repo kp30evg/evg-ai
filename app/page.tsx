@@ -2,9 +2,10 @@
 
 import Header from '@/components/Header'
 import AnnouncementBanner from '@/components/AnnouncementBanner'
+import NavigationBar from '@/components/NavigationBar'
 import HeroSection from '@/components/HeroSection'
-import OpportunitySection from '@/components/OpportunitySection'
 import ProductArchitecture from '@/components/ProductArchitecture'
+import DepartmentCommandShowcase from '@/components/DepartmentCommandShowcase'
 import CompetitiveComparison from '@/components/CompetitiveComparison'
 import ScenariosCarousel from '@/components/ScenariosCarousel'
 import LiveCommandPlayground from '@/components/LiveCommandPlayground'
@@ -14,17 +15,16 @@ import Footer from '@/components/Footer'
 export default function LandingPage() {
   return (
     <div style={{ backgroundColor: '#FFFFFF' }}>
-      <AnnouncementBanner />
-      <div style={{ paddingTop: '72px' }}>
-        <Header />
+      <NavigationBar />
+      <div style={{ paddingTop: '64px' }}>
+        <HeroSection />
+        <ProductArchitecture />
+        <DepartmentCommandShowcase />
+        <ScenariosCarousel />
+        <CompetitiveComparison />
+        <ConversionSection />
+        <Footer />
       </div>
-      <HeroSection />
-      <OpportunitySection />
-      <ProductArchitecture />
-      <ScenariosCarousel />
-      <CompetitiveComparison />
-      <ConversionSection />
-      <Footer />
     </div>
   )
 }

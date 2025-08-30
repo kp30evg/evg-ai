@@ -50,7 +50,7 @@ export default function ScenariosCarousel() {
         impact: '$4.2M saved',
         accuracy: '98%'
       },
-      color: '#EF4444'
+      color: colors.evergreen
     },
     {
       icon: Rocket,
@@ -70,7 +70,7 @@ export default function ScenariosCarousel() {
         impact: '60 hours saved',
         accuracy: '100%'
       },
-      color: colors.gold
+      color: colors.evergreen
     },
     {
       icon: DollarSign,
@@ -110,7 +110,7 @@ export default function ScenariosCarousel() {
         impact: '94% on-time',
         accuracy: '99%'
       },
-      color: '#3B82F6'
+      color: colors.evergreen
     },
     {
       icon: Users,
@@ -130,7 +130,7 @@ export default function ScenariosCarousel() {
         impact: '85% accept rate',
         accuracy: '92%'
       },
-      color: '#8B5CF6'
+      color: colors.evergreen
     },
     {
       icon: Globe2,
@@ -499,7 +499,7 @@ export default function ScenariosCarousel() {
                       <div style={styles.metric}>
                         <div style={{
                           ...styles.metricValue,
-                          color: scenario.color
+                          color: colors.evergreen
                         }}>
                           {scenario.metrics.impact}
                         </div>
@@ -508,7 +508,7 @@ export default function ScenariosCarousel() {
                       <div style={styles.metric}>
                         <div style={{
                           ...styles.metricValue,
-                          color: colors.charcoal
+                          color: colors.evergreen
                         }}>
                           {scenario.metrics.accuracy}
                         </div>
