@@ -18,6 +18,8 @@ const config: Config = {
           dark: "#0D2B19",    // Darker green for gradients
         },
         charcoal: "#222B2E",   // Primary text
+        'medium-gray': "#6B7280", // Secondary text alias
+        'soft-green': "#E6F4EC", // Soft green alias
         gray: {
           medium: "#6B7280",   // Secondary text
           light: "#E5E7EB",    // Borders, dividers
@@ -61,6 +63,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        inter: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       fontSize: {
         // Typography scale from design principles

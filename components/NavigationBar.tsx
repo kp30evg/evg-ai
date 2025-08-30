@@ -144,6 +144,35 @@ export default function NavigationBar() {
             >
               Sign In
             </motion.button>
+            <motion.a
+              href="/demo"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              style={{
+                padding: '10px 24px',
+                backgroundColor: colors.gold,
+                color: colors.charcoal,
+                borderRadius: '10px',
+                fontSize: '14px',
+                fontWeight: '600',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(255, 214, 0, 0.25)',
+                transition: 'all 120ms ease-out',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)'
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(255, 214, 0, 0.35)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 214, 0, 0.25)'
+              }}
+            >
+              🚀 Try Demo
+            </motion.a>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
