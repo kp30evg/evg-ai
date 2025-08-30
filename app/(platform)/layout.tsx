@@ -1,11 +1,21 @@
-export default function PlatformLayout({
+import { auth } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
+
+export default async function PlatformLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FFFFFF' }}>
-      {children}
-    </div>
-  );
+  const { userId, orgId } = await auth();
+
+  if (!userId) {
+    redirect('/sign-in');
+  }
+
+  // Force organization selection/creation
+  if (!orgId) {
+    redirect('/select-org');
+  }
+
+  return <>{children}</>;
 }

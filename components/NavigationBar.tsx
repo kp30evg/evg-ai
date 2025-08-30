@@ -118,75 +118,53 @@ export default function NavigationBar() {
 
           {/* CTA Buttons */}
           <div style={{
-            display: 'none',
+            display: 'flex',
             alignItems: 'center',
-            gap: '16px'
-          }} className="md:flex">
-            <motion.button
+            gap: '12px'
+          }}>
+            <motion.a
+              href="/sign-in"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               style={{
                 padding: '10px 20px',
-                color: colors.charcoal,
+                color: colors.evergreen,
                 fontSize: '14px',
                 fontWeight: '500',
-                background: 'none',
-                border: 'none',
+                background: colors.white,
+                border: `2px solid ${colors.evergreen}`,
+                borderRadius: '8px',
                 cursor: 'pointer',
-                transition: 'color 120ms ease-out'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = colors.evergreen
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = colors.charcoal
-              }}
-            >
-              Sign In
-            </motion.button>
-            <motion.a
-              href="/demo"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              style={{
-                padding: '10px 24px',
-                backgroundColor: colors.gold,
-                color: colors.charcoal,
-                borderRadius: '10px',
-                fontSize: '14px',
-                fontWeight: '600',
-                border: 'none',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(255, 214, 0, 0.25)',
                 transition: 'all 120ms ease-out',
                 textDecoration: 'none',
                 display: 'inline-block'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)'
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(255, 214, 0, 0.35)'
+                e.currentTarget.style.backgroundColor = colors.softGreen
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 214, 0, 0.25)'
+                e.currentTarget.style.backgroundColor = colors.white
               }}
             >
-              🚀 Try Demo
+              Sign In
             </motion.a>
-            <motion.button
+            <motion.a
+              href="/sign-up"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               style={{
                 padding: '10px 24px',
                 backgroundColor: colors.evergreen,
                 color: colors.white,
-                borderRadius: '10px',
+                borderRadius: '8px',
                 fontSize: '14px',
                 fontWeight: '600',
                 border: 'none',
                 cursor: 'pointer',
                 boxShadow: '0 4px 12px rgba(29, 82, 56, 0.15)',
-                transition: 'all 120ms ease-out'
+                transition: 'all 120ms ease-out',
+                textDecoration: 'none',
+                display: 'inline-block'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-1px)'
@@ -197,8 +175,8 @@ export default function NavigationBar() {
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(29, 82, 56, 0.15)'
               }}
             >
-              Get Early Access
-            </motion.button>
+              Sign Up
+            </motion.a>
           </div>
 
           {/* Mobile menu button */}
@@ -267,7 +245,7 @@ export default function NavigationBar() {
               flexDirection: 'column',
               gap: '12px'
             }}>
-              <button style={{
+              <a href="/sign-in" style={{
                 width: '100%',
                 padding: '12px 20px',
                 color: colors.charcoal,
@@ -276,11 +254,14 @@ export default function NavigationBar() {
                 background: 'none',
                 border: `1px solid ${colors.lightGray}`,
                 borderRadius: '10px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'block',
+                textAlign: 'center'
               }}>
                 Sign In
-              </button>
-              <button style={{
+              </a>
+              <a href="/sign-up" style={{
                 width: '100%',
                 padding: '12px 24px',
                 backgroundColor: colors.evergreen,
@@ -289,10 +270,13 @@ export default function NavigationBar() {
                 fontSize: '14px',
                 fontWeight: '600',
                 border: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'block',
+                textAlign: 'center'
               }}>
-                Get Early Access
-              </button>
+                Get Started
+              </a>
             </div>
           </div>
         </motion.div>
