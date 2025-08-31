@@ -1,5 +1,16 @@
 # evergreenOS Technical Implementation Guide
 
+## ⚠️ CRITICAL: UI/UX Design Requirements
+
+**BEFORE ANY UI CHANGES:**
+1. **MUST** read `/context/style-guide.md` and `/context/design-principles.md`
+2. **MUST** use exact brand colors, typography, and spacing from style guide
+3. **MUST** use Playwright MCP to reference existing UI for consistency
+4. **MUST** invoke `@agent-design-review` for significant changes
+5. **MUST** save all screenshots to `.screenshots/` directory
+
+**Our product MUST look beautiful and professional. Design quality is NON-NEGOTIABLE.**
+
 ## Project Overview
 
 evergreenOS is a unified business operating system that replaces 50+ fragmented business tools with a single platform controlled by natural language commands. This guide covers building 10 core modules with architecture supporting infinite expansion.
@@ -806,24 +817,74 @@ Test with real users as you build
 
 ## Visual Development
 
-### Design Principles
-- Comprehensive design checklist in `/context/design-principles.md`
-- Brand style guide in `/context/style-guide.md`
-- When making visual (front-end, UI/UX) changes, always refer to these files for guidance
+### MANDATORY Design Review Process
+**⚠️ CRITICAL: BEFORE making ANY UI changes, you MUST:**
+
+1. **Review Design Guidelines**
+   - Read `/context/style-guide.md` for brand colors, typography, spacing
+   - Read `/context/design-principles.md` for UI best practices
+   - These documents are the source of truth for ALL design decisions
+
+2. **Plan the Design**
+   - Identify which components from the style guide apply
+   - Note the specific colors, spacing, and typography to use
+   - Consider animations and interactions from the guidelines
+
+3. **Use Playwright for Reference**
+   - Navigate to similar existing pages for consistency check
+   - Take screenshots of current state before changes
+   - Save all screenshots to `.screenshots/` directory
+
+4. **Invoke Design Review Agent**
+   - For significant UI changes, use the `@agent-design-review` subagent
+   - This ensures professional, world-class design quality
+
+### Design Implementation Checklist
+BEFORE writing ANY UI code:
+- ✅ Have I read the style guide for colors, typography, spacing?
+- ✅ Have I checked the design principles checklist?
+- ✅ Have I identified the exact hex colors to use from the brand palette?
+- ✅ Have I confirmed the spacing units (8px base) to apply?
+- ✅ Have I verified the typography scale and font weights?
+- ✅ Have I considered the animation timings (200ms standard)?
+- ✅ Have I planned for hover states and interactions?
+- ✅ Have I ensured accessibility (WCAG AA contrast)?
 
 ### Quick Visual Check
-IMMEDIATELY after implementing any front-end change:
-1. **Identify what changed** - Review the modified components/pages
-2. **Navigate to affected pages** - Use `mcp__playwright__browser_navigate` to visit each changed view
-3. **Verify design compliance** - Compare against `/context/design-principles.md` and `/context/style-guide.md`
-4. **Validate feature implementation** - Ensure the change fulfills the user's specific request
-5. **Check acceptance criteria** - Review any provided context files or requirements
-6. **Capture evidence** - Take full page screenshot at desktop viewport (1440px) of each changed view
-   - **IMPORTANT**: Always save screenshots to `.screenshots/` directory
-   - Example: `filename: ".screenshots/feature-name.png"`
-7. **Check for errors** - Run `mcp__playwright__browser_console_messages`
+AFTER implementing any front-end change:
+1. **Navigate to affected pages** - Use `mcp__playwright__browser_navigate`
+2. **Verify design compliance** - Compare against style guide and principles
+3. **Capture evidence** - Screenshots to `.screenshots/[feature-name].png`
+4. **Check for errors** - Run `mcp__playwright__browser_console_messages`
+5. **Run design review** - Use `@agent-design-review` for final validation
 
-This verification ensures changes meet design standards and user requirements.
+### Brand Colors Reference (Quick Access)
+```
+Evergreen: #1D5238 (Primary CTAs, active states)
+Charcoal: #222B2E (Primary text)
+Pure White: #FFFFFF (Backgrounds)
+Medium Gray: #6B7280 (Secondary text)
+Light Gray: #E5E7EB (Borders)
+Soft Green: #E6F4EC (Hover states)
+Gold Accent: #FFD600 (Premium features)
+```
+
+### Typography Scale (Quick Access)
+```
+H1: 48px/52px, Weight 700
+H2: 36px/40px, Weight 600
+H3: 24px/28px, Weight 600
+Body: 16px/24px, Weight 400
+Small: 14px/20px, Weight 400
+```
+
+### Spacing System (Quick Access)
+```
+Base: 8px
+Scale: 4px, 8px, 12px, 16px, 24px, 32px, 48px, 64px
+```
+
+This ensures EVERY UI change meets our world-class design standards.
 
 ### Comprehensive Design Review
 Invoke the `@agent-design-review` subagent for thorough design validation when:
