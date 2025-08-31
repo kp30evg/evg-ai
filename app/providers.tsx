@@ -27,7 +27,31 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        baseTheme: undefined,
+        variables: {
+          colorPrimary: '#1D5238',
+          colorText: '#222B2E',
+          colorBackground: '#FFFFFF',
+          colorInputBackground: '#FFFFFF',
+          colorInputText: '#222B2E',
+          borderRadius: '0.75rem',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        elements: {
+          formButtonPrimary: 'bg-[#1D5238] hover:bg-[#1D5238]/90',
+          card: 'shadow-xl',
+          headerTitle: 'text-2xl font-bold',
+          headerSubtitle: 'text-gray-600',
+          socialButtonsBlockButton: 'border-2',
+          formFieldInput: 'border-2',
+          footerActionLink: 'text-[#1D5238] hover:text-[#1D5238]/80',
+          identityPreviewEditButton: 'text-[#1D5238] hover:text-[#1D5238]/80',
+          organizationSwitcherTrigger: 'border-2',
+        }
+      }}
+    >
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           {children}

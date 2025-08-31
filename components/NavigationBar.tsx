@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Zap, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 
 export default function NavigationBar() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -58,32 +58,39 @@ export default function NavigationBar() {
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <motion.a 
-              href="#" 
+              href="/" 
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                textDecoration: 'none'
+                textDecoration: 'none',
+                position: 'relative'
               }}
               whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                backgroundColor: colors.softGreen,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Zap size={20} color={colors.evergreen} strokeWidth={2} />
-              </div>
               <span style={{
-                fontSize: '20px',
-                fontWeight: '600',
-                color: colors.charcoal,
-                letterSpacing: '-0.01em'
-              }}>evergreenOS</span>
+                fontSize: '22px',
+                fontWeight: '700',
+                background: `linear-gradient(135deg, ${colors.evergreen} 0%, ${colors.evergreen}DD 50%, ${colors.evergreen} 100%)`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                letterSpacing: '-0.02em',
+                position: 'relative',
+                textShadow: '0 2px 8px rgba(29, 82, 56, 0.1)',
+                transition: 'all 300ms ease-out'
+              }}>
+                evergreen
+                <span style={{
+                  background: `linear-gradient(135deg, ${colors.charcoal}EE 0%, ${colors.charcoal}CC 100%)`,
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  fontWeight: '300',
+                  fontSize: '22px',
+                  letterSpacing: '0.02em'
+                }}>OS</span>
+              </span>
             </motion.a>
           </div>
 

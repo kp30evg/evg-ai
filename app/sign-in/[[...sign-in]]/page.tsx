@@ -10,6 +10,8 @@ export default function SignInPage() {
             card: 'shadow-xl',
           }
         }}
+        fallbackRedirectUrl="/dashboard"
+        signInUrl="/sign-in"
       />
     </div>
   );

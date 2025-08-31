@@ -1,0 +1,397 @@
+/* 
+ * evergreenOS Visual Polish Layer
+ * Sophisticated micro-interactions and atmospheric effects
+ * Following brand guidelines from /context/style-guide.md
+ */
+
+/* ============================================
+   1. MICRO-ANIMATIONS & MAGNETIC HOVER EFFECTS
+   ============================================ */
+
+/* Magnetic button effect - buttons subtly move toward cursor */
+@keyframes magnetic-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+button, a[role="button"], .btn {
+  position: relative;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+button:hover, a[role="button"]:hover, .btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  transition: all 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+button:active, a[role="button"]:active, .btn:active {
+  transform: translateY(0) scale(0.98);
+  transition: all 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Primary buttons get a subtle glow pulse */
+button[style*="backgroundColor: #1D5238"],
+button[style*="background-color: #1D5238"],
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+button[style*="backgroundColor: #1D5238"]::before,
+button[style*="background-color: #1D5238"]::before,
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(29, 82, 56, 0.3) 0%, transparent 70%);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+button[style*="backgroundColor: #1D5238"]:hover::before,
+button[style*="background-color: #1D5238"]:hover::before,
+.btn-primary:hover::before {
+  transform: translate(-50%, -50%) scale(2);
+}
+
+/* Text links have a subtle color shift and underline animation */
+a:not([role="button"]) {
+  position: relative;
+  transition: color 200ms ease-out;
+  text-decoration: none;
+}
+
+a:not([role="button"])::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: linear-gradient(90deg, #1D5238, #E6F4EC);
+  transition: width 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+a:not([role="button"]):hover::after {
+  width: 100%;
+}
+
+/* Input fields get a subtle glow on focus */
+input, textarea, select {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input:focus, textarea:focus, select:focus {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 0 0 3px rgba(29, 82, 56, 0.1),
+    0 4px 12px rgba(29, 82, 56, 0.05),
+    inset 0 0 0 2px rgba(29, 82, 56, 0.2);
+}
+
+/* ============================================
+   2. TYPOGRAPHY FINE-TUNING
+   ============================================ */
+
+/* Optical alignment for headlines */
+h1, h2, h3 {
+  margin-left: -2px;
+  letter-spacing: -0.02em;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+}
+
+/* Custom kerning for problematic pairs */
+h1, h2, h3, h4, h5, h6 {
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
+}
+
+/* Specific kerning adjustments */
+h1::first-letter,
+h2::first-letter {
+  margin-left: -1px;
+}
+
+/* Subtle weight increase on hover for better readability */
+p, li, td {
+  transition: font-weight 200ms ease-out;
+}
+
+p:hover, li:hover, td:hover {
+  font-weight: 425; /* Slightly heavier than 400 */
+}
+
+/* Better text contrast with subtle text shadow */
+h1, h2, h3, h4, h5, h6 {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* ============================================
+   3. MULTI-LAYERED SHADOWS & DEPTH
+   ============================================ */
+
+/* Cards get sophisticated multi-layer shadows */
+div[style*="backgroundColor: #FFFFFF"],
+div[style*="background-color: #FFFFFF"],
+.card {
+  box-shadow: 
+    0 0.5px 1px rgba(34, 43, 46, 0.05),    /* Tight dark shadow */
+    0 2px 4px rgba(34, 43, 46, 0.04),      /* Mid shadow */
+    0 8px 16px rgba(29, 82, 56, 0.02),     /* Colored ambient shadow */
+    0 16px 32px rgba(34, 43, 46, 0.03);    /* Large soft shadow */
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+div[style*="backgroundColor: #FFFFFF"]:hover,
+div[style*="background-color: #FFFFFF"]:hover,
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 1px 2px rgba(34, 43, 46, 0.07),      /* Tight dark shadow */
+    0 4px 8px rgba(34, 43, 46, 0.06),      /* Mid shadow */
+    0 12px 24px rgba(29, 82, 56, 0.04),    /* Colored ambient shadow */
+    0 24px 48px rgba(34, 43, 46, 0.05);    /* Large soft shadow */
+}
+
+/* CTAs get a glowing backlit effect */
+button[style*="backgroundColor: #1D5238"],
+button[style*="background-color: #1D5238"] {
+  box-shadow: 
+    0 2px 4px rgba(29, 82, 56, 0.2),
+    0 4px 8px rgba(29, 82, 56, 0.1),
+    0 0 20px rgba(29, 82, 56, 0.05);
+  animation: subtle-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes subtle-glow {
+  from {
+    box-shadow: 
+      0 2px 4px rgba(29, 82, 56, 0.2),
+      0 4px 8px rgba(29, 82, 56, 0.1),
+      0 0 20px rgba(29, 82, 56, 0.05);
+  }
+  to {
+    box-shadow: 
+      0 2px 4px rgba(29, 82, 56, 0.25),
+      0 4px 12px rgba(29, 82, 56, 0.15),
+      0 0 30px rgba(29, 82, 56, 0.08);
+  }
+}
+
+/* Modal/Dialog elevation */
+div[role="dialog"], .modal {
+  box-shadow: 
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 10px 25px rgba(0, 0, 0, 0.15),
+    0 20px 50px rgba(0, 0, 0, 0.1),
+    0 0 100px rgba(29, 82, 56, 0.05);
+}
+
+/* ============================================
+   4. ATMOSPHERIC COLOR GRADING
+   ============================================ */
+
+/* Subtle blue cooling overlay for hero sections */
+.hero-section::before,
+div[style*="minHeight: '100vh'"]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(29, 82, 56, 0.02) 0%,
+    rgba(107, 114, 128, 0.01) 50%,
+    rgba(230, 244, 236, 0.02) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Animated grain texture for depth */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.015;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjc1IiBudW1PY3RhdmVzPSIxMCIvPjxmZUNvbG9yTWF0cml4IHZhbHVlcz0iMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMSAwIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2EpIiBvcGFjaXR5PSIxIi8+PC9zdmc+');
+  animation: grain 8s steps(10) infinite;
+}
+
+@keyframes grain {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-5%, -10%); }
+  20% { transform: translate(-15%, 5%); }
+  30% { transform: translate(7%, -25%); }
+  40% { transform: translate(-5%, 25%); }
+  50% { transform: translate(-15%, 10%); }
+  60% { transform: translate(15%, 0%); }
+  70% { transform: translate(0%, 15%); }
+  80% { transform: translate(3%, 20%); }
+  90% { transform: translate(-10%, 10%); }
+}
+
+/* Gradient mesh backgrounds */
+.gradient-mesh {
+  background: 
+    radial-gradient(at 20% 80%, rgba(29, 82, 56, 0.05) 0%, transparent 50%),
+    radial-gradient(at 80% 20%, rgba(230, 244, 236, 0.08) 0%, transparent 50%),
+    radial-gradient(at 40% 40%, rgba(255, 214, 0, 0.03) 0%, transparent 50%),
+    radial-gradient(at 80% 80%, rgba(107, 114, 128, 0.04) 0%, transparent 50%);
+  animation: mesh-shift 20s ease-in-out infinite;
+}
+
+@keyframes mesh-shift {
+  0%, 100% {
+    background-position: 0% 0%, 100% 100%, 50% 50%, 100% 0%;
+  }
+  25% {
+    background-position: 100% 100%, 0% 0%, 100% 0%, 50% 50%;
+  }
+  50% {
+    background-position: 50% 50%, 50% 50%, 0% 100%, 0% 0%;
+  }
+  75% {
+    background-position: 0% 100%, 100% 0%, 50% 50%, 100% 100%;
+  }
+}
+
+/* ============================================
+   5. SMOOTH SCROLLING & PAGE TRANSITIONS
+   ============================================ */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Page transition animations */
+.page-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   6. LOADING STATES & SKELETON SCREENS
+   ============================================ */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #E5E7EB 25%,
+    #F3F4F6 50%,
+    #E5E7EB 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ============================================
+   7. FOCUS STATES & ACCESSIBILITY
+   ============================================ */
+
+*:focus-visible {
+  outline: 2px solid #1D5238;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ============================================
+   8. PERFORMANCE OPTIMIZATIONS
+   ============================================ */
+
+/* Enable GPU acceleration for transforms */
+.card, button, input, a {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   9. CUSTOM SCROLLBAR
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F3F4F6;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #1D5238, #2D6248);
+  border-radius: 10px;
+  border: 2px solid #F3F4F6;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #2D6248, #1D5238);
+}
+
+/* ============================================
+   10. SELECTION STYLES
+   ============================================ */
+
+::selection {
+  background: rgba(29, 82, 56, 0.15);
+  color: #1D5238;
+}
+
+::-moz-selection {
+  background: rgba(29, 82, 56, 0.15);
+  color: #1D5238;
+}

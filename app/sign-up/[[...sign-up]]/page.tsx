@@ -10,6 +10,8 @@ export default function SignUpPage() {
             card: 'shadow-xl',
           }
         }}
+        forceRedirectUrl="/onboarding"
+        signUpUrl="/sign-up"
       />
     </div>
   );

@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useUser, UserButton, OrganizationSwitcher } from '@clerk/nextjs'
+import { useUser, UserButton, OrganizationSwitcher, useOrganization } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 import { 
   Send,
   Paperclip,
@@ -27,6 +28,8 @@ type State = 'welcome' | 'thinking' | 'answer'
 
 export default function DashboardPage() {
   const { user } = useUser()
+  const { organization, isLoaded } = useOrganization()
+  const router = useRouter()
   const [currentState, setCurrentState] = useState<State>('welcome')
   const [inputValue, setInputValue] = useState('')
   const [selectedPrompt, setSelectedPrompt] = useState('')
@@ -199,6 +202,18 @@ export default function DashboardPage() {
       )
     })
   }
+
+  // Check if onboarding is needed
+  useEffect(() => {
+    if (isLoaded && organization) {
+      // Check if this organization has completed onboarding
+      const hasCompletedOnboarding = localStorage.getItem(`onboarding_completed_${organization.id}`)
+      
+      if (!hasCompletedOnboarding) {
+        router.push('/onboarding')
+      }
+    }
+  }, [isLoaded, organization, router])
 
   useEffect(() => {
     if (inputRef.current) {
@@ -908,7 +923,12 @@ export default function DashboardPage() {
 
                 {/* New Question Button */}
                 <motion.button
-                  onClick={resetToWelcome}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    resetToWelcome()
+                  }}
                   style={{
                     padding: '12px 24px',
                     backgroundColor: colors.evergreen,
@@ -918,12 +938,13 @@ export default function DashboardPage() {
                     fontSize: '14px',
                     fontWeight: '500',
                     cursor: 'pointer',
-                    alignSelf: 'center'
+                    alignSelf: 'center',
+                    marginTop: '20px'
                   }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  Ask Another Question
+                  ← Ask Another Question
                 </motion.button>
               </motion.div>
             )}

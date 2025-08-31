@@ -25,6 +25,8 @@
 - **Color**: Evergreen #1D5238 on light backgrounds, White #FFFFFF on dark
 - **Usage**: All primary marketing materials, website headers, business cards
 
+![alt text](<colour (2).svg>)
+
 **Secondary Marks**:
 - Logo + tagline: "evergreenOS™ - Run Your Business By Typing"
 - Icon-only version for favicons, social media profile images

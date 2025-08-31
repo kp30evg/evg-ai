@@ -51,24 +51,49 @@ export const commandHistory = pgTable('command_history', {
   createdAt: timestamp('created_at').defaultNow().notNull()
 });
 
-// Companies table
+// Companies table - Extended with onboarding data
 export const companies = pgTable('companies', {
   id: uuid('id').defaultRandom().primaryKey(),
   clerkOrgId: varchar('clerk_org_id', { length: 255 }).unique().notNull(),
   name: varchar('name', { length: 255 }).notNull(),
+  slug: text('slug'),
+  
+  // Onboarding data
+  onboardingCompleted: boolean('onboarding_completed').default(false),
+  onboardingStep: integer('onboarding_step').default(0),
+  onboardingStartedAt: timestamp('onboarding_started_at'),
+  onboardingCompletedAt: timestamp('onboarding_completed_at'),
+  
+  // Company profile from onboarding
+  companySize: text('company_size'), // '1-10', '11-50', '51-200', '201-500', '500+'
+  industry: text('industry'), // 'saas', 'ecommerce', 'finance', 'healthcare', etc.
+  primaryUseCase: text('primary_use_case'), // 'sales', 'operations', 'finance', 'hr', 'all'
+  
+  // Integration settings
+  connectedIntegrations: jsonb('connected_integrations').default([]),
+  // Stores: ['salesforce', 'gmail', 'slack', 'quickbooks', etc.]
+  
   settings: jsonb('settings').default({}),
   subscription: jsonb('subscription'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
-// Users table
+// Users table - Extended with onboarding tracking
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   clerkUserId: varchar('clerk_user_id', { length: 255 }).unique().notNull(),
   email: varchar('email', { length: 255 }).notNull(),
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  imageUrl: text('image_url'),
   companyId: uuid('company_id').references(() => companies.id),
-  role: varchar('role', { length: 50 }).default('member'),
+  
+  // User-specific onboarding
+  hasCompletedTour: boolean('has_completed_tour').default(false),
+  firstCommandExecuted: boolean('first_command_executed').default(false),
+  
+  role: varchar('role', { length: 50 }).default('member'), // 'admin', 'member', 'viewer'
   settings: jsonb('settings').default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull()
@@ -85,6 +110,53 @@ export const modules = pgTable('modules', {
   installedAt: timestamp('installed_at').defaultNow().notNull()
 });
 
+// Integration credentials - encrypted storage
+export const integrations = pgTable('integrations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id').references(() => companies.id),
+  
+  provider: text('provider').notNull(), // 'salesforce', 'gmail', 'slack', etc.
+  credentials: jsonb('credentials'), // Encrypted tokens/keys
+  
+  status: text('status').default('pending'), // 'pending', 'connected', 'error', 'disconnected'
+  lastSyncAt: timestamp('last_sync_at'),
+  syncError: text('sync_error'),
+  
+  metadata: jsonb('metadata').default({}), // Provider-specific data
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull()
+});
+
+// Team invitations
+export const invitations = pgTable('invitations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id').references(() => companies.id),
+  
+  email: text('email').notNull(),
+  role: text('role').default('member'),
+  invitedBy: uuid('invited_by').references(() => users.id),
+  
+  status: text('status').default('pending'), // 'pending', 'accepted', 'expired'
+  acceptedAt: timestamp('accepted_at'),
+  expiresAt: timestamp('expires_at'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
+// Onboarding analytics - track conversion and user journey
+export const onboardingEvents = pgTable('onboarding_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  companyId: uuid('company_id').references(() => companies.id),
+  userId: uuid('user_id').references(() => users.id),
+  
+  event: text('event').notNull(), // 'step_completed', 'integration_connected', 'data_imported', etc.
+  stepName: text('step_name'),
+  metadata: jsonb('metadata').default({}),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
+
 // Types for TypeScript
 export type Entity = typeof entities.$inferSelect;
 export type NewEntity = typeof entities.$inferInsert;
@@ -93,3 +165,6 @@ export type CommandHistory = typeof commandHistory.$inferSelect;
 export type Company = typeof companies.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type Module = typeof modules.$inferSelect;
+export type Integration = typeof integrations.$inferSelect;
+export type Invitation = typeof invitations.$inferSelect;
+export type OnboardingEvent = typeof onboardingEvents.$inferSelect;

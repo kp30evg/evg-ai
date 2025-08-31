@@ -1106,7 +1106,12 @@ export default function DepartmentCommandShowcase() {
                         <h3 style={styles.answerTitle}>Analysis Complete</h3>
                       </div>
                       <motion.button
-                        onClick={resetToWelcome}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          resetToWelcome()
+                        }}
                         style={{
                           padding: '8px 16px',
                           backgroundColor: colors.white,
