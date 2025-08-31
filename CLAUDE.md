@@ -819,6 +819,8 @@ IMMEDIATELY after implementing any front-end change:
 4. **Validate feature implementation** - Ensure the change fulfills the user's specific request
 5. **Check acceptance criteria** - Review any provided context files or requirements
 6. **Capture evidence** - Take full page screenshot at desktop viewport (1440px) of each changed view
+   - **IMPORTANT**: Always save screenshots to `.screenshots/` directory
+   - Example: `filename: ".screenshots/feature-name.png"`
 7. **Check for errors** - Run `mcp__playwright__browser_console_messages`
 
 This verification ensures changes meet design standards and user requirements.
@@ -828,3 +830,22 @@ Invoke the `@agent-design-review` subagent for thorough design validation when:
 - Completing significant UI/UX features
 - Before finalizing PRs with visual changes
 - Needing comprehensive accessibility and responsiveness testing
+
+## File Organization Guidelines
+
+### Screenshots and Test Files
+**IMPORTANT**: Keep the workspace clean and organized by following these rules:
+
+1. **Screenshots Directory**: `.screenshots/`
+   - ALL screenshots must be saved here
+   - When using `mcp__playwright__browser_take_screenshot`, always use:
+     ```
+     filename: ".screenshots/[descriptive-name].png"
+     ```
+   - Example: `.screenshots/dashboard-with-auth.png`
+
+2. **Test Scripts**: Save as `.screenshots/test-*.js`
+3. **Capture Scripts**: Save as `.screenshots/capture-*.js`
+4. **Never save screenshots in the project root directory**
+
+This directory is gitignored to keep the repository clean.
