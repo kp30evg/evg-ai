@@ -34,14 +34,15 @@ export class GmailClient {
   }) {
     try {
       // If no credentials provided in constructor, get from database
-      if (!this.gmail && params.companyId) {
+      if (!this.gmail && params.companyId && params.userId) {
         const emailAccount = await db
           .select()
           .from(entities)
           .where(
             and(
               eq(entities.companyId, params.companyId),
-              eq(entities.type, 'email_account')
+              eq(entities.type, 'email_account'),
+              eq(entities.createdBy, params.userId) // CRITICAL: User-specific
             )
           )
           .limit(1);

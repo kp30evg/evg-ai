@@ -807,7 +807,7 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
   
   private async sendDraftEmail(draft: any, context: CommandContext) {
     try {
-      // Use the Gmail client to send the email
+      // Use the Gmail client to send the email WITH USER CONTEXT
       const gmailClient = new GmailClient();
       const result = await gmailClient.sendEmail({
         to: draft.to,
@@ -815,7 +815,7 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
         subject: draft.subject,
         body: draft.body,
         companyId: context.companyId,
-        userId: context.userId
+        userId: context.userId // This ensures user-specific Gmail account is used
       });
       
       return {

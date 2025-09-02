@@ -124,23 +124,22 @@ export async function GET(req: NextRequest) {
       const companyId = stringToUuid(finalOrgId);
       const userId = stringToUuid(finalUserId);
       
-      // Check if email account already exists
+      // Check if email account already exists FOR THIS SPECIFIC USER
       const existingAccount = await db
         .select()
         .from(entities)
         .where(
           and(
             eq(entities.companyId, companyId),
-            eq(entities.type, 'email_account')
-            // Note: Can't directly query JSONB field in where clause with Drizzle
-            // Will check email match after fetching
+            eq(entities.type, 'email_account'),
+            eq(entities.createdBy, userId) // CRITICAL: Filter by user ID
           )
         )
         .limit(10); // Get recent email accounts and filter in JS
       
-      // Filter for matching email
+      // Filter for matching email AND user
       const matchingAccount = existingAccount.find(
-        (acc: any) => acc.data?.email === userInfo.data.email
+        (acc: any) => acc.data?.email === userInfo.data.email && acc.data?.userId === finalUserId
       );
       
       const accountData = {
@@ -157,12 +156,15 @@ export async function GET(req: NextRequest) {
           historyId: profileData.historyId,
           connectedAt: new Date().toISOString(),
           lastSyncAt: null,
-          isActive: true
+          isActive: true,
+          userId: finalUserId, // CRITICAL: Store user ID in data
+          userEmail: userInfo.data.email // Store user's actual email
         },
         createdBy: userId,
         metadata: {
           source: 'oauth',
-          scopes: tokens.scope?.split(' ') || []
+          scopes: tokens.scope?.split(' ') || [],
+          userId: finalUserId // Also store in metadata for redundancy
         }
       };
       

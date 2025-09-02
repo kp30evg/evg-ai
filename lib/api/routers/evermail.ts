@@ -48,17 +48,19 @@ const searchEmailsSchema = z.object({
 export const evermailRouter = router({
   // Get Gmail connection status
   getGmailStatus: protectedProcedure.query(async ({ ctx }) => {
-    const { orgId } = ctx;
+    const { orgId, userId } = ctx;
     const companyId = stringToUuid(orgId);
+    const userUuid = stringToUuid(userId);
 
-    // Check for email_account entity (new OAuth flow)
+    // Check for email_account entity FOR THIS USER ONLY
     const emailAccount = await db
       .select()
       .from(entities)
       .where(
         and(
           eq(entities.companyId, companyId),
-          eq(entities.type, 'email_account')
+          eq(entities.type, 'email_account'),
+          eq(entities.createdBy, userUuid) // CRITICAL: User-specific
         )
       )
       .limit(1);
@@ -169,18 +171,20 @@ export const evermailRouter = router({
 
   // Trigger manual sync
   syncEmails: protectedProcedure.mutation(async ({ ctx }) => {
-    const { orgId } = ctx;
+    const { orgId, userId } = ctx;
     const companyId = stringToUuid(orgId);
+    const userUuid = stringToUuid(userId);
     
     try {
-      // Get email account with tokens
+      // Get email account with tokens FOR THIS USER ONLY
       const emailAccount = await db
         .select()
         .from(entities)
         .where(
           and(
             eq(entities.companyId, companyId),
-            eq(entities.type, 'email_account')
+            eq(entities.type, 'email_account'),
+            eq(entities.createdBy, userUuid) // CRITICAL: User-specific
           )
         )
         .limit(1);
@@ -354,16 +358,19 @@ export const evermailRouter = router({
   getEmails: protectedProcedure
     .input(searchEmailsSchema)
     .query(async ({ ctx, input }) => {
-      const { orgId } = ctx;
+      const { orgId, userId } = ctx;
       const companyId = stringToUuid(orgId);
+      const userUuid = stringToUuid(userId);
 
+      // CRITICAL: Only show emails that belong to this user
       let query = db
         .select()
         .from(entities)
         .where(
           and(
             eq(entities.companyId, companyId),
-            eq(entities.type, 'email')
+            eq(entities.type, 'email'),
+            eq(entities.createdBy, userUuid) // User-specific emails only
           )
         );
 
@@ -492,14 +499,15 @@ export const evermailRouter = router({
       const userUuid = stringToUuid(userId);
 
       try {
-        // Get email account with OAuth tokens
+        // Get email account with OAuth tokens FOR THIS USER ONLY
         const emailAccount = await db
           .select()
           .from(entities)
           .where(
             and(
               eq(entities.companyId, companyId),
-              eq(entities.type, 'email_account')
+              eq(entities.type, 'email_account'),
+              eq(entities.createdBy, userUuid) // CRITICAL: User-specific
             )
           )
           .limit(1);
