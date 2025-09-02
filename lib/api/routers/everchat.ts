@@ -85,12 +85,18 @@ export const everchatRouter = router({
       attachments: z.array(z.string()).optional()
     }))
     .mutation(async ({ ctx, input }) => {
-      const { orgId, userId } = ctx;
+      const { orgId, userId, user } = ctx;
       const companyId = stringToUuid(orgId);
       const userUuid = stringToUuid(userId);
 
       // Check if it's an AI command
       const isAiCommand = input.text.startsWith('@evergreen');
+      
+      // Get user's full name and image
+      const userName = user?.firstName && user?.lastName 
+        ? `${user.firstName} ${user.lastName}`.trim() 
+        : user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User';
+      const userImage = user?.imageUrl || null;
 
       // Create message entity
       const [message] = await db.insert(entities).values({
@@ -100,8 +106,8 @@ export const everchatRouter = router({
           channelId: input.channelId,
           text: input.text,
           userId,
-          userName: 'User', // Simplified for now
-          userImage: null,
+          userName,
+          userImage,
           threadId: input.threadId,
           mentions: input.mentions || [],
           attachments: input.attachments || [],
@@ -303,12 +309,16 @@ export const everchatRouter = router({
       }
 
       if (pusher) {
+        const userName = ctx.user?.firstName && ctx.user?.lastName 
+          ? `${ctx.user.firstName} ${ctx.user.lastName}`.trim() 
+          : ctx.user?.firstName || ctx.user?.emailAddresses?.[0]?.emailAddress || 'User';
+          
         await pusher.trigger(
           channelName,
           events.USER_TYPING,
           {
             userId,
-            userName: ctx.user?.firstName ? `${ctx.user.firstName} ${ctx.user.lastName}` : 'User',
+            userName,
             isTyping: input.isTyping
           }
         );
@@ -329,12 +339,16 @@ export const everchatRouter = router({
       // This would typically be handled by Pusher presence channels automatically,
       // but we can still broadcast manual status updates
       if (pusher) {
+        const userName = ctx.user?.firstName && ctx.user?.lastName 
+          ? `${ctx.user.firstName} ${ctx.user.lastName}`.trim() 
+          : ctx.user?.firstName || ctx.user?.emailAddresses?.[0]?.emailAddress || 'User';
+          
         await pusher.trigger(
           channels.orgPresence(orgId),
           'user.status_changed',
           {
             userId,
-            userName: ctx.user?.firstName ? `${ctx.user.firstName} ${ctx.user.lastName}` : 'User',
+            userName,
             isOnline: input.isOnline
           }
         );

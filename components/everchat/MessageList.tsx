@@ -6,6 +6,7 @@ import { useChat } from './ChatProvider'
 import { format } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
 import { Sparkles } from 'lucide-react'
+import { useUser } from '@clerk/nextjs'
 
 const colors = {
   evergreen: '#1D5238',
@@ -19,6 +20,7 @@ const colors = {
 
 export default function MessageList() {
   const { messages, isTyping } = useChat()
+  const { user } = useUser()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -81,131 +83,158 @@ export default function MessageList() {
           </div>
 
           {/* Messages for this day */}
-          {dayMessages.map((message, index) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              style={{
-                display: 'flex',
-                gap: '12px',
-                marginBottom: '12px'
-              }}
-            >
-              {/* Avatar */}
-              <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                backgroundColor: message.userId === 'evergreen-ai' ? colors.evergreen : colors.lightGray,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0
-              }}>
-                {message.userId === 'evergreen-ai' ? (
-                  <Sparkles size={16} color={colors.white} />
-                ) : message.userImage ? (
-                  <img 
-                    src={message.userImage} 
-                    alt={message.userName}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      borderRadius: '50%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    color: colors.evergreen
-                  }}>
-                    {message.userName.split(' ').map(n => n[0]).join('').toUpperCase()}
-                  </div>
-                )}
-              </div>
-
-              {/* Message content */}
-              <div style={{ flex: 1 }}>
+          {dayMessages.map((message, index) => {
+            const isCurrentUser = message.userId === user?.id
+            const isAI = message.userId === 'evergreen-ai'
+            
+            return (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                style={{
+                  display: 'flex',
+                  justifyContent: isCurrentUser ? 'flex-end' : 'flex-start',
+                  marginBottom: '16px'
+                }}
+              >
                 <div style={{
                   display: 'flex',
-                  alignItems: 'baseline',
                   gap: '8px',
-                  marginBottom: '4px'
+                  maxWidth: '70%',
+                  flexDirection: isCurrentUser ? 'row-reverse' : 'row'
                 }}>
-                  <span style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: message.userId === 'evergreen-ai' ? colors.evergreen : colors.charcoal
+                  {/* Avatar */}
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    backgroundColor: isAI ? colors.evergreen : (message.userImage ? 'transparent' : colors.lightGray),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
                   }}>
-                    {message.userName}
-                  </span>
-                  <span style={{
-                    fontSize: '11px',
-                    color: colors.mediumGray
-                  }}>
-                    {format(message.timestamp, 'h:mm a')}
-                  </span>
-                  {message.aiCommand && (
-                    <span style={{
-                      fontSize: '10px',
-                      padding: '2px 6px',
-                      backgroundColor: colors.evergreen + '10',
-                      color: colors.evergreen,
-                      borderRadius: '4px',
-                      fontWeight: '600',
-                      textTransform: 'uppercase'
-                    }}>
-                      AI Command
-                    </span>
-                  )}
-                </div>
+                    {isAI ? (
+                      <Sparkles size={18} color={colors.white} />
+                    ) : message.userImage ? (
+                      <img 
+                        src={message.userImage} 
+                        alt={message.userName}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: '50%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: colors.charcoal
+                      }}>
+                        {message.userName ? message.userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??'}
+                      </div>
+                    )}
+                  </div>
 
-                <div style={{
-                  fontSize: '14px',
-                  lineHeight: '1.5',
-                  color: colors.charcoal,
-                  backgroundColor: message.commandResult ? colors.softGreen + '30' : 'transparent',
-                  padding: message.commandResult ? '12px' : '0',
-                  borderRadius: message.commandResult ? '8px' : '0',
-                  border: message.commandResult ? `1px solid ${colors.evergreen}20` : 'none'
-                }}>
-                  {message.commandResult ? (
-                    <ReactMarkdown
-                      components={{
-                        strong: ({ children }) => (
-                          <strong style={{ color: colors.evergreen, fontWeight: 600 }}>
-                            {children}
-                          </strong>
-                        ),
-                        ul: ({ children }) => (
-                          <ul style={{ 
-                            margin: '8px 0', 
-                            paddingLeft: '20px',
-                            listStyleType: 'disc'
-                          }}>
-                            {children}
-                          </ul>
-                        ),
-                        li: ({ children }) => (
-                          <li style={{ marginBottom: '4px' }}>
-                            {children}
-                          </li>
-                        )
-                      }}
-                    >
-                      {message.text}
-                    </ReactMarkdown>
-                  ) : (
-                    <span>{message.text}</span>
-                  )}
+                  {/* Message content */}
+                  <div style={{ 
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: isCurrentUser ? 'flex-end' : 'flex-start'
+                  }}>
+                    {/* Name and time header */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: '8px',
+                      marginBottom: '4px',
+                      flexDirection: isCurrentUser ? 'row-reverse' : 'row'
+                    }}>
+                      <span style={{
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        color: isAI ? colors.evergreen : colors.charcoal
+                      }}>
+                        {message.userName || 'Unknown User'}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        color: colors.mediumGray
+                      }}>
+                        {format(message.timestamp, 'h:mm a')}
+                      </span>
+                      {message.aiCommand && (
+                        <span style={{
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          backgroundColor: colors.evergreen + '10',
+                          color: colors.evergreen,
+                          borderRadius: '4px',
+                          fontWeight: '600',
+                          textTransform: 'uppercase'
+                        }}>
+                          AI Command
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Message bubble */}
+                    <div style={{
+                      fontSize: '14px',
+                      lineHeight: '1.5',
+                      color: isCurrentUser ? colors.white : colors.charcoal,
+                      backgroundColor: isCurrentUser 
+                        ? colors.evergreen 
+                        : (message.commandResult ? colors.softGreen + '30' : colors.lightGray + '30'),
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      borderTopLeftRadius: !isCurrentUser ? '4px' : '12px',
+                      borderTopRightRadius: isCurrentUser ? '4px' : '12px',
+                      border: message.commandResult && !isCurrentUser ? `1px solid ${colors.evergreen}20` : 'none',
+                      wordBreak: 'break-word'
+                    }}>
+                      {message.commandResult ? (
+                        <ReactMarkdown
+                          components={{
+                            strong: ({ children }) => (
+                              <strong style={{ 
+                                color: isCurrentUser ? colors.white : colors.evergreen, 
+                                fontWeight: 600 
+                              }}>
+                                {children}
+                              </strong>
+                            ),
+                            ul: ({ children }) => (
+                              <ul style={{ 
+                                margin: '8px 0', 
+                                paddingLeft: '20px',
+                                listStyleType: 'disc'
+                              }}>
+                                {children}
+                              </ul>
+                            ),
+                            li: ({ children }) => (
+                              <li style={{ marginBottom: '4px' }}>
+                                {children}
+                              </li>
+                            )
+                          }}
+                        >
+                          {message.text}
+                        </ReactMarkdown>
+                      ) : (
+                        <span>{message.text}</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            )
+          })}
         </div>
       ))}
 
