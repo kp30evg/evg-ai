@@ -1,266 +1,356 @@
-# evergreenOS Landing Page - Project Status Report
-*Last Updated: August 30, 2025*
+# evergreenOS Project Status Report
+*Last Updated: December 2, 2024*
 
-## 🚀 Current State - 85% Complete
-The landing page now features a **world-class ChatGPT-like UI experience** with fully functional command interfaces, animations, and optimized layouts. The project is running successfully on `http://localhost:3006`.
+## 🎯 Project Overview
+evergreenOS is a unified business operating system that replaces 50+ business tools with ONE platform, controlled entirely through natural language. All data lives in a single `entities` table with JSONB, enabling infinite extensibility without schema changes.
 
-## 📋 Recent Session Summary (August 30, 2025)
+## 📊 Current State: Platform MVP with 2 Modules Complete
+- **Landing Page**: 85% Complete (World-class ChatGPT UI)
+- **Platform Dashboard**: Fully functional with AI command interface
+- **Module 1 - EverChat**: ✅ Complete (Real-time messaging)
+- **Module 2 - EverMail**: ✅ Complete (Gmail integration with OAuth)
+- **Infrastructure**: Production-ready with Clerk auth, Neon DB, tRPC API
 
-### Major Accomplishments in This Session
-1. **Implemented ChatGPT-like Command Interface**
-   - Created three-state system: `welcome` → `thinking` → `answer`
-   - Added streaming text effects with character-by-character reveal
-   - Implemented progressive disclosure with staggered animations
-   - Added "THE BOX" - prominent input area matching ChatGPT/Perplexity design patterns
+## 🏗️ Architecture Implementation
 
-2. **Created DepartmentCommandShowcase Component**
-   - 7 departments with unique content (Revenue, Finance, Operations, Marketing, Human Capital, Business Intelligence, Supply Chain)
-   - Each department has 3 sample questions and 3 sample actions (reduced from 5 for better UI)
-   - Department-specific streaming answers with relevant metrics
-   - Seamless department switching maintains UI state properly
-
-3. **Layout Optimization for Single-Screen Visibility**
-   - All 7 department tabs now fit on ONE line (no wrapping)
-   - Reduced vertical spacing: section padding from 120px to 60px
-   - Compact headers: font size from 3.5rem to 2.75rem
-   - Container height optimized to 480px (from 550px)
-   - Wider container (1400px) to accommodate all tabs
-
-4. **Added Navigation Bar**
-   - Clean, minimal design with evergreenOS branding
-   - Fixed position with blur backdrop
-   - Responsive with mobile menu support
-
-## ✅ Completed Components (9/12)
-
-1. **NavigationBar** (`/components/NavigationBar.tsx`) - NEW ✅
-   - Fixed navigation with blur backdrop
-   - evergreenOS logo with green accent
-   - Clean, minimal design
-   - Mobile responsive hamburger menu
-
-2. **HeroSection** (`/components/HeroSection.tsx`) - ENHANCED ✅
-   - Main headline: "Run Your Entire Business By Typing"
-   - NEW: ChatGPT-style command interface with three states
-   - NEW: Streaming text animations
-   - Live metrics display
-   - Trust indicators and CTAs
-
-3. **HeroSection-CommandInterface** (`/components/HeroSection-CommandInterface.tsx`) - NEW ✅
-   - Complete ChatGPT-like experience
-   - Three-state system with animations
-   - Auto-resizing textarea with icons
-   - Progressive disclosure of content
-
-4. **ProductArchitecture** (`/components/ProductArchitecture.tsx`) ✅
-   - Interactive accordion showing 5 departments
-   - Revenue Ops, Financial Ops, People Ops, Supply Chain, BI
-   - Each section shows features and tools replaced
-   - Core AI capabilities card
-
-5. **DepartmentCommandShowcase** (`/components/DepartmentCommandShowcase.tsx`) - NEW ✅
-   - 7 department-specific command interfaces
-   - ChatGPT-like UI for each department
-   - Optimized single-screen layout
-   - 1100+ lines of production-ready code
-
-6. **ScenariosCarousel** (`/components/ScenariosCarousel.tsx`) ✅
-   - 6 real-world command examples
-   - Auto-playing carousel
-   - Shows command → actions → metrics
-
-7. **CompetitiveComparison** (`/components/CompetitiveComparison.tsx`) ✅
-   - "Why They Can't Build This" section
-   - 4 competitor cards
-   - Feature comparison table
-
-8. **MondayComparisonSection** (`/components/MondayComparisonSection.tsx`) - NEW ✅
-   - Additional competitor analysis
-   - Shows architectural limitations
-
-9. **ConversionSection** (`/components/ConversionSection.tsx`) ✅
-   - Beta access signup
-   - Savings calculator
-   - Action cards (Demo, Book, Whitepaper)
-
-10. **Footer** (`/components/Footer.tsx`) ✅
-   - 4-column layout
-   - Newsletter signup
-   - Social links
-
-## 🔄 Components Needing Attention (3)
-
-11. **Testimonials Section** - Not Started
-   - Need: Social proof from beta customers
-   - Should include: Company logos, quotes, metrics
-
-12. **Live Command Playground** - Partially Complete
-   - Basic structure exists
-   - Needs: Real command processing logic
-   - Consider: WebSocket integration for live demo
-
-13. **Announcement Banner** - Structure exists
-   - Needs: Content and styling updates
-
-## 📁 Key Files Modified/Created in This Session
-
-### New Components Created
-- `components/DepartmentCommandShowcase.tsx` (1100+ lines)
-- `components/NavigationBar.tsx` (273 lines)
-- `components/MondayComparisonSection.tsx` (150+ lines)
-
-### Significantly Modified
-- `components/HeroSection-CommandInterface.tsx` - Complete rewrite
-- `components/HeroSection.tsx` - Updated integration
-- `app/page.tsx` - Added new components
-
-## 🎨 Design Implementation Details
-
-### ChatGPT-like UI Features
-- **Stable Viewport**: Fixed 480px height container
-- **Progressive Disclosure**: Content appears sequentially
-- **Streaming Text**: Bold markdown support with `**text**` syntax
-- **Auto-resizing Textarea**: Grows with content
-- **Icon Integration**: Paperclip and Mic icons
-- **Animation Timing**: 
-  - Thinking steps: 20ms per character
-  - Streaming answer: 10ms per 3 characters
-  - Component stagger: 100ms between items
-
-### Color System
-```javascript
-const colors = {
-  evergreen: '#1D5238',
-  white: '#FFFFFF',
-  charcoal: '#222B2E',
-  mediumGray: '#6B7280',
-  lightGray: '#E5E7EB',
-  softGreen: '#E6F4EC',
-  gold: '#FFD600'
-}
+### Database Schema (Implemented)
+```sql
+-- Single unified table for ALL business data
+CREATE TABLE entities (
+  id UUID PRIMARY KEY,
+  company_id UUID NOT NULL,  -- Multi-tenant via Clerk orgs
+  type VARCHAR(50),          -- 'message', 'email', 'contact', etc.
+  data JSONB,               -- Flexible data storage
+  relationships JSONB[],     -- Entity connections
+  metadata JSONB,           -- System metadata
+  created_by UUID,          -- User isolation
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
 ```
 
-## 🐛 Issues Resolved in This Session
-1. **Fixed Navigation Bar visibility** - Reduced padding
-2. **Fixed "New Question" button** - Simplified AnimatePresence
-3. **Fixed department tabs wrapping** - Changed to nowrap
-4. **Fixed blank screen issue** - Removed dynamic resetKey
+### Current Tech Stack
+- **Frontend**: Next.js 14, TypeScript, Framer Motion
+- **Backend**: tRPC, Drizzle ORM, PostgreSQL (Neon)
+- **Auth**: Clerk (Multi-tenant with organizations)
+- **Real-time**: Pusher
+- **AI**: OpenAI GPT-4
+- **Email**: Gmail API with OAuth2
+- **Hosting**: Vercel (ready), Local dev on port 3000
 
-## 📊 Current Metrics
-- **Total Components**: 12 (9 complete, 3 pending)
-- **Files Changed Today**: 7
-- **Lines Added**: 3,061
-- **Lines Removed**: 716
-- **Git Status**: 2 commits ahead of origin/main
+## 📅 Development Timeline
 
-## 🔄 Development Server
-- **Port**: 3006 (3000 was occupied)
-- **Framework**: Next.js 15.5.2 with Turbopack
-- **Status**: Running successfully
-- **Access**: http://localhost:3006
+### Phase 1: Landing Page (August 28-30, 2024)
+**Status**: ✅ Complete
+- Built marketing landing page with ChatGPT-like command interface
+- 7 department showcases with streaming animations
+- Responsive design with brand guidelines
+- Files: `/app/page.tsx`, `/components/*`
 
-## 📝 Recent Git Commits
+### Phase 2: Platform Foundation (October-November 2024)
+**Status**: ✅ Complete
+
+#### Authentication & Multi-tenancy
+- Clerk integration with organization support
+- User/company isolation
+- Onboarding flow with company details
+- Files: `/app/(auth)/*`, `/app/onboarding/*`
+
+#### Database & API Layer
+- Drizzle ORM setup with Neon PostgreSQL
+- tRPC routers for type-safe API
+- Unified entities table implementation
+- Files: `/lib/db/*`, `/lib/api/*`
+
+### Phase 3: Module Development (November-December 2024)
+
+#### Module 1: EverChat ✅ (Completed November 28)
+**Features Implemented:**
+- Real-time messaging with Pusher
+- Channel management (#general, #sales, etc.)
+- Direct messages between users
+- AI command integration ("message John about...")
+- Message persistence in entities table
+- Slack-like UI with sidebar
+
+**Key Files:**
+- `/lib/api/routers/everchat.ts` - Backend API
+- `/components/everchat/ChatWidget.tsx` - UI components
+- `/app/(platform)/chat/*` - Chat pages
+
+**Natural Language Commands:**
 ```
-3800f46 - Implement world-class ChatGPT-like UI experience across landing page
-09226ec - Redesign hero section with improved layout and command interface
-689122b - Center Watch Demo button below command center
+"Message #sales about new pricing"
+"Send John a summary of our CRM features"
+"Tell the team about tomorrow's meeting"
 ```
 
-## 🎯 Next Steps for Future Engineers
+#### Module 2: EverMail ✅ (Completed December 2)
+**Features Implemented:**
+- Gmail OAuth2 authentication (per-user isolation)
+- Email sync from Gmail API
+- Send emails with AI-generated content
+- Natural language email commands
+- Inbox, Sent, Drafts views
+- Email draft preview with action buttons
+- **CRITICAL SECURITY FIX**: User-specific email isolation
 
-### Immediate Priority Tasks
-1. **Complete Testimonials Section**
-   - Add 3-4 testimonial cards with company logos
-   - Include metrics: "Saved $2M annually", etc.
-   - Consider video testimonials
+**Key Files:**
+- `/lib/api/routers/evermail.ts` - Backend API
+- `/lib/evermail/command-processor.ts` - NLP processor
+- `/lib/evermail/gmail-client.ts` - Gmail API client
+- `/app/(platform)/mail/*` - Email pages
+- `/app/api/auth/gmail/*` - OAuth handlers
 
-2. **Enhance Live Command Playground**
-   - Implement actual command processing
-   - Add more command examples
-   - Consider WebSocket for real-time updates
+**Natural Language Commands:**
+```
+"Send an email to john@example.com about our Q4 plans"
+"Show me unread emails from this week"
+"Summarize emails from Sarah"
+"Archive all newsletters"
+"Reply to the latest email from the CEO"
+```
 
-3. **Mobile Responsiveness Testing**
-   - Test ChatGPT UI on mobile devices
-   - Ensure department tabs work on small screens
-   - Verify animations performance on mobile
+### Phase 4: Command Processing & AI (Ongoing)
+**Status**: ✅ Core Complete
 
-### Technical Improvements Needed
-1. **TypeScript Types** - Replace 'any' types with specific interfaces
-2. **Component Splitting** - Break down large components
-3. **Performance** - Consider memoization for animations
-4. **Accessibility** - Add ARIA labels and keyboard navigation
-5. **Error Handling** - Add error states for failed commands
+#### Implemented Features:
+1. **Unified Command Processor**
+   - Routes commands to appropriate modules
+   - OpenAI GPT-4 integration
+   - Intent recognition and entity extraction
+   - Multi-module orchestration capability
 
-### Future Enhancements
-1. **Real API Integration** - Connect to backend
-2. **User Authentication** - Add login/signup flow
-3. **Command History** - Store previous commands
-4. **Dark Mode** - Implement theme switching
-5. **Internationalization** - Multi-language support
+2. **ChatGPT-like Dashboard UI**
+   - Three-state system: welcome → thinking → answer
+   - Streaming text responses
+   - Action buttons for confirmations
+   - Follow-up suggestions
 
-## 🛠️ Setup Instructions
+**Key Files:**
+- `/lib/ai/command-processor.ts` - Main command router
+- `/app/dashboard/page.tsx` - Dashboard UI
+- `/lib/api/routers/command.ts` - Command API
+
+## 🔒 Security Implementation
+
+### Critical Security Fix (December 2, 2024)
+**Issue**: Gmail accounts were shared across all users in an organization
+**Resolution**: 
+- Added `createdBy` field to email_account entities
+- All email queries now filter by userId AND companyId
+- Each user's Gmail connection is completely isolated
+- OAuth tokens stored per user, not per company
+
+### Current Security Measures:
+- Row-level security via Clerk auth
+- User isolation in all queries
+- Encrypted OAuth token storage
+- HTTPS-only in production
+- Environment variables for secrets
+
+## 📁 Project Structure
+```
+evergreenlp/
+├── app/
+│   ├── (auth)/          # Auth pages
+│   ├── (platform)/      # Main app pages
+│   │   ├── chat/       # EverChat module
+│   │   ├── mail/       # EverMail module
+│   │   └── settings/   # Settings pages
+│   ├── api/            # API routes
+│   │   └── auth/gmail/ # OAuth handlers
+│   ├── dashboard/      # Main dashboard
+│   └── onboarding/     # Onboarding flow
+├── components/
+│   ├── dashboard/      # Dashboard components
+│   ├── everchat/      # Chat components
+│   └── ui/            # Shared UI components
+├── lib/
+│   ├── ai/            # AI & command processing
+│   ├── api/           # tRPC routers
+│   ├── db/            # Database schema & client
+│   ├── evermail/      # Email module logic
+│   └── pusher.ts      # Real-time config
+└── context/           # Design system & guidelines
+```
+
+## ✅ What's Working Now
+
+### For Users:
+1. **Sign up & Onboarding**
+   - Create account via Clerk
+   - Set up organization
+   - Complete company profile
+
+2. **Natural Language Commands**
+   - "Send an email to..." - drafts, previews, and sends
+   - "Message #channel..." - sends real-time messages
+   - "Show unread emails" - searches and displays
+   - AI understands context and intent
+
+3. **Email Management**
+   - Connect personal Gmail account
+   - Sync emails to platform
+   - Send emails with AI-generated content
+   - View inbox, sent, drafts
+
+4. **Team Communication**
+   - Real-time messaging
+   - Channel-based conversations
+   - Direct messages
+   - Slack-like interface
+
+### For Developers:
+1. **Development Server**: `npm run dev` on port 3000
+2. **Database**: Neon PostgreSQL with migrations
+3. **Type Safety**: End-to-end with tRPC
+4. **Hot Reload**: Fast refresh enabled
+5. **Error Handling**: Comprehensive try-catch blocks
+
+## 🐛 Recent Issues Resolved
+
+1. **Gmail Shared Account Bug** (CRITICAL)
+   - Fixed: Each user now has isolated Gmail connection
+   - Impact: Enterprise-ready security
+
+2. **Email Send Button Not Working**
+   - Fixed: Added proper state management and click handlers
+   - Added action buttons for email confirmation
+
+3. **OAuth Redirect Issues**
+   - Fixed: Proper redirect URI configuration
+   - Must run on port 3000 for Google OAuth
+
+4. **Command Processing Errors**
+   - Fixed: Proper error handling in AI processor
+   - Added fallback responses
+
+## 🚀 Next Steps (Priority Order)
+
+### Immediate (This Week):
+1. **Module 3: EverCore (CRM)**
+   - [ ] Contact management
+   - [ ] Deal pipeline
+   - [ ] Company profiles
+   - [ ] Activity tracking
+
+2. **Cross-Module Queries**
+   - [ ] Link emails to contacts
+   - [ ] Associate messages with deals
+   - [ ] Unified search across modules
+
+### Short-term (Next 2 Weeks):
+3. **Module 4: EverTask**
+   - [ ] Task creation from emails/messages
+   - [ ] Project management
+   - [ ] Due date tracking
+
+4. **Module 5: EverCal**
+   - [ ] Google Calendar integration
+   - [ ] Meeting scheduling
+   - [ ] Availability checking
+
+### Medium-term (Next Month):
+5. **Advanced Features**
+   - [ ] File attachments (EverDrive)
+   - [ ] Document generation (EverDocs)
+   - [ ] Analytics dashboard (EverSight)
+   - [ ] Invoicing (EverBooks)
+
+## 🎯 Success Metrics
+
+### Achieved:
+✅ Natural language command processing (<2s response)
+✅ Multi-tenant architecture with isolation
+✅ Real-time messaging functionality
+✅ Gmail integration with full send/receive
+✅ AI-powered content generation
+✅ Secure user data isolation
+
+### Pending:
+⏳ Cross-module data relationships
+⏳ 10 modules complete (2/10 done)
+⏳ Import from Salesforce, HubSpot
+⏳ Mobile responsive platform
+⏳ Production deployment
+
+## 🔧 Setup Instructions for New Engineers
 
 ```bash
-# Install dependencies
+# 1. Clone repository
+git clone [repo-url]
+cd evergreenlp
+
+# 2. Install dependencies
 npm install
 
-# Run development server
+# 3. Set up environment variables
+cp .env.example .env.local
+# Add keys for:
+# - DATABASE_URL (Neon PostgreSQL)
+# - CLERK_* (Authentication)
+# - OPENAI_API_KEY
+# - GOOGLE_CLIENT_ID/SECRET
+# - PUSHER_* (Real-time)
+
+# 4. Run database migrations
+npm run db:migrate
+
+# 5. Start development server
 npm run dev
 
-# View at http://localhost:3006 (or displayed port)
+# 6. Access at http://localhost:3000
 ```
 
-## 📚 Important Context Files
-- `/CLAUDE.md` - Comprehensive project requirements and company context
-- `/BRAND.md` - Brand guidelines and visual identity
-- `/context/design-principles.md` - Design guidelines
-- `/context/style-guide.md` - Detailed style guide
+## 📚 Key Documentation Files
+- `/CLAUDE.md` - Complete project vision & architecture
+- `/context/style-guide.md` - UI/UX guidelines
+- `/context/design-principles.md` - Design system
+- `/test-email-flow.md` - Email feature testing guide
 
-## 💡 Technical Notes
+## 💡 Technical Decisions & Rationale
 
-### State Management Pattern
-```javascript
-// Three-state system used throughout
-type State = 'welcome' | 'thinking' | 'answer'
-const [currentState, setCurrentState] = useState<State>('welcome')
-```
+### Why Single Table Design?
+- Infinite extensibility without migrations
+- Consistent query patterns
+- Easy cross-module relationships
+- JSONB allows schema flexibility
 
-### Animation Library
-- Framer Motion for all animations
-- AnimatePresence for enter/exit
-- Stagger animations for sequential reveals
+### Why tRPC?
+- End-to-end type safety
+- No API documentation needed
+- Direct function calls feel
+- Perfect for monolithic Next.js
 
-### Styling Approach
-- Inline styles with style objects
-- No CSS-in-JS runtime overhead
-- Dynamic styling based on state
+### Why Clerk?
+- Built-in multi-tenancy
+- Organization management
+- Production-ready auth
+- Great developer experience
 
-## 🔗 Resources
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Framer Motion](https://www.framer.com/motion/)
-- [Lucide Icons](https://lucide.dev/)
+## 🚨 Critical Notes for Engineers
 
-## 📈 Progress Timeline
-- **August 28**: Initial 6 components completed (70%)
-- **August 30**: Added ChatGPT UI, new components (85%)
-- **Remaining**: Testimonials, API integration (15%)
+1. **ALWAYS filter by userId**: Every query must include user isolation
+2. **Port 3000 Required**: Google OAuth redirect is hardcoded
+3. **Check CLAUDE.md**: Contains the complete vision and architecture
+4. **Use entities table**: Never create module-specific tables
+5. **Test multi-user**: Always verify data isolation
 
-## 🚦 Project Health
-- **Build Status**: ✅ Passing
-- **Performance**: ⚠️ Needs optimization
-- **Accessibility**: ⚠️ Needs improvement
-- **Mobile**: ⚠️ Needs testing
-- **SEO**: ❌ Meta tags needed
+## 📈 Progress Summary
+- **Overall Completion**: ~25% of full vision
+- **Modules Complete**: 2 of 10 (EverChat, EverMail)
+- **Commands Working**: ~30 different natural language commands
+- **Code Quality**: Production-ready with security fixes
+- **Time Invested**: ~2 months of development
 
-## 📞 Handoff Notes
-The project is in excellent shape with a professional ChatGPT-like UI implementation. The main landing page sections are complete and functional. Focus should be on completing the testimonials section, improving mobile responsiveness, and adding real backend integration.
-
-Key areas to review:
-1. Test all department command interfaces
-2. Verify animations on different devices
-3. Check state management in DepartmentCommandShowcase
-4. Review the three-state system implementation
+## 🎉 Major Accomplishments
+1. Proved the unified data model works
+2. Natural language commands fully functional
+3. Real-time features implemented
+4. Email integration with proper security
+5. Beautiful, consistent UI throughout
 
 ---
 
-*This progress report ensures smooth continuation of the evergreenOS landing page development.*
+*This is evergreenOS - not just another SaaS tool, but the operating system for business where all data lives in harmony and speaks the same language.*

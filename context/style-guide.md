@@ -79,10 +79,6 @@
 - Success messages background
 - Gentle accent areas
 
-**Gold Accent** - #FFD600  
-- Premium features
-- Special callouts
-- Trust indicators
 
 ### Semantic Colors
 
