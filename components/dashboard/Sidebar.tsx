@@ -43,11 +43,10 @@ export default function Sidebar() {
       icon: <Mail size={24} strokeWidth={2} />,
       label: 'EverMail',
       items: [
-        { label: 'Inbox', icon: <Inbox size={18} />, path: '/dashboard/evermail/inbox' },
-        { label: 'Sent', icon: <Send size={18} />, path: '/dashboard/evermail/sent' },
-        { label: 'Drafts', icon: <FileText size={18} />, path: '/dashboard/evermail/drafts' },
-        { label: 'Import Gmail', icon: <Upload size={18} />, path: '/dashboard/evermail/import' },
-        { label: 'Email Settings', icon: <Settings size={18} />, path: '/dashboard/evermail/settings' }
+        { label: 'Inbox', icon: <Inbox size={18} />, path: '/mail/inbox' },
+        { label: 'Sent', icon: <Send size={18} />, path: '/mail/sent' },
+        { label: 'Drafts', icon: <FileText size={18} />, path: '/mail/drafts' },
+        { label: 'Email Settings', icon: <Settings size={18} />, path: '/mail/settings' }
       ]
     }
   ]
@@ -77,7 +76,7 @@ export default function Sidebar() {
   const handleModuleLeave = () => {
     hoverTimeoutRef.current = setTimeout(() => {
       setActiveModule(null)
-    }, 100) // Small delay to allow moving to panel
+    }, 300) // Increased delay to allow moving to panel
   }
 
   const handlePanelEnter = () => {
@@ -181,8 +180,8 @@ export default function Sidebar() {
             onMouseLeave={handlePanelLeave}
             style={{
               position: 'fixed',
-              left: '70px',
-              top: mousePosition.y + 40, // Position relative to icon
+              left: '80px', // Slightly overlapping to prevent gap
+              top: '120px', // Fixed position instead of following mouse
               minWidth: '240px',
               backgroundColor: colors.white,
               border: `1px solid ${colors.lightGray}40`,
@@ -190,7 +189,7 @@ export default function Sidebar() {
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
               padding: '12px',
               zIndex: 100,
-              maxHeight: 'calc(100vh - 100px)',
+              maxHeight: 'calc(100vh - 140px)',
               overflowY: 'auto'
             }}
           >

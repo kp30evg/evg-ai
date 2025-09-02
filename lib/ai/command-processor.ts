@@ -4,6 +4,7 @@ import { entities, commandHistory } from '@/lib/db/schema';
 import { eq, and, or, ilike, desc, sql } from 'drizzle-orm';
 import { pusher, channels, events } from '@/lib/pusher';
 import { createHash } from 'crypto';
+import { EmailCommandProcessor } from '@/lib/evermail/command-processor';
 
 // Initialize OpenAI with proper error handling
 let openai: OpenAI | null = null;
@@ -38,6 +39,8 @@ export interface CommandResult {
 }
 
 export class CommandProcessor {
+  private lastEmailDraft: any = null; // Store the last email draft for confirmation
+  
   // Helper to create a deterministic UUID from any string ID
   private stringToUuid(str: string): string {
     const hash = createHash('sha256').update(str).digest('hex');
@@ -50,10 +53,40 @@ export class CommandProcessor {
     ].join('-');
   }
 
-  async process(input: string, context: CommandContext): Promise<CommandResult> {
+  async process(input: string, context: CommandContext, confirmation?: any): Promise<CommandResult> {
     const startTime = Date.now();
     
     try {
+      // Check if user is confirming a draft email action
+      const lowerInput = input.toLowerCase().trim();
+      if (this.lastEmailDraft && (lowerInput === 'send' || lowerInput === 'send it' || lowerInput === 'yes send')) {
+        // Send the stored draft
+        const emailProcessor = new EmailCommandProcessor();
+        const sendResult = await emailProcessor.processCommand('', {
+          companyId: this.stringToUuid(context.companyId),
+          userId: this.stringToUuid(context.userId),
+          userEmail: context.user?.email || ''
+        }, { action: 'send', draft: this.lastEmailDraft });
+        
+        // Clear the draft after sending
+        this.lastEmailDraft = null;
+        
+        return {
+          success: true,
+          message: this.formatEmailResponse(sendResult),
+          data: sendResult,
+          executionTime: Date.now() - startTime
+        };
+      } else if (this.lastEmailDraft && (lowerInput === 'cancel' || lowerInput === 'no' || lowerInput === 'discard')) {
+        // Cancel the draft
+        this.lastEmailDraft = null;
+        return {
+          success: true,
+          message: 'Email draft cancelled.',
+          executionTime: Date.now() - startTime
+        };
+      }
+      
       // First, identify the intent and extract entities
       const intentAnalysis = await this.analyzeIntent(input, context);
       
@@ -65,6 +98,27 @@ export class CommandProcessor {
         case 'send_message':
           actionResult = await this.sendMessage(intentAnalysis, context);
           response = actionResult.message;
+          break;
+          
+        case 'send_email':
+        case 'search_emails':
+        case 'summarize_emails':
+        case 'email_command':
+          // Use EverMail command processor for comprehensive email handling
+          const emailProcessor = new EmailCommandProcessor();
+          const emailResult = await emailProcessor.processCommand(input, {
+            companyId: this.stringToUuid(context.companyId),
+            userId: this.stringToUuid(context.userId),
+            userEmail: context.user?.email || ''
+          }, confirmation);
+          
+          // Store draft if it's a draft_email result
+          if (emailResult.type === 'draft_email') {
+            this.lastEmailDraft = emailResult.draft;
+          }
+          
+          response = this.formatEmailResponse(emailResult);
+          actionResult = emailResult;
           break;
           
         case 'summarize_conversation':
@@ -161,11 +215,15 @@ export class CommandProcessor {
           {
             role: 'system',
             content: `Analyze the user's intent and extract entities. Return a JSON object with:
-            - intent: one of 'send_message', 'summarize_conversation', 'query_data', 'other'
-            - entities: object with relevant entities like 'recipient', 'channel', 'message', 'user', 'timeframe', etc.
+            - intent: one of 'send_message', 'send_email', 'search_emails', 'summarize_emails', 'summarize_conversation', 'query_data', 'other'
+            - entities: object with relevant entities like 'recipient', 'channel', 'message', 'user', 'timeframe', 'subject', 'email_address', etc.
             
             Examples:
             "Send a message to #sales about new pricing" -> {"intent": "send_message", "entities": {"channel": "sales", "message": "about new pricing"}}
+            "Email john@example.com about the project update" -> {"intent": "send_email", "entities": {"to": ["john@example.com"], "subject": "project update"}}
+            "Email kian@evergreengroup.ai a summary on salesforce" -> {"intent": "send_email", "entities": {"to": ["kian@evergreengroup.ai"], "generateSummary": true, "topic": "salesforce"}}
+            "Show me emails from last week" -> {"intent": "search_emails", "entities": {"timeframe": "last week"}}
+            "Summarize emails from Sarah" -> {"intent": "summarize_emails", "entities": {"from": "Sarah"}}
             "message omid a paragraph explanation of the term CRM" -> {"intent": "send_message", "entities": {"recipient": "omid", "explanation": true, "term": "CRM"}}
             "message omid summary of what claude code is" -> {"intent": "send_message", "entities": {"recipient": "omid", "generateSummary": true, "topic": "claude code"}}
             "give sales group chat the update that new pricing is 200,000" -> {"intent": "send_message", "entities": {"channel": "sales", "update": "new pricing is 200,000"}}
@@ -191,6 +249,56 @@ export class CommandProcessor {
   
   private analyzeIntentFallback(input: string): any {
     const lowerInput = input.toLowerCase();
+    
+    // Comprehensive email command detection
+    const emailKeywords = ['email', 'emails', 'inbox', 'unread', 'important', 'archive', 'forward', 'reply', 'draft', 'compose', 'attachments', 'urgent', 'starred'];
+    const emailActions = ['show', 'find', 'search', 'summarize', 'extract', 'analyze'];
+    
+    if (emailKeywords.some(keyword => lowerInput.includes(keyword)) || 
+        emailActions.some(action => lowerInput.includes(action) && lowerInput.includes('email'))) {
+      return { intent: 'email_command', entities: {} };
+    }
+    
+    // Legacy email patterns for backwards compatibility
+    if (lowerInput.includes('email') && lowerInput.includes('@')) {
+      const entities: any = {};
+      
+      // Extract email addresses
+      const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g;
+      const emailMatches = input.match(emailRegex);
+      if (emailMatches) {
+        entities.to = emailMatches;
+      }
+      
+      // Check if it's about searching/viewing emails
+      if (lowerInput.includes('show') || lowerInput.includes('find') || lowerInput.includes('search')) {
+        return { intent: 'search_emails', entities };
+      }
+      
+      // Check if it's about summarizing
+      if (lowerInput.includes('summar')) {
+        const fromMatch = input.match(/from\s+(\w+)/i);
+        if (fromMatch) entities.from = fromMatch[1];
+        return { intent: 'summarize_emails', entities };
+      }
+      
+      // It's about sending an email
+      const aboutMatch = input.match(/about\s+(.+?)(?:\s|$)/i);
+      if (aboutMatch) {
+        entities.subject = aboutMatch[1];
+      }
+      
+      // Check for summary generation
+      if (lowerInput.includes('summary on') || lowerInput.includes('summary of')) {
+        const topicMatch = input.match(/summary\s+(?:on|of)\s+(.+)/i);
+        if (topicMatch) {
+          entities.generateSummary = true;
+          entities.topic = topicMatch[1];
+        }
+      }
+      
+      return { intent: 'send_email', entities };
+    }
     
     // Message sending patterns
     if (lowerInput.includes('message') || lowerInput.includes('send') || lowerInput.includes('tell') || lowerInput.includes('give')) {
@@ -543,6 +651,142 @@ export class CommandProcessor {
     return {
       success: true,
       message: `I'm still learning to analyze that type of data. For now, I can help with:\n• Sending messages to team members or channels\n• Summarizing conversations\n• Basic business metrics`
+    };
+  }
+  
+  private formatEmailResponse(result: any): string {
+    switch (result.type) {
+      case 'search_results':
+        if (result.emails.length === 0) {
+          return result.message;
+        }
+        const emailList = result.emails.slice(0, 5).map((e: any) => 
+          `• From: ${e.from?.email || 'Unknown'}\n  Subject: ${e.subject}\n  ${e.body?.snippet?.substring(0, 100)}...`
+        ).join('\n\n');
+        return `${result.message}\n\n${emailList}`;
+        
+      case 'summary':
+        return `${result.message}\n\n${result.summary}`;
+        
+      case 'draft_email':
+      case 'draft_reply':
+      case 'draft_forward':
+        const draftDisplay = `${result.message}\n\n**To:** ${result.draft.to?.join(', ')}\n**Subject:** ${result.draft.subject}\n\n${result.draft.body}`;
+        
+        // Add action buttons if they exist
+        if (result.actions) {
+          const buttons = result.actions.map((action: any) => 
+            action.primary ? `\n\n✅ **${action.label}**` : `\n🔘 ${action.label}`
+          ).join('  ');
+          return draftDisplay + '\n\n---' + buttons + '\n\n_Reply with "send" to send this email, "edit" to modify it, or "cancel" to discard._';
+        }
+        return draftDisplay;
+        
+      case 'extraction':
+        if (Array.isArray(result.data)) {
+          return `${result.message}\n\n${result.data.join('\n')}`;
+        }
+        return `${result.message}\n\n${result.data}`;
+        
+      case 'analysis':
+        return `${result.message}\n\n${result.analysis || ''}`;
+        
+      case 'success':
+      case 'info':
+      case 'error':
+      default:
+        return result.message;
+    }
+  }
+  
+  private async sendEmail(intentData: any, context: CommandContext): Promise<any> {
+    const { entities } = intentData;
+    
+    // Check if we have recipients
+    if (!entities.to || entities.to.length === 0) {
+      return {
+        success: false,
+        message: 'Please specify an email address to send to. For example: "Email john@example.com about the meeting"'
+      };
+    }
+    
+    // Generate content if needed
+    let emailBody = '';
+    let subject = entities.subject || 'Message from evergreenOS';
+    
+    if (entities.generateSummary && entities.topic) {
+      // Generate a summary about the topic
+      emailBody = await this.generateSummaryWithAI(entities.topic);
+      subject = `Summary: ${entities.topic}`;
+    } else if (entities.subject) {
+      // Generate email body based on subject
+      if (openai) {
+        try {
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4-turbo-preview',
+            messages: [
+              {
+                role: 'system',
+                content: 'Write a professional email body for the given subject. Be clear, concise, and friendly.'
+              },
+              {
+                role: 'user',
+                content: `Write an email about: ${entities.subject}`
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 300,
+          });
+          emailBody = completion.choices[0].message.content || '';
+        } catch (error) {
+          emailBody = `This email is regarding ${entities.subject}.\n\nPlease let me know if you need any additional information.`;
+        }
+      } else {
+        emailBody = `This email is regarding ${entities.subject}.\n\nPlease let me know if you need any additional information.`;
+      }
+    }
+    
+    // For now, we'll create a draft that shows what would be sent
+    // In production, this would use the evermailRouter to actually send
+    return {
+      success: true,
+      message: `📧 **Email Draft Created:**\n\n**To:** ${entities.to.join(', ')}\n**Subject:** ${subject}\n\n**Body:**\n${emailBody}\n\n_To send this email, connect your Gmail account in Email Settings_`,
+      data: {
+        to: entities.to,
+        subject,
+        body: emailBody
+      }
+    };
+  }
+  
+  private async searchEmails(intentData: any, context: CommandContext): Promise<any> {
+    const { entities } = intentData;
+    
+    // Parse time frame
+    let timeframeText = '';
+    if (entities.timeframe) {
+      timeframeText = ` from ${entities.timeframe}`;
+    }
+    
+    // For demo, return mock search results
+    return {
+      success: true,
+      message: `📧 **Email Search Results${timeframeText}:**\n\n1. **From:** john@example.com\n   **Subject:** Q4 Budget Review\n   _Received 2 days ago_\n\n2. **From:** sarah@client.com\n   **Subject:** Re: Project Timeline\n   _Received 3 days ago_\n\n3. **From:** team@company.com\n   **Subject:** Weekly Update\n   _Received 5 days ago_\n\n_To view full emails, go to your Inbox_`
+    };
+  }
+  
+  private async summarizeEmails(intentData: any, context: CommandContext): Promise<any> {
+    const { entities } = intentData;
+    
+    let filterText = '';
+    if (entities.from) {
+      filterText = ` from ${entities.from}`;
+    }
+    
+    // For demo, return mock summary
+    return {
+      success: true,
+      message: `📧 **Email Summary${filterText}:**\n\n**Key Topics:**\n• Budget approval needed for Q4 projects\n• Project timeline shifted by 2 weeks\n• New client onboarding scheduled for next Monday\n\n**Action Items:**\n• Review and approve budget by Friday\n• Update project milestones in system\n• Prepare onboarding materials\n\n**Important Dates:**\n• Nov 15: Budget deadline\n• Nov 20: Project kick-off\n• Nov 25: Client onboarding\n\n_Based on 12 emails analyzed_`
     };
   }
   

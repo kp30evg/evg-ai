@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { commandProcessor } from '@/lib/ai/command-processor';
-import { clerkClient } from '@clerk/nextjs/server';
 
 export const commandRouter = router({
   execute: protectedProcedure
@@ -9,19 +8,11 @@ export const commandRouter = router({
       input: z.string().min(1),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Get user details from Clerk
-      let userName = 'User';
-      let userImage = null;
-      
-      try {
-        const user = await clerkClient.users.getUser(ctx.userId);
-        userName = user.firstName && user.lastName 
-          ? `${user.firstName} ${user.lastName}`.trim() 
-          : user.firstName || user.emailAddresses?.[0]?.emailAddress || 'User';
-        userImage = user.imageUrl || null;
-      } catch (error) {
-        console.error('Error fetching user from Clerk:', error);
-      }
+      // Get user details from context
+      const userName = ctx.user?.firstName && ctx.user?.lastName 
+        ? `${ctx.user.firstName} ${ctx.user.lastName}`.trim() 
+        : ctx.user?.firstName || ctx.user?.emailAddresses?.[0]?.emailAddress || 'User';
+      const userImage = ctx.user?.imageUrl || null;
       
       // Use Clerk IDs directly with proper user info
       const result = await commandProcessor.process(input.input, {

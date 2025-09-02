@@ -46,6 +46,8 @@ export default function DashboardPage() {
   const [showFollowups, setShowFollowups] = useState(false)
   const [followupSuggestions, setFollowupSuggestions] = useState<string[]>([])
   const [isFocused, setIsFocused] = useState(false)
+  const [emailDraft, setEmailDraft] = useState<any>(null)
+  const [showEmailActions, setShowEmailActions] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const colors = {
@@ -90,6 +92,16 @@ export default function DashboardPage() {
       // After thinking animation completes, show the answer
       setTimeout(() => {
         setCurrentState('answer')
+        
+        // Check if this is an email draft response
+        if (result.data?.type === 'draft_email') {
+          setEmailDraft(result.data.draft)
+          setShowEmailActions(true)
+        } else {
+          setEmailDraft(null)
+          setShowEmailActions(false)
+        }
+        
         startStreamingText(result.message || 'I couldn\'t generate a response.')
         setFollowupSuggestions(result.suggestions || ['Try again', 'Ask a different question'])
       }, 2500)
@@ -110,6 +122,8 @@ export default function DashboardPage() {
     setStreamedText('')
     setShowFollowups(false)
     setFollowupSuggestions([])
+    setEmailDraft(null)
+    setShowEmailActions(false)
   }
 
   const startThinkingSequence = () => {
@@ -161,10 +175,56 @@ export default function DashboardPage() {
     setSelectedPrompt('')
     resetAnimationStates()
   }
+  
+  const handleEmailAction = async (action: string) => {
+    if (action === 'send' && emailDraft) {
+      // Send confirmation to process the email
+      setCurrentState('thinking')
+      resetAnimationStates()
+      startThinkingSequence()
+      
+      try {
+        const result = await executeCommand.mutateAsync({ input: 'send' })
+        
+        setTimeout(() => {
+          setCurrentState('answer')
+          setEmailDraft(null)
+          setShowEmailActions(false)
+          startStreamingText(result.message || 'Email sent successfully!')
+          setFollowupSuggestions(['Compose another email', 'Check inbox', 'View sent emails'])
+        }, 1500)
+      } catch (error) {
+        console.error('Error sending email:', error)
+        setTimeout(() => {
+          setCurrentState('answer')
+          startStreamingText('Failed to send email. Please make sure your Gmail account is connected.')
+          setFollowupSuggestions(['Try again', 'Go to settings'])
+        }, 1000)
+      }
+    } else if (action === 'cancel') {
+      setEmailDraft(null)
+      setShowEmailActions(false)
+      startStreamingText('Email draft cancelled.')
+      setFollowupSuggestions(['Compose new email', 'Ask another question'])
+    } else if (action === 'edit') {
+      // TODO: Implement edit functionality
+      startStreamingText('Edit functionality coming soon. For now, you can cancel and create a new draft.')
+    }
+  }
 
   const formatText = (text: string) => {
     const lines = text.split('\n')
     return lines.map((line, index) => {
+      // Skip the action button instructions line if present
+      if (line.includes('_Reply with "send"') || line.includes('---')) {
+        return null
+      }
+      
+      // Check for checkmarks and buttons (these are handled by actual buttons now)
+      if (line.includes('✅') || line.includes('🔘')) {
+        return null
+      }
+      
       // Bold text
       const parts = line.split(/\*\*(.*?)\*\*/g)
       const formatted = parts.map((part, i) => 
@@ -182,7 +242,7 @@ export default function DashboardPage() {
           {formatted}
         </div>
       )
-    })
+    }).filter(Boolean)
   }
 
   // Check if onboarding is needed
@@ -737,8 +797,86 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+                {/* Email Action Buttons */}
+                {showEmailActions && emailDraft && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      gap: '12px',
+                      marginBottom: '24px'
+                    }}
+                  >
+                    <motion.button
+                      onClick={() => handleEmailAction('send')}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: colors.evergreen,
+                        color: colors.white,
+                        border: 'none',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Check size={16} />
+                      Send Email
+                    </motion.button>
+                    
+                    <motion.button
+                      onClick={() => handleEmailAction('edit')}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: colors.white,
+                        color: colors.charcoal,
+                        border: `1px solid ${colors.lightGray}`,
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                      whileHover={{ 
+                        backgroundColor: colors.softGreen,
+                        borderColor: colors.evergreen + '30'
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      Edit Draft
+                    </motion.button>
+                    
+                    <motion.button
+                      onClick={() => handleEmailAction('cancel')}
+                      style={{
+                        padding: '12px 24px',
+                        backgroundColor: colors.white,
+                        color: colors.mediumGray,
+                        border: `1px solid ${colors.lightGray}`,
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer'
+                      }}
+                      whileHover={{ 
+                        backgroundColor: '#FEE',
+                        borderColor: '#F88'
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      Cancel
+                    </motion.button>
+                  </motion.div>
+                )}
+
                 {/* Follow-ups */}
-                {showFollowups && (
+                {showFollowups && !showEmailActions && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -794,31 +932,36 @@ export default function DashboardPage() {
                   </motion.div>
                 )}
 
-                {/* New Question Button */}
-                <motion.button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    resetToWelcome()
-                  }}
-                  style={{
-                    padding: '12px 24px',
-                    backgroundColor: colors.evergreen,
-                    color: colors.white,
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    alignSelf: 'center',
-                    marginTop: '20px'
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  ← Ask Another Question
-                </motion.button>
+                {/* Action Buttons Row */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  marginTop: '20px'
+                }}>
+                  <motion.button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      resetToWelcome()
+                    }}
+                    style={{
+                      padding: '12px 24px',
+                      backgroundColor: colors.evergreen,
+                      color: colors.white,
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer'
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    ← Ask Another Question
+                  </motion.button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
