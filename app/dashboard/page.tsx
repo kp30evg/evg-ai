@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
 import ChatWidget from '@/components/everchat/ChatWidget'
+import Sidebar from '@/components/dashboard/Sidebar'
 
 type State = 'welcome' | 'thinking' | 'answer'
 
@@ -187,12 +188,23 @@ export default function DashboardPage() {
   // Check if onboarding is needed
   useEffect(() => {
     if (isLoaded && organization) {
-      // Check if this organization has completed onboarding
-      const hasCompletedOnboarding = localStorage.getItem(`onboarding_completed_${organization.id}`)
-      
-      if (!hasCompletedOnboarding) {
-        router.push('/onboarding')
+      // Check onboarding status from database
+      const checkOnboardingStatus = async () => {
+        try {
+          const response = await fetch('/api/onboarding/status')
+          const data = await response.json()
+          
+          if (data.needsOnboarding) {
+            router.push('/onboarding')
+          }
+        } catch (error) {
+          console.error('Error checking onboarding status:', error)
+          // Fallback: if we can't check status, assume onboarding is needed
+          router.push('/onboarding')
+        }
       }
+      
+      checkOnboardingStatus()
     }
   }, [isLoaded, organization, router])
 
@@ -216,18 +228,26 @@ export default function DashboardPage() {
       backgroundColor: '#FAFBFC',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     }}>
-      {/* Header */}
+      {/* Sidebar */}
+      <Sidebar />
+      
+      {/* Main Content Area - adjusted for sidebar */}
       <div style={{
-        backgroundColor: colors.white,
-        borderBottom: `1px solid ${colors.lightGray}40`,
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100
+        marginLeft: '70px', // Account for sidebar width
+        minHeight: '100vh'
       }}>
+        {/* Header */}
+        <div style={{
+          backgroundColor: colors.white,
+          borderBottom: `1px solid ${colors.lightGray}40`,
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40 // Lower than sidebar panels
+        }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
@@ -802,10 +822,11 @@ export default function DashboardPage() {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+        
+        {/* EverChat floating widget */}
+        <ChatWidget />
       </div>
-      
-      {/* EverChat floating widget */}
-      <ChatWidget />
     </div>
   )
 }

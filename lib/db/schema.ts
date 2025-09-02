@@ -148,7 +148,7 @@ export const invitations = pgTable('invitations', {
 export const onboardingEvents = pgTable('onboarding_events', {
   id: uuid('id').defaultRandom().primaryKey(),
   companyId: uuid('company_id').references(() => companies.id),
-  userId: uuid('user_id').references(() => users.id),
+  userId: varchar('user_id', { length: 255 }), // Clerk user ID
   
   event: text('event').notNull(), // 'step_completed', 'integration_connected', 'data_imported', etc.
   stepName: text('step_name'),

@@ -66,6 +66,60 @@ export async function POST(req: Request) {
     }
   }
   
+  if (eventType === 'user.created') {
+    const { id, email_addresses, first_name, last_name, image_url } = evt.data
+    
+    try {
+      // Check if user already exists
+      const [existingUser] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkUserId, id))
+        .limit(1)
+      
+      if (!existingUser) {
+        // Create user record (without company initially)
+        await db.insert(users).values({
+          clerkUserId: id,
+          email: email_addresses[0]?.email_address || '',
+          firstName: first_name,
+          lastName: last_name,
+          imageUrl: image_url,
+          companyId: null, // Will be set when they join an organization
+          hasCompletedTour: false,
+          firstCommandExecuted: false,
+          role: 'member'
+        })
+        
+        console.log(`User created: ${email_addresses[0]?.email_address}`)
+      }
+    } catch (error) {
+      console.error('Error creating user:', error)
+    }
+  }
+  
+  if (eventType === 'user.updated') {
+    const { id, email_addresses, first_name, last_name, image_url } = evt.data
+    
+    try {
+      // Update user record
+      await db
+        .update(users)
+        .set({
+          email: email_addresses[0]?.email_address || '',
+          firstName: first_name,
+          lastName: last_name,
+          imageUrl: image_url,
+          updatedAt: new Date()
+        })
+        .where(eq(users.clerkUserId, id))
+      
+      console.log(`User updated: ${email_addresses[0]?.email_address}`)
+    } catch (error) {
+      console.error('Error updating user:', error)
+    }
+  }
+  
   if (eventType === 'organizationMembership.created') {
     const { organization, public_user_data } = evt.data
     
@@ -85,8 +139,19 @@ export async function POST(req: Request) {
           .where(eq(users.clerkUserId, public_user_data.user_id))
           .limit(1)
         
-        if (!existingUser) {
-          // Create user record
+        if (existingUser) {
+          // Update user with company association
+          await db
+            .update(users)
+            .set({
+              companyId: company.id,
+              updatedAt: new Date()
+            })
+            .where(eq(users.clerkUserId, public_user_data.user_id))
+          
+          console.log(`User ${public_user_data.identifier} linked to organization ${organization.name}`)
+        } else {
+          // Create user record if it doesn't exist
           await db.insert(users).values({
             clerkUserId: public_user_data.user_id,
             email: public_user_data.identifier || '',
@@ -99,7 +164,7 @@ export async function POST(req: Request) {
             role: 'member'
           })
           
-          console.log(`User added to organization: ${public_user_data.identifier}`)
+          console.log(`User created and added to organization: ${public_user_data.identifier}`)
         }
       }
     } catch (error) {

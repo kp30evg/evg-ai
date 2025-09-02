@@ -27,24 +27,22 @@ export default function OnboardingStep5() {
     setIsLoading(true)
     
     try {
-      await fetch('/api/onboarding/complete', {
+      const response = await fetch('/api/onboarding/complete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId: organization?.id,
-          userId: user?.id
-        })
+        headers: { 'Content-Type': 'application/json' }
       })
       
-      // Mark onboarding as complete
-      if (organization?.id) {
-        localStorage.setItem(`onboarding_completed_${organization.id}`, 'true')
+      if (!response.ok) {
+        throw new Error('Failed to complete onboarding')
       }
       
+      // Small delay for better UX
       await new Promise(resolve => setTimeout(resolve, 1000))
       router.push('/dashboard')
     } catch (error) {
       console.error('Error completing onboarding:', error)
+      // Still navigate to dashboard even if the API call fails
+      router.push('/dashboard')
     } finally {
       setIsLoading(false)
     }

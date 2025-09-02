@@ -9,22 +9,49 @@ export async function POST(req: Request) {
     const { userId, orgId } = await auth()
     
     if (!userId || !orgId) {
+      console.error('Onboarding complete called without auth:', { userId, orgId })
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    // Mark onboarding as complete for the company
-    await db
-      .update(companies)
-      .set({
+    console.log('Completing onboarding for org:', orgId, 'user:', userId)
+
+    // First check if company exists
+    const [existingCompany] = await db
+      .select()
+      .from(companies)
+      .where(eq(companies.clerkOrgId, orgId))
+      .limit(1)
+
+    if (!existingCompany) {
+      console.error('Company not found for orgId:', orgId)
+      // Create the company if it doesn't exist
+      await db.insert(companies).values({
+        clerkOrgId: orgId,
+        name: 'Unknown Organization', // This will be updated by webhook
+        slug: orgId,
         onboardingCompleted: true,
         onboardingCompletedAt: new Date(),
         onboardingStep: 5,
-        updatedAt: new Date()
+        connectedIntegrations: []
       })
-      .where(eq(companies.clerkOrgId, orgId))
+      console.log('Created new company record for:', orgId)
+    } else {
+      // Update existing company
+      const result = await db
+        .update(companies)
+        .set({
+          onboardingCompleted: true,
+          onboardingCompletedAt: new Date(),
+          onboardingStep: 5,
+          updatedAt: new Date()
+        })
+        .where(eq(companies.clerkOrgId, orgId))
+      
+      console.log('Updated company onboarding status:', result)
+    }
 
     // Mark user as having completed the tour
     await db
