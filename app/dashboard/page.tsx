@@ -23,6 +23,8 @@ import {
   ChevronRight,
   BarChart3
 } from 'lucide-react'
+import { trpc } from '@/lib/trpc/client'
+import ChatWidget from '@/components/everchat/ChatWidget'
 
 type State = 'welcome' | 'thinking' | 'answer'
 
@@ -30,6 +32,9 @@ export default function DashboardPage() {
   const { user } = useUser()
   const { organization, isLoaded } = useOrganization()
   const router = useRouter()
+  
+  // tRPC mutation for command execution
+  const executeCommand = trpc.command.execute.useMutation()
   const [currentState, setCurrentState] = useState<State>('welcome')
   const [inputValue, setInputValue] = useState('')
   const [selectedPrompt, setSelectedPrompt] = useState('')
@@ -53,26 +58,10 @@ export default function DashboardPage() {
   }
 
   const prompts = [
-    { 
-      text: "What's our monthly burn rate?", 
-      subtitle: "Financial analysis",
-      icon: '💰'
-    },
-    { 
-      text: "Show revenue by customer segment", 
-      subtitle: "Business intelligence",
-      icon: '📊'
-    },
-    { 
-      text: "Who are our top 10 customers?", 
-      subtitle: "Customer insights",
-      icon: '👥'
-    },
-    { 
-      text: "Optimize inventory for Q4", 
-      subtitle: "Operations planning",
-      icon: '📦'
-    }
+    "What's our monthly burn rate?",
+    "Show revenue by customer segment",
+    "Who are our top 10 customers?",
+    "Optimize inventory for Q4"
   ]
 
   const thinkingSteps = [
@@ -94,25 +83,17 @@ export default function DashboardPage() {
     startThinkingSequence()
 
     try {
-      // Call the OpenAI API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: commandText }),
-      });
-
-      const data = await response.json();
+      // Execute command using tRPC
+      const result = await executeCommand.mutateAsync({ input: commandText })
 
       // After thinking animation completes, show the answer
       setTimeout(() => {
         setCurrentState('answer')
-        startStreamingText(data.message || 'I couldn\'t generate a response.')
-        setFollowupSuggestions(data.suggestions || followupSuggestions)
+        startStreamingText(result.message || 'I couldn\'t generate a response.')
+        setFollowupSuggestions(result.suggestions || ['Try again', 'Ask a different question'])
       }, 2500)
     } catch (error) {
-      console.error('Error calling API:', error)
+      console.error('Error executing command:', error)
       setTimeout(() => {
         setCurrentState('answer')
         startStreamingText('I encountered an error processing your request. Please try again.')
@@ -248,18 +229,6 @@ export default function DashboardPage() {
         zIndex: 100
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <button style={{
-            padding: '8px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Menu size={20} color={colors.charcoal} />
-          </button>
-          
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               fontSize: '18px',
@@ -268,18 +237,6 @@ export default function DashboardPage() {
               letterSpacing: '-0.01em'
             }}>
               evergreenOS
-            </div>
-            <div style={{
-              padding: '3px 8px',
-              backgroundColor: colors.softGreen,
-              borderRadius: '10px',
-              fontSize: '10px',
-              fontWeight: '600',
-              color: colors.evergreen,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              AI Assistant
             </div>
           </div>
           
@@ -340,15 +297,6 @@ export default function DashboardPage() {
             New Chat
           </button>
           
-          <button style={{
-            padding: '8px',
-            backgroundColor: 'transparent',
-            border: 'none',
-            cursor: 'pointer'
-          }}>
-            <History size={18} color={colors.mediumGray} />
-          </button>
-          
           <button 
             onClick={() => window.location.href = '/settings/organization'}
             style={{
@@ -367,107 +315,10 @@ export default function DashboardPage() {
       {/* Main Content */}
       <div style={{
         display: 'flex',
-        height: 'calc(100vh - 56px)'
+        flexDirection: 'column',
+        height: 'calc(100vh - 56px)',
+        width: '100%'
       }}>
-        {/* Sidebar */}
-        <div style={{
-          width: '260px',
-          backgroundColor: colors.white,
-          borderRight: `1px solid ${colors.lightGray}40`,
-          padding: '16px',
-          overflowY: 'auto'
-        }}>
-          <div style={{
-            marginBottom: '24px'
-          }}>
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              style={{
-                width: '100%',
-                padding: '10px 12px 10px 36px',
-                backgroundColor: '#F3F4F6',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '13px',
-                outline: 'none',
-                position: 'relative'
-              }}
-            />
-            <Search size={16} color={colors.mediumGray} style={{
-              position: 'absolute',
-              left: '28px',
-              marginTop: '-26px'
-            }} />
-          </div>
-
-          <div style={{
-            fontSize: '11px',
-            fontWeight: '600',
-            color: colors.mediumGray,
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            marginBottom: '12px'
-          }}>
-            Today
-          </div>
-          
-          {['Revenue analysis Q3', 'Customer segmentation', 'Team productivity metrics'].map((item, i) => (
-            <button key={i} style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: i === 0 ? colors.softGreen : 'transparent',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '13px',
-              color: colors.charcoal,
-              cursor: 'pointer',
-              textAlign: 'left',
-              marginBottom: '4px',
-              transition: 'all 200ms ease-out'
-            }}>
-              {item}
-            </button>
-          ))}
-
-          <div style={{
-            fontSize: '11px',
-            fontWeight: '600',
-            color: colors.mediumGray,
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            marginTop: '24px',
-            marginBottom: '12px'
-          }}>
-            Yesterday
-          </div>
-          
-          {['Inventory optimization', 'Sales pipeline review', 'Marketing ROI analysis'].map((item, i) => (
-            <button key={i} style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: 'transparent',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '13px',
-              color: colors.charcoal,
-              cursor: 'pointer',
-              textAlign: 'left',
-              marginBottom: '4px',
-              transition: 'all 200ms ease-out'
-            }}>
-              {item}
-            </button>
-          ))}
-        </div>
-
-        {/* Chat Area */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative'
-        }}>
           <AnimatePresence mode="wait">
             {/* Welcome State */}
             {currentState === 'welcome' && (
@@ -483,106 +334,58 @@ export default function DashboardPage() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '24px',
-                  maxWidth: '720px',
+                  padding: '48px 24px',
+                  maxWidth: '680px',
                   margin: '0 auto',
                   width: '100%'
                 }}
               >
+                {/* Hero Text */}
                 <div style={{
                   textAlign: 'center',
-                  marginBottom: '48px'
+                  marginBottom: '64px'
                 }}>
                   <h1 style={{
-                    fontSize: '32px',
+                    fontSize: '36px',
                     fontWeight: '600',
                     color: colors.charcoal,
-                    marginBottom: '12px',
-                    letterSpacing: '-0.02em'
+                    marginBottom: '16px',
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.2
                   }}>
                     How can I help you today{user?.firstName ? `, ${user.firstName}` : ''}?
                   </h1>
                   <p style={{
-                    fontSize: '15px',
+                    fontSize: '16px',
                     color: colors.mediumGray,
-                    lineHeight: 1.6
+                    lineHeight: 1.5,
+                    maxWidth: '420px',
+                    margin: '0 auto'
                   }}>
                     Ask me anything about your business data, analytics, or operations
                   </p>
                 </div>
 
-                {/* Sample Prompts Grid */}
+                {/* Main Input Box */}
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '12px',
                   width: '100%',
+                  position: 'relative',
                   marginBottom: '32px'
-                }}>
-                  {prompts.map((prompt, index) => (
-                    <motion.button
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      style={{
-                        padding: '16px',
-                        backgroundColor: colors.white,
-                        border: `1px solid ${colors.lightGray}60`,
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 200ms ease-out'
-                      }}
-                      whileHover={{ 
-                        backgroundColor: colors.softGreen,
-                        borderColor: colors.evergreen + '30',
-                        scale: 1.02
-                      }}
-                      onClick={() => handleSubmit(prompt.text)}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                        <span style={{ fontSize: '20px' }}>{prompt.icon}</span>
-                        <div>
-                          <div style={{
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            color: colors.charcoal,
-                            marginBottom: '4px'
-                          }}>
-                            {prompt.text}
-                          </div>
-                          <div style={{
-                            fontSize: '12px',
-                            color: colors.mediumGray
-                          }}>
-                            {prompt.subtitle}
-                          </div>
-                        </div>
-                      </div>
-                    </motion.button>
-                  ))}
-                </div>
-
-                {/* Input Box */}
-                <div style={{
-                  width: '100%',
-                  position: 'relative'
                 }}>
                   <motion.div 
                     style={{
                       backgroundColor: colors.white,
-                      border: `2px solid ${isFocused ? colors.evergreen : colors.lightGray + '60'}`,
-                      borderRadius: '16px',
-                      padding: '16px',
+                      border: `1px solid ${isFocused ? colors.evergreen : colors.lightGray}`,
+                      borderRadius: '24px',
+                      padding: '20px 24px',
                       transition: 'all 200ms ease-out',
-                      boxShadow: isFocused ? '0 4px 16px rgba(29, 82, 56, 0.1)' : '0 2px 8px rgba(0, 0, 0, 0.04)'
+                      boxShadow: isFocused ? '0 8px 32px rgba(29, 82, 56, 0.12)' : '0 4px 12px rgba(0, 0, 0, 0.05)'
                     }}
                   >
                     <div style={{
                       display: 'flex',
                       alignItems: 'flex-end',
-                      gap: '12px'
+                      gap: '16px'
                     }}>
                       <textarea
                         ref={inputRef}
@@ -602,8 +405,8 @@ export default function DashboardPage() {
                           resize: 'none',
                           border: 'none',
                           outline: 'none',
-                          fontSize: '15px',
-                          lineHeight: 1.6,
+                          fontSize: '16px',
+                          lineHeight: 1.5,
                           color: colors.charcoal,
                           backgroundColor: 'transparent',
                           minHeight: '24px',
@@ -619,9 +422,9 @@ export default function DashboardPage() {
                       }}>
                         <motion.button
                           style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '12px',
                             border: 'none',
                             backgroundColor: 'transparent',
                             cursor: 'pointer',
@@ -632,15 +435,15 @@ export default function DashboardPage() {
                           whileHover={{ backgroundColor: colors.softGreen }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          <Paperclip size={18} color={colors.mediumGray} />
+                          <Paperclip size={20} color={colors.mediumGray} />
                         </motion.button>
                         <motion.button
                           onClick={() => handleSubmit()}
                           disabled={!inputValue.trim()}
                           style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '12px',
                             border: 'none',
                             backgroundColor: inputValue.trim() ? colors.evergreen : colors.lightGray,
                             cursor: inputValue.trim() ? 'pointer' : 'not-allowed',
@@ -648,14 +451,64 @@ export default function DashboardPage() {
                             alignItems: 'center',
                             justifyContent: 'center'
                           }}
-                          whileHover={inputValue.trim() ? { scale: 1.1 } : {}}
+                          whileHover={inputValue.trim() ? { scale: 1.05 } : {}}
                           whileTap={inputValue.trim() ? { scale: 0.95 } : {}}
                         >
-                          <Send size={16} color={colors.white} />
+                          <Send size={18} color={colors.white} />
                         </motion.button>
                       </div>
                     </div>
                   </motion.div>
+                </div>
+
+                {/* Suggested Questions */}
+                <div style={{
+                  width: '100%'
+                }}>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: colors.mediumGray,
+                    marginBottom: '16px',
+                    textAlign: 'center'
+                  }}>
+                    Try asking about:
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    alignItems: 'center'
+                  }}>
+                    {prompts.map((prompt, index) => (
+                      <motion.button
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        style={{
+                          padding: '12px 20px',
+                          backgroundColor: 'transparent',
+                          border: `1px solid ${colors.lightGray}`,
+                          borderRadius: '20px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: '400',
+                          color: colors.charcoal,
+                          transition: 'all 200ms ease-out',
+                          maxWidth: '320px'
+                        }}
+                        whileHover={{ 
+                          backgroundColor: colors.softGreen,
+                          borderColor: colors.evergreen,
+                          scale: 1.02
+                        }}
+                        onClick={() => handleSubmit(prompt)}
+                      >
+                        {prompt}
+                      </motion.button>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -949,8 +802,10 @@ export default function DashboardPage() {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
       </div>
+      
+      {/* EverChat floating widget */}
+      <ChatWidget />
     </div>
   )
 }

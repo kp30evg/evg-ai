@@ -59,19 +59,12 @@ export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
     throw new TRPCError({ code: 'UNAUTHORIZED' });
   }
 
-  // Ensure user and company exist in database
-  if (!ctx.user || !ctx.company) {
-    throw new TRPCError({ 
-      code: 'FORBIDDEN',
-      message: 'User or organization not found in database'
-    });
-  }
-
   return next({
     ctx: {
       ...ctx,
       userId: ctx.userId,
       orgId: ctx.orgId,
+      organizationId: ctx.orgId, // Add alias for compatibility
       user: ctx.user,
       company: ctx.company,
     },

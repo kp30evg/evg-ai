@@ -3,7 +3,7 @@
 
 ---
 
-## 🎯 Brand Essence
+## Brand Essence
 
 **Mission Statement**: "We're not building another SaaS platform - we're obsoleting the entire concept of business software interfaces."
 
@@ -15,12 +15,12 @@
 
 ---
 
-## 🎨 Visual Identity Core
+## Visual Identity Core
 
 ### Logo System
 
 **Primary Logo**: evergreenOS™  
-- **Symbol**: Lightning bolt icon (⚡) representing instant execution
+- **Symbol**: Clean text-based logo or minimal geometric icon
 - **Wordmark**: "evergreenOS" in custom letterforms with subtle tech-forward styling
 - **Color**: Evergreen #1D5238 on light backgrounds, White #FFFFFF on dark
 - **Usage**: All primary marketing materials, website headers, business cards
@@ -39,7 +39,7 @@
 
 ---
 
-## 🌈 Color System
+## Color System
 
 ### Primary Brand Colors
 
@@ -91,8 +91,11 @@
 - Success messages
 
 **Error Red** - #EF4444  
-- Error states, warnings
-- Critical actions
+- Error states only
+- Critical error messages only
+- Use sparingly and only when necessary
+
+**Note**: Avoid using additional colors. Stick to the core brand palette for all UI elements. Use opacity variations and the existing grays for different states instead of introducing new colors.
 
 
 ### Dark Mode Palette
@@ -111,7 +114,7 @@
 
 ---
 
-## 📝 Typography Scale
+## Typography Scale
 
 ### Font Family
 **Primary**: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
@@ -158,7 +161,7 @@
 
 ---
 
-## 📐 Spacing System
+## Spacing System
 
 **Base Unit**: 8px  
 All spacing uses multiples of 8px for pixel-perfect consistency
@@ -177,7 +180,7 @@ All spacing uses multiples of 8px for pixel-perfect consistency
 
 ---
 
-## 🔲 Border Radius System
+## Border Radius System
 
 **Small (4px)**: Form inputs, small buttons, badges  
 **Medium (8px)**: Standard buttons, small cards  
@@ -188,7 +191,41 @@ All spacing uses multiples of 8px for pixel-perfect consistency
 
 ---
 
-## 🧩 Component Library
+## Icons and Visual Elements
+
+### Icon Guidelines
+**Primary Icon Set**: Use Lucide React icons exclusively
+- Clean, minimal line icons
+- Consistent 24px base size
+- Stroke width: 2px
+- Color: Match text color or use brand green for emphasis
+
+**Approved Icons for Core Features**:
+- Search: Search icon (magnifying glass)
+- Send: Send or ArrowRight icon
+- Attachment: Paperclip icon
+- Voice: Mic icon
+- Settings: Settings icon
+- Menu: Menu icon
+- Close: X icon
+- Check: Check icon
+- Copy: Copy icon
+- Download: Download icon
+
+**Icon Usage Rules**:
+- NO emoji icons in the UI
+- NO colorful or playful icons
+- NO decorative icons without function
+- Keep icons monochrome (use brand colors only)
+- Maintain consistent sizing across the interface
+
+### Visual Hierarchy
+- Use typography and spacing for hierarchy, not colors
+- Rely on the brand green sparingly for key CTAs only
+- Use grays and opacity for secondary elements
+- Maintain high contrast for accessibility
+
+## Component Library
 
 ### Buttons
 
@@ -292,7 +329,7 @@ font-weight: 500
 
 ---
 
-## ✨ Animation & Motion
+## Animation & Motion
 
 ### Timing Functions
 - **Fast**: 150ms - Micro-interactions, hovers
@@ -334,24 +371,32 @@ animation-delay: calc(index * 50ms)
 
 ---
 
-## 🎪 ChatGPT-Style UI Pattern
+## ChatGPT-Style UI Pattern
 
 ### Three-State System
 1. **Welcome State**: Clean input with sample prompts
-2. **Thinking State**: Animated processing steps
-3. **Answer State**: Streaming text + interactive components
+2. **Thinking State**: Subtle loading animation (no flashy effects)
+3. **Answer State**: Streaming text with clean formatting
 
 ### Key Elements
-- **THE BOX**: Prominent input area with icons (paperclip, mic, send)
+- **THE BOX**: Clean input area with minimal, monochrome icons
 - **Auto-resize Textarea**: Grows with content
-- **Sample Prompts**: Grid of clickable examples
+- **Sample Prompts**: Text-based examples, no emoji decorations
 - **Progressive Disclosure**: Content appears sequentially
-- **Streaming Text**: Bold markdown support with `**text**`
-- **Follow-up Actions**: Contextual next steps
+- **Streaming Text**: Clean markdown formatting
+- **Follow-up Actions**: Simple text-based suggestions
+
+### UI Rules for Chat Interface
+- NO emoji in system responses or UI elements
+- NO colorful badges or tags (use subtle gray backgrounds)
+- NO playful animations or bouncing elements
+- Use Lucide icons only, in brand colors
+- Keep the interface professional and clean
+- Match the aesthetic of the landing page exactly
 
 ---
 
-## 📱 Responsive Breakpoints
+## Responsive Breakpoints
 
 **Mobile**: 0px - 767px  
 - Single column layout
@@ -376,7 +421,7 @@ animation-delay: calc(index * 50ms)
 
 ---
 
-## 🌙 Dark Mode Guidelines
+## Dark Mode Guidelines
 
 ### Implementation Strategy
 - Use CSS custom properties for easy theme switching
@@ -392,7 +437,7 @@ animation-delay: calc(index * 50ms)
 
 ---
 
-## 🎨 Brand Applications
+## Brand Applications
 
 ### Website Headers
 - evergreenOS logo top-left
@@ -420,29 +465,35 @@ animation-delay: calc(index * 50ms)
 
 ---
 
-## 🏆 Brand Guidelines
+## Brand Guidelines
 
-### Do's ✅
+### Do's
 - Use ample white space for clean, uncluttered feeling
 - Apply consistent spacing using 8px grid system
 - Maintain high contrast for accessibility
-- Use animations purposefully to enhance UX
+- Use animations purposefully and subtly
 - Keep messaging clear and direct
 - Show real product capabilities, not mock-ups
 - Use evergreen color strategically as accent
+- Follow the landing page aesthetic as the gold standard
+- Use Lucide React icons exclusively
+- Keep the interface professional and business-focused
 
-### Don'ts ❌
+### Don'ts
+- Never use emoji in the UI or system messages
+- Never use colorful, playful, or decorative icons
+- Never introduce colors outside the brand palette
 - Never overcrowd layouts with too many elements
 - Don't use evergreen as background color extensively
 - Avoid generic stock photos or illustrations
 - Never compromise on loading speed for visual effects
 - Don't use jargon or overly technical language
-- Avoid competing with other green-branded companies' exact styles
-- Never sacrifice usability for visual appeal
+- Never add "fun" or "quirky" elements that dilute professionalism
+- Never sacrifice brand consistency for trendy design patterns
 
 ---
 
-## 🔍 Competitive Differentiation
+## Competitive Differentiation
 
 ### Visual Identity vs Competitors
 
@@ -459,7 +510,7 @@ animation-delay: calc(index * 50ms)
 
 ---
 
-## 📊 Brand Metrics & KPIs
+## Brand Metrics & KPIs
 
 ### Visual Consistency Metrics
 - Color usage accuracy: >95%
@@ -480,7 +531,7 @@ animation-delay: calc(index * 50ms)
 
 ---
 
-## 🛠️ Implementation Tools
+## Implementation Tools
 
 ### Design Tools
 - **Figma**: Primary design tool with shared component library
@@ -501,7 +552,7 @@ animation-delay: calc(index * 50ms)
 
 ---
 
-## 📈 Evolution & Updates
+## Evolution & Updates
 
 ### Quarterly Reviews
 - Brand application consistency audit
@@ -523,7 +574,7 @@ animation-delay: calc(index * 50ms)
 
 ---
 
-## 🔗 Resources & Assets
+## Resources & Assets
 
 ### Download Links
 - Logo package (SVG, PNG, PDF)
