@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Inbox,
   Send,
@@ -105,6 +105,9 @@ export default function MailLayout({ children }: MailLayoutProps) {
     spam: 0,
     trash: 0
   });
+  
+  // Hide sidebar on dashboard (main mail page)
+  const showSidebar = pathname !== '/mail';
 
   const navigationItems = [
     { 
@@ -121,7 +124,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
       icon: Star, 
       path: '/mail/starred',
       count: 0,
-      color: tokens.colors.gold
+      color: tokens.colors.gray500
     },
     { 
       id: 'snoozed', 
@@ -129,7 +132,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
       icon: Clock, 
       path: '/mail/snoozed',
       count: 0,
-      color: tokens.colors.info
+      color: tokens.colors.gray500
     },
     { 
       id: 'sent', 
@@ -156,7 +159,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
       icon: AlertCircle, 
       path: '/mail/important',
       count: 0,
-      color: tokens.colors.error
+      color: tokens.colors.gray500
     },
     { 
       id: 'spam', 
@@ -164,7 +167,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
       icon: AlertCircle, 
       path: '/mail/spam',
       count: unreadCounts.spam,
-      color: tokens.colors.error
+      color: tokens.colors.gray500
     },
     { 
       id: 'trash', 
@@ -185,11 +188,11 @@ export default function MailLayout({ children }: MailLayoutProps) {
   ];
 
   const labels = [
-    { id: 'work', label: 'Work', color: '#1E40AF' },
-    { id: 'personal', label: 'Personal', color: '#10B981' },
-    { id: 'finance', label: 'Finance', color: '#F59E0B' },
-    { id: 'newsletter', label: 'Newsletter', color: '#8B5CF6' },
-    { id: 'social', label: 'Social Media', color: '#EC4899' }
+    { id: 'work', label: 'Work', color: tokens.colors.charcoal },
+    { id: 'personal', label: 'Personal', color: tokens.colors.gray500 },
+    { id: 'finance', label: 'Finance', color: tokens.colors.charcoal },
+    { id: 'newsletter', label: 'Newsletter', color: tokens.colors.gray500 },
+    { id: 'social', label: 'Social Media', color: tokens.colors.gray500 }
   ];
 
   const isActive = (path: string) => {
@@ -210,17 +213,24 @@ export default function MailLayout({ children }: MailLayoutProps) {
       fontFamily: tokens.typography.fontFamily,
       overflow: 'hidden'
     }}>
-      {/* Sidebar */}
-      <div style={{
-        width: sidebarCollapsed ? '60px' : '260px',
-        backgroundColor: tokens.colors.white,
-        borderRight: `1px solid ${tokens.colors.gray200}`,
-        display: 'flex',
-        flexDirection: 'column',
-        transition: tokens.transitions.base,
-        position: 'relative',
-        zIndex: 10
-      }}>
+      {/* Sidebar - Only shown when not on dashboard */}
+      <AnimatePresence mode="wait">
+        {showSidebar && (
+          <motion.div 
+            key="sidebar"
+            initial={{ x: -260 }}
+            animate={{ x: 0 }}
+            exit={{ x: -260 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          style={{
+            width: sidebarCollapsed ? '60px' : '260px',
+            backgroundColor: tokens.colors.white,
+            borderRight: `1px solid ${tokens.colors.gray200}`,
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+            zIndex: 10
+          }}>
         {/* Logo/Header */}
         <div style={{
           padding: tokens.spacing.lg,
@@ -529,7 +539,9 @@ export default function MailLayout({ children }: MailLayoutProps) {
             </div>
           )}
         </div>
-      </div>
+        </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content Area */}
       <div style={{
