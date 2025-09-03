@@ -227,6 +227,7 @@ export const unifiedRouter = router({
       phone: z.string().optional(),
       jobTitle: z.string().optional(),
       companyId: z.string().uuid().optional(),
+      companyName: z.string().optional(), // NEW: Accept company name
     }))
     .mutation(async ({ ctx, input }) => {
       const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);

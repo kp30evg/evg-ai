@@ -69,7 +69,7 @@ export default function CreateContactSheet({ isOpen, onClose, onSuccess }: Creat
       email: formData.email,
       phone: formData.phone || undefined,
       jobTitle: formData.jobTitle || undefined,
-      companyId: undefined, // TODO: Link to company
+      companyName: formData.companyName || undefined, // NOW FIXED: Send company name for auto-creation/linking
     })
   }
   

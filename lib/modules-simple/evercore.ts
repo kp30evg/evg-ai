@@ -13,6 +13,7 @@ export interface ContactData {
   phone?: string;
   jobTitle?: string;
   companyId?: string;
+  companyName?: string; // NEW: Accept company name as alternative to companyId
   sentimentScore?: number;
   lastContactedAt?: Date;
   source?: 'manual' | 'email' | 'calendar' | 'import';
@@ -48,6 +49,7 @@ export interface DealData {
 
 /**
  * Create a contact (person)
+ * Automatically creates or links to company if companyName is provided
  */
 export async function createContact(
   workspaceId: string,
@@ -64,17 +66,63 @@ export async function createContact(
     data.lastContactedAt = new Date();
   }
 
+  let companyId = data.companyId;
+
+  // Handle company name resolution - CRITICAL for interdependent relationships
+  if (!companyId && data.companyName && data.companyName.trim()) {
+    const companyName = data.companyName.trim();
+    
+    // First, try to find existing company by name
+    const existingCompanies = await entityService.find({
+      workspaceId,
+      type: 'company',
+      search: companyName, // This will search in the company data
+      limit: 10
+    });
+
+    // Look for exact match (case-insensitive)
+    let matchingCompany = existingCompanies.find((company: any) => 
+      company.data?.name?.toLowerCase() === companyName.toLowerCase()
+    );
+
+    if (matchingCompany) {
+      // Company exists - use its ID
+      companyId = matchingCompany.id;
+      console.log(`🔗 Linking contact to existing company: ${companyName} (${companyId})`);
+    } else {
+      // Company doesn't exist - create it automatically
+      console.log(`🏢 Creating new company: ${companyName}`);
+      
+      const newCompany = await createCompany(
+        workspaceId,
+        {
+          name: companyName,
+          healthScore: 50, // Default health score
+        },
+        userId
+      );
+      
+      companyId = newCompany.id;
+      console.log(`✅ Created company: ${companyName} (${companyId})`);
+    }
+  }
+
+  // Create the contact with company relationship
   const contact = await entityService.create(
     workspaceId,
     'contact',
-    data,
-    data.companyId ? { company: data.companyId } : {},
+    {
+      ...data,
+      companyId, // Ensure the resolved companyId is stored
+    },
+    companyId ? { company: companyId } : {},
     { userId, source: data.source || 'manual' }
   );
 
-  // If linked to company, update company's relationships
-  if (data.companyId) {
-    await entityService.link(workspaceId, data.companyId, contact.id, 'contacts');
+  // Establish bidirectional relationship with company
+  if (companyId) {
+    await entityService.link(workspaceId, companyId, contact.id, 'contacts', true);
+    console.log(`🔄 Established bidirectional link: Contact ${contact.id} ↔ Company ${companyId}`);
   }
 
   return contact;
