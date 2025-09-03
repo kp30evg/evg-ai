@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs'
+import { auth } from '@clerk/nextjs/server'
 import { pusher } from '@/lib/pusher'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Pusher not configured' }, { status: 503 })
     }
     
-    const { userId, organizationId } = auth()
+    const { userId, organizationId } = await auth()
     
     if (!userId || !organizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
