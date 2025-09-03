@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { google } from 'googleapis';
 import { db } from '@/lib/db';
-import { entities } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { entities } from '@/lib/db/schema/unified';
+import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 
 // Helper function to convert string to UUID
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
         // Continue without Gmail profile data
       }
       
-      const companyId = stringToUuid(finalOrgId);
+      const workspaceId = stringToUuid(finalOrgId);
       const userId = stringToUuid(finalUserId);
       
       // Check if email account already exists FOR THIS SPECIFIC USER
@@ -130,9 +130,9 @@ export async function GET(req: NextRequest) {
         .from(entities)
         .where(
           and(
-            eq(entities.companyId, companyId),
+            eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email_account'),
-            eq(entities.createdBy, userId) // CRITICAL: Filter by user ID
+            sql`metadata->>'createdBy' = ${userId}` // CRITICAL: Filter by user ID
           )
         )
         .limit(10); // Get recent email accounts and filter in JS
@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
       );
       
       const accountData = {
-        companyId,
+        workspaceId,
         type: 'email_account' as const,
         data: {
           provider: 'gmail',
@@ -160,11 +160,11 @@ export async function GET(req: NextRequest) {
           userId: finalUserId, // CRITICAL: Store user ID in data
           userEmail: userInfo.data.email // Store user's actual email
         },
-        createdBy: userId,
         metadata: {
           source: 'oauth',
           scopes: tokens.scope?.split(' ') || [],
-          userId: finalUserId // Also store in metadata for redundancy
+          userId: finalUserId, // Also store in metadata for redundancy
+          createdBy: userId
         }
       };
       

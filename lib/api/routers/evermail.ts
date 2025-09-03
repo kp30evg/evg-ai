@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { db } from '@/lib/db';
-import { entities, integrations } from '@/lib/db/schema';
+import { entities } from '@/lib/db/schema/unified';
 import { eq, and, desc, or, sql, inArray } from 'drizzle-orm';
-import { GmailSyncService } from '@/lib/evermail/gmail-sync';
+import { GmailSyncService } from '@/lib/evermail/gmail-sync-simple';
 import { EmailCommandProcessor } from '@/lib/evermail/command-processor';
 import { GmailClient } from '@/lib/evermail/gmail-client';
 
@@ -49,7 +49,7 @@ export const evermailRouter = router({
   // Get Gmail connection status
   getGmailStatus: protectedProcedure.query(async ({ ctx }) => {
     const { orgId, userId } = ctx;
-    const companyId = stringToUuid(orgId);
+    const workspaceId = stringToUuid(orgId);
     const userUuid = stringToUuid(userId);
 
     // Check for email_account entity FOR THIS USER ONLY
@@ -58,50 +58,19 @@ export const evermailRouter = router({
       .from(entities)
       .where(
         and(
-          eq(entities.companyId, companyId),
+          eq(entities.workspaceId, workspaceId),
           eq(entities.type, 'email_account'),
-          eq(entities.createdBy, userUuid) // CRITICAL: User-specific
+          sql`metadata->>'createdBy' = ${userUuid}` // CRITICAL: User-specific via metadata
         )
       )
       .limit(1);
 
-    // Fallback to check integrations table (old flow)
+    // If no email account found, return disconnected status
     if (!emailAccount || emailAccount.length === 0) {
-      const integration = await db
-        .select()
-        .from(integrations)
-        .where(
-          and(
-            eq(integrations.companyId, companyId),
-            eq(integrations.provider, 'gmail')
-          )
-        )
-        .limit(1);
-
-      if (!integration || integration.length === 0) {
-        return {
-          connected: false,
-          lastSyncAt: null,
-          emailCount: 0
-        };
-      }
-
-      // Get email count
-      const emailCount = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(entities)
-        .where(
-          and(
-            eq(entities.companyId, companyId),
-            eq(entities.type, 'email')
-          )
-        );
-
       return {
-        connected: integration[0].status === 'connected',
-        lastSyncAt: integration[0].lastSyncAt,
-        emailCount: emailCount[0]?.count || 0,
-        syncError: integration[0].syncError
+        connected: false,
+        lastSyncAt: null,
+        emailCount: 0
       };
     }
 
@@ -114,7 +83,7 @@ export const evermailRouter = router({
       .from(entities)
       .where(
         and(
-          eq(entities.companyId, companyId),
+          eq(entities.workspaceId, workspaceId),
           eq(entities.type, 'email')
         )
       );
@@ -136,35 +105,50 @@ export const evermailRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
       
       const syncService = new GmailSyncService();
-      const result = await syncService.connectGmail(input.authCode, companyId, userId);
+      const result = await syncService.connectGmail(input.authCode, workspaceId, userId);
       
       // Start initial sync in background
-      syncService.performInitialSync(companyId).catch(console.error);
+      syncService.performInitialSync(workspaceId).catch(console.error);
       
       return result;
     }),
 
   // Disconnect Gmail
   disconnectGmail: protectedProcedure.mutation(async ({ ctx }) => {
-    const { orgId } = ctx;
-    const companyId = stringToUuid(orgId);
+    const { orgId, userId } = ctx;
+    const workspaceId = stringToUuid(orgId);
+    const userUuid = stringToUuid(userId);
 
-    await db
-      .update(integrations)
-      .set({ 
-        status: 'disconnected',
-        credentials: null,
-        updatedAt: new Date()
-      })
+    // Find and deactivate email account for this user
+    const emailAccount = await db
+      .select()
+      .from(entities)
       .where(
         and(
-          eq(integrations.companyId, companyId),
-          eq(integrations.provider, 'gmail')
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, 'email_account'),
+          sql`metadata->>'createdBy' = ${userUuid}`
         )
-      );
+      )
+      .limit(1);
+
+    if (emailAccount && emailAccount.length > 0) {
+      const accountData = emailAccount[0].data as any;
+      await db
+        .update(entities)
+        .set({ 
+          data: {
+            ...accountData,
+            isActive: false,
+            tokens: null
+          },
+          updatedAt: new Date()
+        })
+        .where(eq(entities.id, emailAccount[0].id));
+    }
 
     return { success: true };
   }),
@@ -172,7 +156,7 @@ export const evermailRouter = router({
   // Trigger manual sync
   syncEmails: protectedProcedure.mutation(async ({ ctx }) => {
     const { orgId, userId } = ctx;
-    const companyId = stringToUuid(orgId);
+    const workspaceId = stringToUuid(orgId);
     const userUuid = stringToUuid(userId);
     
     try {
@@ -182,9 +166,9 @@ export const evermailRouter = router({
         .from(entities)
         .where(
           and(
-            eq(entities.companyId, companyId),
+            eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email_account'),
-            eq(entities.createdBy, userUuid) // CRITICAL: User-specific
+            sql`metadata->>'createdBy' = ${userUuid}` // CRITICAL: User-specific
           )
         )
         .limit(1);
@@ -299,7 +283,7 @@ export const evermailRouter = router({
             .from(entities)
             .where(
               and(
-                eq(entities.companyId, companyId),
+                eq(entities.workspaceId, workspaceId),
                 eq(entities.type, 'email'),
                 sql`data->>'messageId' = ${fullMessage.data.id}`
               )
@@ -309,12 +293,12 @@ export const evermailRouter = router({
           if (existing.length === 0) {
             // Create new email entity
             await db.insert(entities).values({
-              companyId,
+              workspaceId,
               type: 'email',
               data: emailData,
-              createdBy: stringToUuid(ctx.userId),
               metadata: {
-                source: 'gmail_sync'
+                source: 'gmail_sync',
+                createdBy: stringToUuid(ctx.userId)
               }
             });
             syncedCount++;
@@ -359,7 +343,7 @@ export const evermailRouter = router({
     .input(searchEmailsSchema)
     .query(async ({ ctx, input }) => {
       const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
       const userUuid = stringToUuid(userId);
 
       // CRITICAL: Only show emails that belong to this user
@@ -368,9 +352,9 @@ export const evermailRouter = router({
         .from(entities)
         .where(
           and(
-            eq(entities.companyId, companyId),
+            eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email'),
-            eq(entities.createdBy, userUuid) // User-specific emails only
+            sql`metadata->>'createdBy' = ${userUuid}` // User-specific emails only
           )
         );
 
@@ -431,7 +415,7 @@ export const evermailRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       const { orgId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
 
       const email = await db
         .select()
@@ -439,7 +423,7 @@ export const evermailRouter = router({
         .where(
           and(
             eq(entities.id, input.emailId),
-            eq(entities.companyId, companyId),
+            eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email')
           )
         )
@@ -473,14 +457,14 @@ export const evermailRouter = router({
     }))
     .query(async ({ ctx, input }) => {
       const { orgId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
 
       const emails = await db
         .select()
         .from(entities)
         .where(
           and(
-            eq(entities.companyId, companyId),
+            eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email'),
             sql`data->>'threadId' = ${input.threadId}`
           )
@@ -495,7 +479,7 @@ export const evermailRouter = router({
     .input(sendEmailSchema)
     .mutation(async ({ ctx, input }) => {
       const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
       const userUuid = stringToUuid(userId);
 
       try {
@@ -505,9 +489,9 @@ export const evermailRouter = router({
           .from(entities)
           .where(
             and(
-              eq(entities.companyId, companyId),
+              eq(entities.workspaceId, workspaceId),
               eq(entities.type, 'email_account'),
-              eq(entities.createdBy, userUuid) // CRITICAL: User-specific
+              sql`metadata->>'createdBy' = ${userUuid}` // CRITICAL: User-specific
             )
           )
           .limit(1);
@@ -560,7 +544,7 @@ export const evermailRouter = router({
 
         // Store in our database
         const [email] = await db.insert(entities).values({
-          companyId,
+          workspaceId,
           type: 'email',
           data: {
             messageId: sentMessage.data.id,
@@ -582,9 +566,9 @@ export const evermailRouter = router({
             sentAt: new Date(),
             labels: ['SENT']
           },
-          createdBy: userUuid,
           metadata: {
-            source: 'evermail'
+            source: 'evermail',
+            createdBy: userUuid
           }
         }).returning();
 
@@ -600,11 +584,11 @@ export const evermailRouter = router({
     .input(sendEmailSchema)
     .mutation(async ({ ctx, input }) => {
       const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
       const userUuid = stringToUuid(userId);
 
       const [draft] = await db.insert(entities).values({
-        companyId,
+        workspaceId,
         type: 'email',
         data: {
           subject: input.subject,
@@ -622,8 +606,9 @@ export const evermailRouter = router({
           isRead: true,
           createdAt: new Date()
         },
-        createdBy: userUuid,
-        metadata: {}
+        metadata: {
+          createdBy: userUuid
+        }
       }).returning();
 
       return draft;
@@ -636,11 +621,11 @@ export const evermailRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
       
       const processor = new EmailCommandProcessor();
       const result = await processor.processCommand(input.command, {
-        companyId,
+        workspaceId,
         userId,
         userEmail: ctx.user?.emailAddresses?.[0]?.emailAddress || ''
       });
@@ -656,7 +641,7 @@ export const evermailRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { orgId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
 
       for (const emailId of input.emailIds) {
         const [email] = await db
@@ -689,7 +674,7 @@ export const evermailRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { orgId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
 
       const [email] = await db
         .select()
@@ -697,7 +682,7 @@ export const evermailRouter = router({
         .where(
           and(
             eq(entities.id, input.emailId),
-            eq(entities.companyId, companyId)
+            eq(entities.workspaceId, workspaceId)
           )
         )
         .limit(1);
@@ -728,7 +713,7 @@ export const evermailRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { orgId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
 
       const [email] = await db
         .select()
@@ -736,7 +721,7 @@ export const evermailRouter = router({
         .where(
           and(
             eq(entities.id, input.emailId),
-            eq(entities.companyId, companyId)
+            eq(entities.workspaceId, workspaceId)
           )
         )
         .limit(1);
@@ -766,7 +751,7 @@ export const evermailRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { orgId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
 
       const [email] = await db
         .select()
@@ -774,7 +759,7 @@ export const evermailRouter = router({
         .where(
           and(
             eq(entities.id, input.emailId),
-            eq(entities.companyId, companyId)
+            eq(entities.workspaceId, workspaceId)
           )
         )
         .limit(1);
@@ -813,12 +798,12 @@ export const evermailRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const { orgId } = ctx;
-      const companyId = stringToUuid(orgId);
+      const workspaceId = stringToUuid(orgId);
       const userId = stringToUuid(ctx.user.id);
 
       // Create or update draft
       const draftData = {
-        companyId,
+        workspaceId,
         type: 'email' as const,
         data: {
           ...input,
@@ -832,10 +817,10 @@ export const evermailRouter = router({
           sentAt: null,
           gmailId: null,
         },
-        createdBy: userId,
         metadata: {
           source: 'evermail',
           isDraft: true,
+          createdBy: userId
         },
       };
 
@@ -850,7 +835,7 @@ export const evermailRouter = router({
           .where(
             and(
               eq(entities.id, input.id),
-              eq(entities.companyId, companyId),
+              eq(entities.workspaceId, workspaceId),
               eq(entities.type, 'email')
             )
           )

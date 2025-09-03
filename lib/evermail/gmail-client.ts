@@ -1,8 +1,8 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { db } from '@/lib/db';
-import { entities } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { entities } from '@/lib/db/schema/unified';
+import { eq, and, sql } from 'drizzle-orm';
 
 export class GmailClient {
   private gmail: any;
@@ -29,20 +29,20 @@ export class GmailClient {
     body: string;
     replyTo?: string;
     attachments?: any[];
-    companyId?: string;
+    workspaceId?: string;
     userId?: string;
   }) {
     try {
       // If no credentials provided in constructor, get from database
-      if (!this.gmail && params.companyId && params.userId) {
+      if (!this.gmail && params.workspaceId && params.userId) {
         const emailAccount = await db
           .select()
           .from(entities)
           .where(
             and(
-              eq(entities.companyId, params.companyId),
+              eq(entities.workspaceId, params.workspaceId),
               eq(entities.type, 'email_account'),
-              eq(entities.createdBy, params.userId) // CRITICAL: User-specific
+              sql`metadata->>'createdBy' = ${params.userId}` // CRITICAL: User-specific
             )
           )
           .limit(1);
@@ -75,10 +75,10 @@ export class GmailClient {
         }
       });
       
-      // Store sent email in database if companyId provided
-      if (params.companyId && params.userId) {
+      // Store sent email in database if workspaceId provided
+      if (params.workspaceId && params.userId) {
         await db.insert(entities).values({
-          companyId: params.companyId,
+          workspaceId: params.workspaceId,
           type: 'email',
           data: {
             messageId: response.data.id,
@@ -97,9 +97,9 @@ export class GmailClient {
             sentAt: new Date(),
             labels: response.data.labelIds || ['SENT']
           },
-          createdBy: params.userId,
           metadata: {
-            source: 'evermail_command'
+            source: 'evermail_command',
+            createdBy: params.userId
           }
         });
       }
