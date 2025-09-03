@@ -24,11 +24,18 @@ function encryptTokens(tokens: any): string {
 }
 
 export async function GET(req: NextRequest) {
+  console.log('Gmail OAuth callback received');
   try {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
+    
+    console.log('Callback params:', { 
+      hasCode: !!code, 
+      hasState: !!state, 
+      error 
+    });
     
     // Handle Google OAuth errors
     if (error) {
@@ -71,7 +78,7 @@ export async function GET(req: NextRequest) {
     const oauth2Client = new google.auth.OAuth2(
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback'
+      process.env.GOOGLE_GMAIL_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback'
     );
     
     try {
@@ -79,7 +86,7 @@ export async function GET(req: NextRequest) {
         code: code?.substring(0, 20) + '...',
         clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.substring(0, 20) + '...',
         hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-        redirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback'
+        redirectUri: process.env.GOOGLE_GMAIL_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback'
       });
 
       // Exchange authorization code for tokens
@@ -121,7 +128,22 @@ export async function GET(req: NextRequest) {
         // Continue without Gmail profile data
       }
       
-      const workspaceId = stringToUuid(finalOrgId);
+      // Get the actual workspace from database
+      const { workspaces } = await import('@/lib/db/schema/unified');
+      const [workspace] = await db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.clerkOrgId, finalOrgId))
+        .limit(1);
+      
+      if (!workspace) {
+        console.error('Workspace not found for org:', finalOrgId);
+        return NextResponse.redirect(
+          new URL('/mail/settings?error=workspace_not_found', req.url)
+        );
+      }
+      
+      const workspaceId = workspace.id;
       const userId = stringToUuid(finalUserId);
       
       // Check if email account already exists FOR THIS SPECIFIC USER

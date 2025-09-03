@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { companies, invitations, onboardingEvents } from '@/lib/db/schema'
+import { workspaces, invitations, entities } from '@/lib/db/schema/unified'
 import { eq } from 'drizzle-orm'
 
 export async function POST(req: Request) {
@@ -18,16 +18,16 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { teamMembers } = body
 
-    // Get company
-    const [company] = await db
-      .select({ id: companies.id })
-      .from(companies)
-      .where(eq(companies.clerkOrgId, orgId))
+    // Get workspace
+    const [workspace] = await db
+      .select({ id: workspaces.id })
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
       .limit(1)
 
-    if (!company) {
+    if (!workspace) {
       return NextResponse.json(
-        { error: 'Company not found' },
+        { error: 'Workspace not found' },
         { status: 404 }
       )
     }
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       expiresAt.setDate(expiresAt.getDate() + 7) // Expire in 7 days
 
       return db.insert(invitations).values({
-        companyId: company.id,
+        workspaceId: workspace.id,
         email: member.email,
         role: member.role,
         invitedBy: userId,
@@ -50,8 +50,8 @@ export async function POST(req: Request) {
     await Promise.all(invitationPromises)
 
     // Track event
-    await db.insert(onboardingEvents).values({
-      companyId: company.id,
+    await db.insert(entities).values({
+      workspaceId: workspace.id,
       userId: userId,
       event: 'team_invited',
       stepName: 'invite_team',

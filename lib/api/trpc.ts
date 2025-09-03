@@ -3,34 +3,35 @@ import { auth } from '@clerk/nextjs/server';
 import superjson from 'superjson';
 import { ZodError } from 'zod';
 import { db } from '@/lib/db';
-import type { User, Company } from '@/lib/db';
+import type { User, Workspace } from '@/lib/db';
 
 export const createContext = async () => {
   const { userId, orgId } = await auth();
 
-  // Get user and company from database if authenticated
+  // Get user and workspace from database if authenticated
   let user: User | null = null;
-  let company: Company | null = null;
+  let workspace: Workspace | null = null;
 
   if (userId && orgId) {
     const results = await Promise.all([
       db.query.users.findFirst({
         where: (users, { eq }) => eq(users.clerkUserId, userId),
       }),
-      db.query.companies.findFirst({
-        where: (companies, { eq }) => eq(companies.clerkOrgId, orgId),
+      db.query.workspaces.findFirst({
+        where: (workspaces, { eq }) => eq(workspaces.clerkOrgId, orgId),
       }),
     ]);
     
     user = results[0] || null;
-    company = results[1] || null;
+    workspace = results[1] || null;
   }
 
   return {
     userId,
     orgId,
     user,
-    company,
+    workspace,
+    company: workspace, // Add alias for backwards compatibility
     db,
   };
 };
@@ -66,7 +67,8 @@ export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
       orgId: ctx.orgId,
       organizationId: ctx.orgId, // Add alias for compatibility
       user: ctx.user,
-      company: ctx.company,
+      workspace: ctx.workspace,
+      company: ctx.company, // Alias for workspace
     },
   });
 });

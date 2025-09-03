@@ -1,359 +1,298 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
-import { db } from '@/lib/db';
-import { entities } from '@/lib/db/schema';
-import { eq, and, desc, or } from 'drizzle-orm';
+import * as everchat from '@/lib/modules-simple/everchat';
+import { processCommand } from '@/lib/modules-simple/command-processor';
+import { TRPCError } from '@trpc/server';
 import { pusher, channels, events } from '@/lib/pusher';
-import { createHash } from 'crypto';
-
-// Helper to create a deterministic UUID from any string ID
-function stringToUuid(str: string): string {
-  // Create a deterministic UUID v5 namespace from the string
-  const hash = createHash('sha256').update(str).digest('hex');
-  // Format as UUID v4 (for compatibility)
-  return [
-    hash.substring(0, 8),
-    hash.substring(8, 12),
-    '4' + hash.substring(13, 16), // Version 4
-    ((parseInt(hash.substring(16, 18), 16) & 0x3f) | 0x80).toString(16) + hash.substring(18, 20), // Variant bits
-    hash.substring(20, 32)
-  ].join('-');
-}
+import { workspaces } from '@/lib/db/schema/unified';
 
 export const everchatRouter = router({
-  // Get conversations (channels and DMs)
-  getConversations: protectedProcedure.query(async ({ ctx }) => {
-    const { orgId, userId } = ctx;
-    const companyId = stringToUuid(orgId);
-
-    // Get all channels and DMs for this organization
-    const conversations = await db
-      .select()
-      .from(entities)
-      .where(
-        and(
-          eq(entities.companyId, companyId),
-          or(
-            eq(entities.type, 'channel'),
-            eq(entities.type, 'dm')
-          )
-        )
-      )
-      .orderBy(desc(entities.updatedAt));
-
-    return conversations;
-  }),
-
-  // Get messages for a conversation
-  getMessages: protectedProcedure
+  // Execute natural language command
+  executeCommand: protectedProcedure
     .input(z.object({
-      channelId: z.string(),
-      limit: z.number().optional().default(50),
-      cursor: z.string().optional()
+      command: z.string().min(1),
     }))
-    .query(async ({ ctx, input }) => {
-      const { orgId } = ctx;
-      const companyId = stringToUuid(orgId);
-
-      const allMessages = await db
-        .select()
-        .from(entities)
-        .where(
-          and(
-            eq(entities.companyId, companyId),
-            eq(entities.type, 'message')
-          )
-        )
-        .orderBy(desc(entities.createdAt))
-        .limit(input.limit * 2); // Get more to filter
-
-      // Filter messages for the specific channel
-      const messages = allMessages.filter(msg => 
-        (msg.data as any).channelId === input.channelId
-      ).slice(0, input.limit);
-
-      return messages.reverse(); // Return in chronological order
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Workspace not found',
+        });
+      }
+      const workspaceId = ctx.workspace.id;
+      const userId = ctx.userId;
+      
+      try {
+        const result = await processCommand(workspaceId, input.command, userId);
+        
+        if (!result.success) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: result.error || 'Command execution failed',
+          });
+        }
+        
+        return result;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     }),
 
   // Send a message
   sendMessage: protectedProcedure
     .input(z.object({
-      channelId: z.string(),
-      text: z.string(),
-      threadId: z.string().optional(),
-      mentions: z.array(z.string()).optional(),
-      attachments: z.array(z.string()).optional()
+      content: z.string().min(1),
+      conversationId: z.string().uuid().optional(),
+      channelId: z.string().optional(), // Add support for non-UUID channel IDs
     }))
     .mutation(async ({ ctx, input }) => {
-      const { orgId, userId, user } = ctx;
-      const companyId = stringToUuid(orgId);
-      const userUuid = stringToUuid(userId);
-
-      // Check if it's an AI command
-      const isAiCommand = input.text.startsWith('@evergreen');
+      // Get or create workspace for this org
+      let workspaceId: string;
+      if (ctx.workspace) {
+        workspaceId = ctx.workspace.id;
+      } else {
+        // Create workspace if it doesn't exist
+        const { db } = ctx;
+        const [newWorkspace] = await db.insert(workspaces).values({
+          clerkOrgId: ctx.orgId,
+          name: 'Default Workspace',
+        }).returning();
+        workspaceId = newWorkspace.id;
+      }
+      const userId = ctx.userId;
       
-      // Get user's full name and image
-      const userName = user?.firstName && user?.lastName 
-        ? `${user.firstName} ${user.lastName}`.trim() 
-        : user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User';
-      const userImage = user?.imageUrl || null;
-
-      // Create message entity
-      const [message] = await db.insert(entities).values({
-        companyId: companyId,
-        type: 'message',
-        data: {
-          channelId: input.channelId,
-          text: input.text,
+      // Get user info from context
+      let userName = 'User';
+      let userImage: string | undefined;
+      if (ctx.user) {
+        userName = ctx.user.name || ctx.user.email || userId || 'User';
+        userImage = ctx.user.imageUrl || undefined;
+      } else {
+        // Fallback to userId if no user in context
+        userName = userId || 'User';
+      }
+      
+      try {
+        // For non-UUID channels (like "general", "sales"), create/find conversation
+        let conversationId = input.conversationId;
+        
+        if (!conversationId && input.channelId) {
+          // Check if a conversation exists for this channel
+          const existingConversations = await everchat.getConversations(workspaceId, 100);
+          const channelConversation = existingConversations.find(
+            (conv: any) => conv.data?.channel === input.channelId || conv.data?.title === `#${input.channelId}`
+          );
+          
+          if (channelConversation) {
+            conversationId = channelConversation.id;
+          } else {
+            // Create a new conversation for this channel
+            const newConversation = await everchat.createConversation(
+              workspaceId,
+              `#${input.channelId}`,
+              [],
+              userId
+            );
+            conversationId = newConversation.id;
+          }
+        }
+        
+        const message = await everchat.sendMessage(
+          workspaceId,
+          input.content,
+          conversationId,
           userId,
           userName,
-          userImage,
-          threadId: input.threadId,
-          mentions: input.mentions || [],
-          attachments: input.attachments || [],
-          aiCommand: isAiCommand,
-          timestamp: new Date()
-        },
-        createdBy: userUuid,
-        metadata: {}
-      }).returning();
-
-      // Determine the channel to broadcast to
-      let channelName: string;
-      if (input.channelId === 'general') {
-        channelName = channels.orgGeneral(orgId);
-      } else if (input.channelId.startsWith('dm-')) {
-        // Extract participants from DM ID
-        const participants = input.channelId.replace('dm-', '').split('-');
-        channelName = channels.dm(orgId, participants[0], participants[1]);
-      } else {
-        // Regular channel
-        channelName = channels.channel(orgId, input.channelId);
-      }
-
-      // Broadcast via Pusher if configured
-      if (pusher) {
-        await pusher.trigger(
-          channelName,
-          events.MESSAGE_NEW,
-          {
-            id: message.id,
-            ...message.data
-          }
+          userImage
         );
         
-        // Also broadcast to general channel for notifications
-        if (input.channelId !== 'general') {
-          await pusher.trigger(
-            channels.orgGeneral(orgId),
-            events.MESSAGE_NEW,
-            {
-              id: message.id,
-              ...message.data,
-              isNotification: true
-            }
-          );
-        }
-      }
-
-      // Process AI command if needed
-      if (isAiCommand) {
-        // TODO: Process with OpenAI and return response
-        const command = input.text.replace('@evergreen', '').trim();
+        // Broadcast to Pusher for real-time updates
+        const channelName = conversationId 
+          ? channels.getConversationChannel(workspaceId, conversationId)
+          : channels.getCompanyChannel(workspaceId);
         
-        // For now, return a mock response
-        setTimeout(async () => {
-          const [aiResponse] = await db.insert(entities).values({
-            companyId: companyId,
-            type: 'message',
-            data: {
-              channelId: input.channelId,
-              text: `Processing command: "${command}"...`,
-              userId: 'evergreen-ai',
-              userName: 'evergreenOS AI',
-              userImage: '/evergreen-icon.svg',
-              threadId: message.id,
-              commandResult: true,
-              timestamp: new Date()
-            },
-            createdBy: stringToUuid('system'),
-            metadata: {}
-          }).returning();
-
-          if (pusher) {
-            await pusher.trigger(
-              channelName,
-              events.MESSAGE_NEW,
-              {
-                id: aiResponse.id,
-                ...aiResponse.data
-              }
-            );
-          }
-        }, 1000);
+        await pusher.trigger(channelName, events.MESSAGE_SENT, {
+          message,
+          timestamp: new Date().toISOString(),
+        });
+        
+        return message;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to send message',
+        });
       }
-
-      return message;
     }),
 
-  // Create or get a DM channel
-  createOrGetDM: protectedProcedure
+  // Get messages for a conversation
+  getMessages: protectedProcedure
     .input(z.object({
-      recipientId: z.string()
+      conversationId: z.string().uuid().optional(),
+      channelId: z.string().optional(), // Support both channelId and conversationId
+      limit: z.number().min(1).max(100).default(50),
+      offset: z.number().min(0).default(0),
     }))
-    .mutation(async ({ ctx, input }) => {
-      const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
-      const userUuid = stringToUuid(userId);
-
-      // Create a sorted channel ID for consistent DM identification
-      const participants = [userId, input.recipientId].sort();
-      const dmId = `dm-${participants.join('-')}`;
-
-      // Check if DM already exists
-      const existingDMs = await db
-        .select()
-        .from(entities)
-        .where(
-          and(
-            eq(entities.companyId, companyId),
-            eq(entities.type, 'dm')
-          )
-        );
+    .query(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        return []; // No workspace, no messages
+      }
+      const workspaceId = ctx.workspace.id;
       
-      const existingDM = existingDMs.filter(dm => 
-        (dm.data as any).dmId === dmId
-      );
-
-      if (existingDM.length > 0) {
-        return existingDM[0];
-      }
-
-      // Create new DM
-      const [dm] = await db.insert(entities).values({
-        companyId: companyId,
-        type: 'dm',
-        data: {
-          dmId,
-          participants,
-          name: 'Direct Message', // Will be overridden on client with recipient name
-        },
-        createdBy: userUuid,
-        metadata: {}
-      }).returning();
-
-      return dm;
-    }),
-
-  // Create a channel
-  createChannel: protectedProcedure
-    .input(z.object({
-      name: z.string(),
-      description: z.string().optional(),
-      isPrivate: z.boolean().default(false),
-      members: z.array(z.string()).optional()
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
-      const userUuid = stringToUuid(userId);
-
-      const [channel] = await db.insert(entities).values({
-        companyId: companyId,
-        type: 'channel',
-        data: {
-          name: input.name,
-          description: input.description,
-          isPrivate: input.isPrivate,
-          members: input.members || [userId],
-          createdBy: userId
-        },
-        createdBy: userUuid,
-        metadata: {}
-      }).returning();
-
-      // Notify organization about new channel
-      if (pusher) {
-        await pusher.trigger(
-          channels.orgGeneral(orgId),
-          events.CHANNEL_CREATED,
-          {
-            id: channel.id,
-            ...channel.data
-          }
-        );
-      }
-
-      return channel;
-    }),
-
-  // Send typing indicator
-  sendTyping: protectedProcedure
-    .input(z.object({
-      channelId: z.string(),
-      isTyping: z.boolean()
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
-
-      // Determine the channel
-      let channelName: string;
-      if (input.channelId === 'general') {
-        channelName = channels.orgGeneral(orgId);
-      } else if (input.channelId.startsWith('dm-')) {
-        const participants = input.channelId.replace('dm-', '').split('-');
-        channelName = channels.dm(orgId, participants[0], participants[1]);
-      } else {
-        channelName = channels.channel(orgId, input.channelId);
-      }
-
-      if (pusher) {
-        const userName = ctx.user?.firstName && ctx.user?.lastName 
-          ? `${ctx.user.firstName} ${ctx.user.lastName}`.trim() 
-          : ctx.user?.firstName || ctx.user?.emailAddresses?.[0]?.emailAddress || 'User';
+      try {
+        let conversationId = input.conversationId;
+        
+        // If channelId is provided instead of conversationId, find the conversation
+        if (!conversationId && input.channelId) {
+          const existingConversations = await everchat.getConversations(workspaceId, 100);
+          const channelConversation = existingConversations.find(
+            (conv: any) => conv.data?.channel === input.channelId || conv.data?.title === `#${input.channelId}`
+          );
           
-        await pusher.trigger(
-          channelName,
-          events.USER_TYPING,
-          {
-            userId,
-            userName,
-            isTyping: input.isTyping
+          if (channelConversation) {
+            conversationId = channelConversation.id;
+          } else {
+            // If conversation doesn't exist for this channel, return empty array
+            return [];
           }
+        }
+        
+        if (!conversationId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Either conversationId or channelId must be provided',
+          });
+        }
+        
+        return await everchat.getMessages(
+          workspaceId,
+          conversationId,
+          input.limit
         );
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get messages',
+        });
       }
-
-      return { success: true };
     }),
 
-  // Update presence
-  updatePresence: protectedProcedure
+  // Get all conversations
+  getConversations: protectedProcedure
     .input(z.object({
-      isOnline: z.boolean()
+      limit: z.number().min(1).max(100).default(20),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        return [];
+      }
+      const workspaceId = ctx.workspace.id;
+      
+      try {
+        return await everchat.getConversations(workspaceId, input.limit);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get conversations',
+        });
+      }
+    }),
+
+  // Create a new conversation
+  createConversation: protectedProcedure
+    .input(z.object({
+      title: z.string().min(1),
+      participants: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { orgId, userId } = ctx;
-      const companyId = stringToUuid(orgId);
-
-      // This would typically be handled by Pusher presence channels automatically,
-      // but we can still broadcast manual status updates
-      if (pusher) {
-        const userName = ctx.user?.firstName && ctx.user?.lastName 
-          ? `${ctx.user.firstName} ${ctx.user.lastName}`.trim() 
-          : ctx.user?.firstName || ctx.user?.emailAddresses?.[0]?.emailAddress || 'User';
-          
-        await pusher.trigger(
-          channels.orgPresence(orgId),
-          'user.status_changed',
-          {
-            userId,
-            userName,
-            isOnline: input.isOnline
-          }
-        );
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Workspace not found',
+        });
       }
+      const workspaceId = ctx.workspace.id;
+      const userId = ctx.userId;
+      
+      try {
+        const conversation = await everchat.createConversation(
+          workspaceId,
+          input.title,
+          input.participants,
+          userId
+        );
+        
+        return conversation;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to create conversation',
+        });
+      }
+    }),
 
-      return { success: true };
-    })
+  // Search messages
+  searchMessages: protectedProcedure
+    .input(z.object({
+      query: z.string().min(1),
+      conversationId: z.string().uuid().optional(),
+      limit: z.number().min(1).max(100).default(20),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        return [];
+      }
+      const workspaceId = ctx.workspace.id;
+      
+      try {
+        return await everchat.searchMessages(
+          workspaceId,
+          input.query,
+          input.conversationId,
+          input.limit
+        );
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to search messages',
+        });
+      }
+    }),
+
+  // Handle natural language chat command
+  handleChatCommand: protectedProcedure
+    .input(z.object({
+      command: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Workspace not found',
+        });
+      }
+      const workspaceId = ctx.workspace.id;
+      const userId = ctx.userId;
+      
+      try {
+        const result = await everchat.handleChatCommand(workspaceId, input.command, userId);
+        
+        if (result.error) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: result.error,
+          });
+        }
+        
+        return result;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to handle chat command',
+        });
+      }
+    }),
 });

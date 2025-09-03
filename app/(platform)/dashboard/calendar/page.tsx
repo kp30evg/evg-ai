@@ -182,15 +182,21 @@ export default function CalendarPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="border-b border-gray-200" style={{padding: '24px'}}>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 bg-[#1D5238] rounded-lg flex items-center justify-center">
-            <Calendar className="h-4 w-4 text-white" />
+      <div className="border-b border-gray-200" style={{padding: '16px 24px'}}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-[#E6F4EC] rounded-xl flex items-center justify-center">
+              <Calendar className="h-6 w-6 text-[#1D5238]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-gray-900" style={{fontSize: '24px', fontWeight: 600}}>EverCal</h1>
+                <span className="text-xs font-medium text-[#1D5238] bg-[#E6F4EC] px-2 py-1 rounded-full">Smart Scheduling</span>
+              </div>
+              <p className="text-gray-600 text-sm">Professional booking experiences that your clients will love</p>
+            </div>
           </div>
-          <span className="text-sm font-medium text-[#1D5238] bg-[#E6F4EC] px-3 py-1 rounded-full">Smart Scheduling</span>
         </div>
-        <h1 className="text-gray-900 mb-2" style={{fontSize: '48px', lineHeight: '52px', fontWeight: 700}}>Let's Get Your Day in <span style={{color: '#1D5238'}}>Order.</span></h1>
-        <p className="text-gray-600" style={{fontSize: '18px', lineHeight: '28px'}}>Create beautiful, professional booking experiences that your clients will love. No more back-and-forth emails or scheduling stress.</p>
       </div>
 
       {/* Tab Navigation */}

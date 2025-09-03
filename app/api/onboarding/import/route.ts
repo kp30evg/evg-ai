@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { companies, onboardingEvents } from '@/lib/db/schema'
+import { workspaces, entities } from '@/lib/db/schema/unified'
 import { eq } from 'drizzle-orm'
 
 export async function POST(req: Request) {
@@ -18,24 +18,24 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { selectedOptions } = body
 
-    // Get company
-    const [company] = await db
-      .select({ id: companies.id })
-      .from(companies)
-      .where(eq(companies.clerkOrgId, orgId))
+    // Get workspace
+    const [workspace] = await db
+      .select({ id: workspaces.id })
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
       .limit(1)
 
-    if (!company) {
+    if (!workspace) {
       return NextResponse.json(
-        { error: 'Company not found' },
+        { error: 'Workspace not found' },
         { status: 404 }
       )
     }
 
     // Track import event
     if (selectedOptions && selectedOptions.length > 0) {
-      await db.insert(onboardingEvents).values({
-        companyId: company.id,
+      await db.insert(entities).values({
+        workspaceId: workspace.id,
         userId: userId,
         event: 'step_completed',
         stepName: 'import_data',
@@ -45,12 +45,12 @@ export async function POST(req: Request) {
 
     // Update onboarding step
     await db
-      .update(companies)
+      .update(workspaces)
       .set({
         onboardingStep: 4,
         updatedAt: new Date()
       })
-      .where(eq(companies.clerkOrgId, orgId))
+      .where(eq(workspaces.clerkOrgId, orgId))
 
     return NextResponse.json({ success: true })
   } catch (error) {

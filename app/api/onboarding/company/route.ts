@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { companies, onboardingEvents } from '@/lib/db/schema'
+import { workspaces, entities } from '@/lib/db/schema/unified'
 import { eq } from 'drizzle-orm'
 
 export async function POST(req: Request) {
@@ -18,41 +18,59 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { companySize, industry, primaryUseCase } = body
 
-    // Update company profile
+    // Update workspace profile - store in settings JSONB field
+    const [workspace] = await db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
+      .limit(1)
+    
+    if (!workspace) {
+      return NextResponse.json(
+        { error: 'Workspace not found' },
+        { status: 404 }
+      )
+    }
+    
     await db
-      .update(companies)
+      .update(workspaces)
       .set({
-        companySize,
-        industry, 
-        primaryUseCase,
-        onboardingStep: 1,
-        onboardingStartedAt: new Date(),
+        settings: {
+          ...(workspace.settings as any || {}),
+          companySize,
+          industry,
+          primaryUseCase,
+          onboardingStep: 1,
+          onboardingStartedAt: new Date().toISOString()
+        },
         updatedAt: new Date()
       })
-      .where(eq(companies.clerkOrgId, orgId))
+      .where(eq(workspaces.clerkOrgId, orgId))
 
-    // Track onboarding event
-    const [company] = await db
-      .select({ id: companies.id })
-      .from(companies)
-      .where(eq(companies.clerkOrgId, orgId))
-      .limit(1)
-
-    if (company) {
-      await db.insert(onboardingEvents).values({
-        companyId: company.id,
-        userId: userId,
-        event: 'step_completed',
-        stepName: 'company_profile',
-        metadata: { companySize, industry, primaryUseCase }
+    // Track onboarding event in entities table
+    if (workspace) {
+      await db.insert(entities).values({
+        workspaceId: workspace.id,
+        type: 'onboarding_event',
+        data: {
+          event: 'step_completed',
+          stepName: 'company_profile',
+          userId: userId,
+          companySize,
+          industry,
+          primaryUseCase
+        },
+        metadata: {
+          createdBy: userId
+        }
       })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error saving company profile:', error)
+    console.error('Error saving workspace profile:', error)
     return NextResponse.json(
-      { error: 'Failed to save company profile' },
+      { error: 'Failed to save workspace profile' },
       { status: 500 }
     )
   }
@@ -69,23 +87,31 @@ export async function GET(req: Request) {
       )
     }
 
-    const [company] = await db
+    const [workspace] = await db
       .select({
-        companySize: companies.companySize,
-        industry: companies.industry,
-        primaryUseCase: companies.primaryUseCase,
-        onboardingStep: companies.onboardingStep,
-        onboardingCompleted: companies.onboardingCompleted
+        settings: workspaces.settings
       })
-      .from(companies)
-      .where(eq(companies.clerkOrgId, orgId))
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
       .limit(1)
+    
+    if (!workspace) {
+      return NextResponse.json({})
+    }
+    
+    const settings = workspace.settings as any || {}
 
-    return NextResponse.json(company || {})
+    return NextResponse.json({
+      companySize: settings.companySize,
+      industry: settings.industry,
+      primaryUseCase: settings.primaryUseCase,
+      onboardingStep: settings.onboardingStep,
+      onboardingCompleted: settings.onboardingCompleted
+    })
   } catch (error) {
-    console.error('Error fetching company profile:', error)
+    console.error('Error fetching workspace profile:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch company profile' },
+      { error: 'Failed to fetch workspace profile' },
       { status: 500 }
     )
   }

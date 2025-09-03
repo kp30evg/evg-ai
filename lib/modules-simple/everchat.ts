@@ -14,7 +14,9 @@ export async function sendMessage(
   workspaceId: string,
   content: string,
   conversationId?: string,
-  userId?: string
+  userId?: string,
+  userName?: string,
+  userImage?: string
 ): Promise<any> {
   // Create or get conversation
   if (!conversationId) {
@@ -30,6 +32,9 @@ export async function sendMessage(
       content,
       channel: 'chat',
       from: userId || 'user',
+      userId: userId || 'user',
+      userName: userName || userId || 'User',
+      userImage: userImage,
       timestamp: new Date(),
     } as MessageData,
     {
@@ -41,14 +46,20 @@ export async function sendMessage(
   );
 
   // Update conversation's last message time
-  await entityService.update(
-    workspaceId,
-    conversationId,
-    {
-      lastMessageAt: new Date(),
-      messageCount: await countMessages(workspaceId, conversationId),
-    }
-  );
+  try {
+    const messageCount = await getMessageCount(workspaceId, conversationId);
+    await entityService.update(
+      workspaceId,
+      conversationId,
+      {
+        lastMessageAt: new Date(),
+        messageCount: messageCount,
+      }
+    );
+  } catch (e) {
+    // Conversation update failed, but message was sent
+    console.error('Failed to update conversation:', e);
+  }
 
   // Broadcast via Pusher if configured
   if (pusher) {
@@ -147,6 +158,23 @@ export async function searchMessages(
     search: searchTerm,
     limit,
   });
+}
+
+/**
+ * Get message count for a conversation
+ */
+async function getMessageCount(
+  workspaceId: string,
+  conversationId: string
+): Promise<number> {
+  const messages = await entityService.find({
+    workspaceId,
+    type: 'message',
+    relationships: {
+      conversation: conversationId,
+    },
+  });
+  return messages.length;
 }
 
 /**

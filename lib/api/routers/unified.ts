@@ -10,19 +10,8 @@ import { processCommand } from '@/lib/modules-simple/command-processor';
 import * as everchat from '@/lib/modules-simple/everchat';
 import * as evercore from '@/lib/modules-simple/evercore';
 import { TRPCError } from '@trpc/server';
+import { workspaceService } from '@/lib/services/workspace-service';
 
-// Helper to create a deterministic UUID from any string ID
-function stringToUuid(str: string): string {
-  const crypto = require('crypto');
-  const hash = crypto.createHash('sha256').update(str).digest('hex');
-  return [
-    hash.substring(0, 8),
-    hash.substring(8, 12),
-    '4' + hash.substring(13, 16),
-    ((parseInt(hash.substring(16, 18), 16) & 0x3f) | 0x80).toString(16) + hash.substring(18, 20),
-    hash.substring(20, 32)
-  ].join('-');
-}
 
 export const unifiedRouter = router({
   // Execute natural language command
@@ -31,7 +20,7 @@ export const unifiedRouter = router({
       command: z.string().min(1),
     }))
     .mutation(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId); // Convert orgId to UUID format
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       const userId = ctx.userId;
       
       try {
@@ -62,7 +51,7 @@ export const unifiedRouter = router({
       metadata: z.record(z.any()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       return await entityService.create(
         workspaceId,
@@ -78,7 +67,7 @@ export const unifiedRouter = router({
       id: z.string().uuid(),
     }))
     .query(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       const entity = await entityService.findById(workspaceId, input.id);
       
@@ -104,7 +93,7 @@ export const unifiedRouter = router({
       orderDirection: z.enum(['asc', 'desc']).default('desc'),
     }))
     .query(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       return await entityService.find({
         workspaceId,
@@ -120,7 +109,7 @@ export const unifiedRouter = router({
       metadata: z.any().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       return await entityService.update(
         workspaceId,
@@ -136,7 +125,7 @@ export const unifiedRouter = router({
       id: z.string().uuid(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       const success = await entityService.delete(workspaceId, input.id);
       
@@ -158,7 +147,7 @@ export const unifiedRouter = router({
       bidirectional: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       await entityService.link(
         workspaceId,
@@ -177,7 +166,7 @@ export const unifiedRouter = router({
       relationshipType: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       return await entityService.findRelated(
         workspaceId,
@@ -193,7 +182,7 @@ export const unifiedRouter = router({
       conversationId: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       const userId = ctx.userId;
       
       return await everchat.sendMessage(
@@ -210,7 +199,7 @@ export const unifiedRouter = router({
       limit: z.number().min(1).max(100).default(50),
     }))
     .query(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       return await everchat.getMessages(
         workspaceId,
@@ -224,24 +213,41 @@ export const unifiedRouter = router({
       limit: z.number().min(1).max(100).default(20),
     }))
     .query(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       return await everchat.getConversations(workspaceId, input.limit);
     }),
 
   // CRM-specific operations
-  createCustomer: protectedProcedure
+  createContact: protectedProcedure
     .input(z.object({
-      name: z.string(),
-      email: z.string().email().optional(),
+      firstName: z.string(),
+      lastName: z.string(),
+      email: z.string().email(),
       phone: z.string().optional(),
-      company: z.string().optional(),
+      jobTitle: z.string().optional(),
+      companyId: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       const userId = ctx.userId;
       
-      return await evercore.createCustomer(workspaceId, input, userId);
+      return await evercore.createContact(workspaceId, input, userId);
+    }),
+  
+  createCompany: protectedProcedure
+    .input(z.object({
+      name: z.string(),
+      domain: z.string().optional(),
+      industry: z.string().optional(),
+      employeeCount: z.number().optional(),
+      annualRevenue: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      const userId = ctx.userId;
+      
+      return await evercore.createCompany(workspaceId, input, userId);
     }),
 
   createDeal: protectedProcedure
@@ -249,49 +255,546 @@ export const unifiedRouter = router({
       name: z.string(),
       value: z.number(),
       stage: z.string(),
-      customerId: z.string().uuid().optional(),
+      companyId: z.string().uuid().optional(),
+      primaryContactId: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       const userId = ctx.userId;
       
       return await evercore.createDeal(workspaceId, input, userId);
     }),
 
-  getCustomers: protectedProcedure
-    .query(async ({ ctx }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
-      
-      return await evercore.getCustomers(workspaceId);
-    }),
-
   getDeals: protectedProcedure
     .input(z.object({
       stage: z.string().optional(),
+      companyId: z.string().uuid().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
-      return await evercore.getDeals(workspaceId, input.stage);
+      return await evercore.getDeals(workspaceId, input);
     }),
 
-  getCustomerInsights: protectedProcedure
+  updateDealStage: protectedProcedure
     .input(z.object({
-      customerId: z.string().uuid(),
+      dealId: z.string().uuid(),
+      stage: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      return await evercore.updateDealStage(workspaceId, input.dealId, input.stage);
+    }),
+  
+  // Deal Intelligence endpoints
+  calculateDealScore: protectedProcedure
+    .input(z.object({
+      dealId: z.string().uuid(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Import the deal intelligence module
+      const { calculateDealScore } = await import('@/lib/services/evercore/deal-intelligence');
+      
+      try {
+        return await calculateDealScore(workspaceId, input.dealId);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to calculate deal score',
+        });
+      }
+    }),
+  
+  detectDealsAtRisk: protectedProcedure
+    .query(async ({ ctx }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Import the deal intelligence module
+      const { detectDealsAtRisk } = await import('@/lib/services/evercore/deal-intelligence');
+      
+      try {
+        return await detectDealsAtRisk(workspaceId);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to detect deals at risk',
+        });
+      }
+    }),
+  
+  predictRevenue: protectedProcedure
+    .input(z.object({
+      periodDays: z.number().optional().default(90),
     }))
     .query(async ({ ctx, input }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
-      return await evercore.getCustomerInsights(workspaceId, input.customerId);
+      // Import the deal intelligence module
+      const { predictRevenue } = await import('@/lib/services/evercore/deal-intelligence');
+      
+      try {
+        return await predictRevenue(workspaceId, input.periodDays);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to predict revenue',
+        });
+      }
+    }),
+  
+  // Activity Timeline endpoints
+  getTimeline: protectedProcedure
+    .input(z.object({
+      entityType: z.enum(['contact', 'company', 'deal']),
+      entityId: z.string().uuid(),
+      filters: z.object({
+        types: z.array(z.string()).optional(),
+        searchQuery: z.string().optional(),
+        dateRange: z.object({
+          start: z.date(),
+          end: z.date()
+        }).optional()
+      }).optional()
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Import the timeline module
+      const { getContactTimeline, getCompanyTimeline, getDealTimeline } = 
+        await import('@/lib/services/evercore/activity-timeline');
+      
+      try {
+        switch (input.entityType) {
+          case 'contact':
+            return await getContactTimeline(workspaceId, input.entityId, input.filters);
+          case 'company':
+            return await getCompanyTimeline(workspaceId, input.entityId, input.filters);
+          case 'deal':
+            return await getDealTimeline(workspaceId, input.entityId, input.filters);
+          default:
+            throw new Error('Invalid entity type');
+        }
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get timeline',
+        });
+      }
+    }),
+  
+  getEngagementInsights: protectedProcedure
+    .input(z.object({
+      entityId: z.string().uuid(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Import the timeline module
+      const { getEngagementInsights } = await import('@/lib/services/evercore/activity-timeline');
+      
+      try {
+        return await getEngagementInsights(workspaceId, input.entityId);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get engagement insights',
+        });
+      }
+    }),
+  
+  getActivitySummary: protectedProcedure
+    .input(z.object({
+      entityId: z.string().uuid(),
+      days: z.number().optional().default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Import the timeline module
+      const { getActivitySummary } = await import('@/lib/services/evercore/activity-timeline');
+      
+      try {
+        return await getActivitySummary(workspaceId, input.entityId, input.days);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get activity summary',
+        });
+      }
+    }),
+
+  getContactInsights: protectedProcedure
+    .input(z.object({
+      contactId: z.string().uuid(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      return await evercore.getContactInsights(workspaceId, input.contactId);
+    }),
+  
+  getCompanyInsights: protectedProcedure
+    .input(z.object({
+      companyId: z.string().uuid(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      return await evercore.getCompanyInsights(workspaceId, input.companyId);
+    }),
+
+  // Dashboard Stats
+  getDashboardStats: protectedProcedure
+    .input(z.object({
+      period: z.enum(['today', 'week', 'month', 'year']).default('month'),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Get contacts, companies, and deals
+      const contacts = await evercore.getContacts(workspaceId);
+      const companies = await evercore.getCompanies(workspaceId);
+      const deals = await evercore.getDeals(workspaceId);
+      
+      // Calculate metrics based on period
+      const now = Date.now();
+      const periodMs = input.period === 'today' ? 24 * 60 * 60 * 1000 :
+                       input.period === 'week' ? 7 * 24 * 60 * 60 * 1000 :
+                       input.period === 'month' ? 30 * 24 * 60 * 60 * 1000 :
+                       365 * 24 * 60 * 60 * 1000;
+      
+      const recentContacts = contacts.filter(c => 
+        (now - new Date(c.createdAt).getTime()) < periodMs
+      );
+      
+      const recentDeals = deals.filter(d =>
+        (now - new Date(d.createdAt).getTime()) < periodMs
+      );
+      
+      // Calculate pipeline value
+      const totalPipelineValue = deals
+        .filter(d => !['closed_won', 'closed_lost'].includes(d.data.stage?.toLowerCase() || ''))
+        .reduce((sum, deal) => sum + (deal.data.value || 0), 0);
+      
+      const closedDealsValue = deals
+        .filter(d => d.data.stage?.toLowerCase() === 'closed_won')
+        .filter(d => (now - new Date(d.createdAt).getTime()) < periodMs)
+        .reduce((sum, deal) => sum + (deal.data.value || 0), 0);
+      
+      // Calculate growth
+      const previousPeriodStart = now - (periodMs * 2);
+      const previousPeriodEnd = now - periodMs;
+      
+      const previousContacts = contacts.filter(c => {
+        const created = new Date(c.createdAt).getTime();
+        return created >= previousPeriodStart && created < previousPeriodEnd;
+      });
+      
+      const contactsGrowth = previousContacts.length > 0 
+        ? ((recentContacts.length - previousContacts.length) / previousContacts.length) * 100
+        : 0;
+      
+      const previousDeals = deals.filter(d => {
+        const created = new Date(d.createdAt).getTime();
+        return created >= previousPeriodStart && created < previousPeriodEnd;
+      });
+      
+      const dealsGrowth = previousDeals.length > 0
+        ? ((recentDeals.length - previousDeals.length) / previousDeals.length) * 100
+        : 0;
+      
+      return {
+        contacts: {
+          total: contacts.length,
+          new: recentContacts.length,
+          growth: contactsGrowth
+        },
+        companies: {
+          total: companies.length,
+          new: companies.filter(c => 
+            (now - new Date(c.createdAt).getTime()) < periodMs
+          ).length
+        },
+        deals: {
+          total: deals.length,
+          active: deals.filter(d => 
+            !['closed_won', 'closed_lost'].includes(d.data.stage?.toLowerCase() || '')
+          ).length,
+          new: recentDeals.length,
+          growth: dealsGrowth
+        },
+        revenue: {
+          pipeline: totalPipelineValue,
+          closed: closedDealsValue,
+          avgDealSize: deals.length > 0 
+            ? deals.reduce((sum, d) => sum + (d.data.value || 0), 0) / deals.length
+            : 0
+        }
+      };
+    }),
+
+  // CRM Dashboard
+  getCRMDashboard: protectedProcedure
+    .input(z.object({
+      period: z.enum(['today', 'week', 'month']).default('week'),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Get contacts, companies, and deals
+      const contacts = await evercore.getContacts(workspaceId);
+      const companies = await evercore.getCompanies(workspaceId);
+      const deals = await evercore.getDeals(workspaceId);
+      
+      // Calculate metrics based on period
+      const now = Date.now();
+      const periodMs = input.period === 'today' ? 24 * 60 * 60 * 1000 :
+                       input.period === 'week' ? 7 * 24 * 60 * 60 * 1000 :
+                       30 * 24 * 60 * 60 * 1000;
+      
+      const recentContacts = contacts.filter(c => 
+        (now - new Date(c.createdAt).getTime()) < periodMs
+      );
+      
+      const recentDeals = deals.filter(d =>
+        (now - new Date(d.createdAt).getTime()) < periodMs
+      );
+      
+      // Calculate pipeline value
+      const totalPipelineValue = deals
+        .filter(d => !['closed_won', 'closed_lost'].includes(d.data.stage?.toLowerCase()))
+        .reduce((sum, deal) => sum + (deal.data.value || 0), 0);
+      
+      const closingThisMonth = deals
+        .filter(d => {
+          const closeDate = d.data.closeDate ? new Date(d.data.closeDate) : null;
+          if (!closeDate) return false;
+          const thisMonth = new Date();
+          return closeDate.getMonth() === thisMonth.getMonth() && 
+                 closeDate.getFullYear() === thisMonth.getFullYear();
+        })
+        .reduce((sum, deal) => sum + (deal.data.value || 0), 0);
+      
+      return {
+        metrics: {
+          totalContacts: contacts.length,
+          newContacts: recentContacts.length,
+          totalCompanies: companies.length,
+          totalDeals: deals.length,
+          newDeals: recentDeals.length,
+          totalPipelineValue,
+          closingThisMonth,
+        },
+        recentActivity: await entityService.find({
+          workspaceId,
+          type: ['contact', 'company', 'deal', 'email', 'calendar_event'],
+          limit: 10,
+          orderBy: 'createdAt',
+          orderDirection: 'desc',
+        }),
+      };
+    }),
+
+  // Get contacts (new people-focused method)
+  getContacts: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(100).default(50),
+      search: z.string().optional(),
+      companyId: z.string().uuid().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      return await evercore.getContacts(workspaceId, {
+        limit: input.limit,
+        search: input.search,
+        companyId: input.companyId,
+      });
+    }),
+
+  // Get companies
+  getCompanies: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(100).default(50),
+      search: z.string().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      return await evercore.getCompanies(workspaceId, {
+        limit: input.limit,
+        search: input.search,
+      });
+    }),
+
+  // Custom Fields endpoints
+  createFieldFromNaturalLanguage: protectedProcedure
+    .input(z.object({
+      command: z.string(),
+      entityType: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Import the custom fields module
+      const { createFieldFromNaturalLanguage } = await import('@/lib/services/evercore/custom-fields');
+      
+      try {
+        return await createFieldFromNaturalLanguage(
+          workspaceId,
+          input.command,
+          ctx.userId
+        );
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to create field',
+        });
+      }
+    }),
+  
+  createCustomField: protectedProcedure
+    .input(z.object({
+      entityType: z.string(),
+      name: z.string(),
+      label: z.string(),
+      type: z.enum(['text', 'number', 'date', 'boolean', 'select', 'multiselect', 'url', 'email', 'phone', 'currency', 'percentage']),
+      options: z.array(z.string()).optional(),
+      required: z.boolean().optional(),
+      defaultValue: z.any().optional(),
+      description: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      const { createCustomField } = await import('@/lib/services/evercore/custom-fields');
+      
+      try {
+        return await createCustomField(workspaceId, input, ctx.userId);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to create custom field',
+        });
+      }
+    }),
+  
+  getCustomFields: protectedProcedure
+    .input(z.object({
+      entityType: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      const { getCustomFields } = await import('@/lib/services/evercore/custom-fields');
+      
+      try {
+        return await getCustomFields(workspaceId, input.entityType);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get custom fields',
+        });
+      }
+    }),
+  
+  setFieldValue: protectedProcedure
+    .input(z.object({
+      entityId: z.string().uuid(),
+      fieldId: z.string(),
+      value: z.any(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      const { setFieldValue } = await import('@/lib/services/evercore/custom-fields');
+      
+      try {
+        await setFieldValue(
+          workspaceId,
+          input.entityId,
+          input.fieldId,
+          input.value,
+          ctx.userId
+        );
+        return { success: true };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to set field value',
+        });
+      }
+    }),
+  
+  deleteCustomField: protectedProcedure
+    .input(z.object({
+      fieldId: z.string(),
+      removeData: z.boolean().optional().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      const { deleteCustomField } = await import('@/lib/services/evercore/custom-fields');
+      
+      try {
+        await deleteCustomField(workspaceId, input.fieldId, input.removeData);
+        return { success: true };
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to delete field',
+        });
+      }
+    }),
+  
+  suggestFields: protectedProcedure
+    .input(z.object({
+      entityType: z.string(),
+      existingFields: z.array(z.string()),
+    }))
+    .query(async ({ ctx, input }) => {
+      const { suggestFields } = await import('@/lib/services/evercore/custom-fields');
+      
+      try {
+        return await suggestFields(input.entityType, input.existingFields);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get field suggestions',
+        });
+      }
+    }),
+  
+  generateFieldReport: protectedProcedure
+    .input(z.object({
+      entityType: z.string(),
+      fieldId: z.string(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      const { generateFieldReport } = await import('@/lib/services/evercore/custom-fields');
+      
+      try {
+        return await generateFieldReport(workspaceId, input.entityType, input.fieldId);
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to generate report',
+        });
+      }
     }),
 
   // Analytics
   getEntityStats: protectedProcedure
     .query(async ({ ctx }) => {
-      const workspaceId = stringToUuid(ctx.orgId);
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
       
       // Get counts by type
-      const types = ['customer', 'deal', 'message', 'conversation', 'task', 'email', 'invoice'];
+      const types = ['contact', 'company', 'deal', 'message', 'conversation', 'task', 'email', 'calendar_event', 'invoice'];
       const stats: Record<string, number> = {};
       
       for (const type of types) {

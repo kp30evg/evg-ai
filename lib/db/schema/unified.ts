@@ -97,6 +97,101 @@ export interface TaskData {
   assignedTo?: string;
 }
 
+// Calendar-related entity types
+export interface EventData {
+  title: string;
+  description?: string;
+  startTime: Date;
+  endTime: Date;
+  attendees: string[];
+  location?: string;
+  googleEventId?: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  recurrence?: string;
+  timezone?: string;
+}
+
+// New Calendar Account entity type
+export interface CalendarAccountData {
+  email: string;
+  name: string;
+  picture?: string;
+  accessToken: string;
+  refreshToken?: string;
+  tokenType?: string;
+  expiresAt?: Date;
+  scope?: string;
+  calendarCount?: number;
+  connected: boolean;
+  lastSync?: Date;
+  lastSyncCount?: number;
+  lastConnected?: Date;
+  createdAt?: Date;
+  disconnectedAt?: Date;
+}
+
+// Enhanced Calendar Event entity type
+export interface CalendarEventData {
+  googleEventId: string;
+  calendarId: string;
+  accountId: string;
+  title: string;
+  description?: string;
+  start: Date;
+  end: Date;
+  attendees: Array<{
+    email: string;
+    name?: string;
+    responseStatus?: string;
+  }>;
+  location?: string;
+  meetingLink?: string;
+  recurrence?: string[];
+  reminders?: {
+    useDefault?: boolean;
+    overrides?: Array<{
+      method: string;
+      minutes: number;
+    }>;
+  };
+  status: 'confirmed' | 'cancelled' | 'tentative';
+  timeZone?: string;
+  created?: Date;
+  updated?: Date;
+  syncedAt?: Date;
+  archived?: boolean;
+  archivedAt?: Date;
+}
+
+export interface AvailabilityData {
+  userId: string;
+  dayOfWeek: number; // 0-6, Sunday=0
+  startTime: string; // "09:00"
+  endTime: string; // "17:00"
+  timezone: string;
+  isActive: boolean;
+  type?: 'working_hours' | 'blocked' | 'available';
+}
+
+export interface BookingData {
+  eventId: string;
+  userId: string;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  bookedAt: Date;
+  notes?: string;
+  confirmationCode?: string;
+}
+
+// Conversation data for EverChat
+export interface ConversationData {
+  name: string;
+  participants: string[];
+  lastMessageAt?: Date;
+  messageCount: number;
+  type: 'direct' | 'group' | 'channel';
+  isArchived?: boolean;
+}
+
 export interface InvoiceData {
   invoiceNumber: string;
   customerId: string;

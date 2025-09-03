@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useOrganization } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
+import { trpc } from '@/lib/trpc/client'
+import CreateContactSheet from '@/components/evercore/CreateContactSheet'
 import { 
   Users, 
   Building2, 
@@ -26,7 +28,8 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react'
 
 interface Contact {
@@ -72,6 +75,7 @@ export default function CRMDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'contacts' | 'deals' | 'companies'>('contacts')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
+  const [showCreateContact, setShowCreateContact] = useState(false)
   
   const colors = {
     evergreen: '#1D5238',
@@ -88,185 +92,67 @@ export default function CRMDashboard() {
     red: '#EF4444'
   }
 
-  // Mock data - replace with real tRPC calls
-  const contacts: Contact[] = [
-    {
-      id: '1',
-      name: 'Sarah Chen',
-      email: 'sarah.chen@acmecorp.com',
-      company: 'Acme Corporation',
-      title: 'VP of Engineering',
-      phone: '+1 (555) 123-4567',
-      lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
-      dealValue: 125000,
-      status: 'Hot',
-      source: 'Email'
-    },
-    {
-      id: '2',
-      name: 'Michael Rodriguez',
-      email: 'm.rodriguez@techstartup.io',
-      company: 'Tech Startup Inc',
-      title: 'CTO',
-      lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7),
-      dealValue: 85000,
-      status: 'Warm',
-      source: 'Calendar'
-    },
-    {
-      id: '3',
-      name: 'Emily Johnson',
-      email: 'emily.j@globalcorp.com',
-      company: 'Global Corp',
-      title: 'Product Manager',
-      phone: '+1 (555) 987-6543',
-      lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14),
-      dealValue: 200000,
-      status: 'Cold',
-      source: 'LinkedIn'
-    },
-    {
-      id: '4',
-      name: 'David Kim',
-      email: 'dkim@innovate.com',
-      company: 'Innovate Solutions',
-      title: 'CEO',
-      lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      dealValue: 300000,
-      status: 'Hot',
-      source: 'Referral'
-    },
-    {
-      id: '5',
-      name: 'Lisa Wang',
-      email: 'lisa@futuretech.org',
-      company: 'Future Tech',
-      title: 'Head of Operations',
-      phone: '+1 (555) 456-7890',
-      lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
-      dealValue: 75000,
-      status: 'Warm',
-      source: 'Website'
-    },
-    {
-      id: '6',
-      name: 'James Wilson',
-      email: 'j.wilson@enterprise.com',
-      company: 'Enterprise Solutions',
-      title: 'Director of Sales',
-      phone: '+1 (555) 234-5678',
-      lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
-      dealValue: 180000,
-      status: 'Hot',
-      source: 'Email'
-    },
-    {
-      id: '7',
-      name: 'Maria Garcia',
-      email: 'maria@startup.co',
-      company: 'Growth Startup',
-      title: 'Marketing Director',
-      lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
-      dealValue: 95000,
-      status: 'Warm',
-      source: 'Conference'
-    },
-    {
-      id: '8',
-      name: 'Robert Brown',
-      email: 'rbrown@bigcorp.com',
-      company: 'Big Corporation',
-      title: 'VP of Technology',
-      phone: '+1 (555) 345-6789',
-      lastContact: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
-      dealValue: 250000,
-      status: 'Hot',
-      source: 'Referral'
-    }
-  ]
+  // Fetch real data from API
+  const { data: contactsData, isLoading: contactsLoading, refetch: refetchContacts } = trpc.unified.getContacts.useQuery(
+    { limit: 100 },
+    { enabled: !!organization }
+  );
+  
+  const { data: companiesData, isLoading: companiesLoading, refetch: refetchCompanies } = trpc.unified.getCompanies.useQuery(
+    { limit: 100 },
+    { enabled: !!organization }
+  );
+  
+  const { data: dealsData, isLoading: dealsLoading, refetch: refetchDeals } = trpc.unified.getDeals.useQuery(
+    {},
+    { enabled: !!organization }
+  );
+  
+  const { data: dashboardStats } = trpc.unified.getDashboardStats.useQuery(
+    { period: 'month' },
+    { enabled: !!organization }
+  );
 
-  const deals: Deal[] = [
-    {
-      id: '1',
-      name: 'Enterprise Plan - Acme Corp',
-      company: 'Acme Corporation',
-      value: 125000,
-      stage: 'Negotiation',
-      probability: 75,
-      closeDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 15),
-      owner: 'You',
-      lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 12)
-    },
-    {
-      id: '2',
-      name: 'Startup Package - Tech Startup',
-      company: 'Tech Startup Inc',
-      value: 85000,
-      stage: 'Proposal',
-      probability: 60,
-      closeDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-      owner: 'You',
-      lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2)
-    },
-    {
-      id: '3',
-      name: 'Global Implementation',
-      company: 'Global Corp',
-      value: 200000,
-      stage: 'Qualification',
-      probability: 40,
-      closeDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 60),
-      owner: 'You',
-      lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7)
-    },
-    {
-      id: '4',
-      name: 'Innovation Platform',
-      company: 'Innovate Solutions',
-      value: 300000,
-      stage: 'Negotiation',
-      probability: 80,
-      closeDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 10),
-      owner: 'You',
-      lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 6)
-    }
-  ]
+  // Transform API data to match UI structure
+  const contacts: Contact[] = contactsData?.map((entity: any) => ({
+    id: entity.id,
+    name: `${entity.data.firstName || ''} ${entity.data.lastName || ''}`.trim() || 'Unknown',
+    email: entity.data.email || '',
+    company: entity.data.companyName || 'No Company',
+    title: entity.data.jobTitle || '',
+    phone: entity.data.phone || '',
+    lastContact: entity.data.lastContactedAt ? new Date(entity.data.lastContactedAt) : new Date(entity.createdAt),
+    dealValue: 0, // TODO: Calculate from related deals
+    status: entity.data.sentimentScore > 70 ? 'Hot' : entity.data.sentimentScore > 40 ? 'Warm' : 'Cold',
+    source: entity.data.source || 'manual'
+  })) || [];
 
-  const companies: Company[] = [
-    {
-      id: '1',
-      name: 'Acme Corporation',
-      domain: 'acmecorp.com',
-      industry: 'Technology',
-      size: '500-1000',
-      location: 'San Francisco, CA',
-      deals: 2,
-      value: 150000,
-      lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 12)
-    },
-    {
-      id: '2',
-      name: 'Tech Startup Inc',
-      domain: 'techstartup.io',
-      industry: 'SaaS',
-      size: '50-100',
-      location: 'Austin, TX',
-      deals: 1,
-      value: 85000,
-      lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2)
-    },
-    {
-      id: '3',
-      name: 'Global Corp',
-      domain: 'globalcorp.com',
-      industry: 'Enterprise',
-      size: '1000+',
-      location: 'New York, NY',
-      deals: 1,
-      value: 200000,
-      lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7)
-    }
-  ]
+  // Transform companies data
+  const companies: Company[] = companiesData?.map((entity: any) => ({
+    id: entity.id,
+    name: entity.data.name || 'Unknown Company',
+    domain: entity.data.domain || '',
+    industry: entity.data.industry || 'Unknown',
+    size: entity.data.employeeCount ? `${entity.data.employeeCount} employees` : 'Unknown',
+    location: entity.data.address || 'Unknown',
+    deals: 0, // TODO: Count related deals
+    value: 0, // TODO: Sum related deal values
+    lastActivity: new Date(entity.updatedAt)
+  })) || [];
+
+  // Transform deals data
+  const deals: Deal[] = dealsData?.map((entity: any) => ({
+    id: entity.id,
+    name: entity.data.name || 'Untitled Deal',
+    company: 'Unknown Company', // TODO: Get company name from relationship
+    value: entity.data.value || 0,
+    stage: entity.data.stage || 'Prospecting',
+    probability: entity.data.probability || 0,
+    closeDate: entity.data.closeDate ? new Date(entity.data.closeDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    owner: 'You',
+    lastActivity: new Date(entity.updatedAt)
+  })) || [];
+  const isLoading = contactsLoading || companiesLoading || dealsLoading;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -430,6 +316,76 @@ export default function CRMDashboard() {
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => router.push('/dashboard/crm/contacts')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                backgroundColor: colors.white,
+                color: colors.evergreen,
+                border: `1px solid ${colors.evergreen}30`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                marginRight: '12px'
+              }}
+            >
+              <Users size={18} />
+              View Contacts
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => router.push('/dashboard/crm/risk')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                backgroundColor: colors.white,
+                color: colors.red,
+                border: `1px solid ${colors.red}30`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                marginRight: '12px'
+              }}
+            >
+              <AlertTriangle size={18} />
+              Risk Center
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => router.push('/dashboard/crm/pipeline')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                backgroundColor: colors.white,
+                color: colors.evergreen,
+                border: `1px solid ${colors.evergreen}30`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                marginRight: '12px'
+              }}
+            >
+              <Target size={18} />
+              Pipeline
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowCreateContact(true)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -496,6 +452,37 @@ export default function CRMDashboard() {
         backgroundColor: '#FAFBFC',
         minHeight: 'calc(100vh - 180px)'
       }}>
+        {isLoading && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '400px',
+            color: colors.mediumGray
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                width: '48px',
+                height: '48px',
+                border: `3px solid ${colors.lightGray}`,
+                borderTop: `3px solid ${colors.evergreen}`,
+                borderRadius: '50%',
+                margin: '0 auto 16px',
+                animation: 'spin 1s linear infinite'
+              }} />
+              <p>Loading CRM data...</p>
+              <style jsx>{`
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
+            </div>
+          </div>
+        )}
+        
+        {!isLoading && (
+          <>
         
         {/* Contacts Table */}
         {activeTab === 'contacts' && (
@@ -638,8 +625,10 @@ export default function CRMDashboard() {
                       transition={{ delay: index * 0.02 }}
                       style={{
                         borderBottom: `1px solid ${colors.lightGray}`,
-                        transition: 'background-color 200ms ease'
+                        transition: 'background-color 200ms ease',
+                        cursor: 'pointer'
                       }}
+                      onClick={() => router.push(`/contacts/${contact.id}`)}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = colors.softGreen + '30'
                       }}
@@ -745,6 +734,10 @@ export default function CRMDashboard() {
                             color: colors.mediumGray,
                             transition: 'all 200ms ease'
                           }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/contacts/${contact.id}`)
+                          }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = colors.softGreen
                             e.currentTarget.style.color = colors.evergreen
@@ -764,6 +757,10 @@ export default function CRMDashboard() {
                             color: colors.mediumGray,
                             transition: 'all 200ms ease'
                           }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // Edit functionality can be added here
+                          }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = colors.softGreen
                             e.currentTarget.style.color = colors.evergreen
@@ -782,6 +779,10 @@ export default function CRMDashboard() {
                             cursor: 'pointer',
                             color: colors.mediumGray,
                             transition: 'all 200ms ease'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/mail/compose?to=${contact.email}`)
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = colors.softGreen
@@ -1356,6 +1357,7 @@ export default function CRMDashboard() {
                   </h2>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
+                    onClick={() => router.push('/dashboard/crm/pipeline')}
                     style={{
                       fontSize: '14px',
                       fontWeight: '500',
@@ -1623,7 +1625,19 @@ export default function CRMDashboard() {
             </div>
           </div>
         )}
+        </>
+        )}
       </div>
+      
+      {/* Create Contact Sheet */}
+      <CreateContactSheet
+        isOpen={showCreateContact}
+        onClose={() => setShowCreateContact(false)}
+        onSuccess={() => {
+          refetchContacts()
+          setShowCreateContact(false)
+        }}
+      />
     </div>
   )
 }

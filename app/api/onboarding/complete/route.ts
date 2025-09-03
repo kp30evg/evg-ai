@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { companies, users, onboardingEvents } from '@/lib/db/schema'
+import { workspaces, users, entities } from '@/lib/db/schema/unified'
 import { eq } from 'drizzle-orm'
 
 export async function POST(req: Request) {
@@ -18,17 +18,17 @@ export async function POST(req: Request) {
 
     console.log('Completing onboarding for org:', orgId, 'user:', userId)
 
-    // First check if company exists
+    // First check if workspace exists
     const [existingCompany] = await db
       .select()
-      .from(companies)
-      .where(eq(companies.clerkOrgId, orgId))
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
       .limit(1)
 
     if (!existingCompany) {
-      console.error('Company not found for orgId:', orgId)
-      // Create the company if it doesn't exist
-      await db.insert(companies).values({
+      console.error('Workspace not found for orgId:', orgId)
+      // Create the workspace if it doesn't exist
+      await db.insert(workspaces).values({
         clerkOrgId: orgId,
         name: 'Unknown Organization', // This will be updated by webhook
         slug: orgId,
@@ -37,20 +37,20 @@ export async function POST(req: Request) {
         onboardingStep: 5,
         connectedIntegrations: []
       })
-      console.log('Created new company record for:', orgId)
+      console.log('Created new workspace record for:', orgId)
     } else {
-      // Update existing company
+      // Update existing workspace
       const result = await db
-        .update(companies)
+        .update(workspaces)
         .set({
           onboardingCompleted: true,
           onboardingCompletedAt: new Date(),
           onboardingStep: 5,
           updatedAt: new Date()
         })
-        .where(eq(companies.clerkOrgId, orgId))
+        .where(eq(workspaces.clerkOrgId, orgId))
       
-      console.log('Updated company onboarding status:', result)
+      console.log('Updated workspace onboarding status:', result)
     }
 
     // Mark user as having completed the tour
@@ -62,17 +62,17 @@ export async function POST(req: Request) {
       })
       .where(eq(users.clerkUserId, userId))
 
-    // Get company ID for event tracking
-    const [company] = await db
-      .select({ id: companies.id })
-      .from(companies)
-      .where(eq(companies.clerkOrgId, orgId))
+    // Get workspace ID for event tracking
+    const [workspace] = await db
+      .select({ id: workspaces.id })
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
       .limit(1)
 
-    if (company) {
+    if (workspace) {
       // Track completion event
-      await db.insert(onboardingEvents).values({
-        companyId: company.id,
+      await db.insert(entities).values({
+        workspaceId: workspace.id,
         userId: userId,
         event: 'onboarding_completed',
         stepName: 'complete',

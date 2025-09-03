@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { processCommand } from '@/lib/modules-simple/command-processor';
+import { db } from '@/lib/db';
+import { workspaces } from '@/lib/db/schema/unified';
+import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const { userId, orgId } = await auth();
     
-    if (!userId) {
+    if (!userId || !orgId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -20,33 +19,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Command is required' }, { status: 400 });
     }
 
-    // Process command with OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
-      messages: [
-        {
-          role: 'system',
-          content: `You are evergreenOS, an advanced business operations AI assistant. 
-          You help process business commands across multiple modules including CRM, Email, Tasks, Calendar, etc.
-          Parse the user's command and return a structured response indicating what action would be taken.
-          For now, return a simulated response as the modules are not yet fully implemented.`
-        },
-        {
-          role: 'user',
-          content: command
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-    });
+    // Get workspace from org ID
+    const workspace = await db.select()
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
+      .limit(1);
 
-    const response = completion.choices[0].message.content;
+    if (!workspace.length) {
+      // Create workspace if it doesn't exist
+      const user = await currentUser();
+      const newWorkspace = await db.insert(workspaces).values({
+        clerkOrgId: orgId,
+        name: user?.organizationMemberships?.[0]?.organization?.name || 'My Workspace',
+        slug: orgId.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      }).returning();
+      
+      const workspaceId = newWorkspace[0].id;
+      
+      // Process command with the new unified system
+      const result = await processCommand(workspaceId, command, userId);
+      
+      return NextResponse.json({
+        ...result,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // In a real implementation, this would execute actual business logic
+    // Process command with the unified system
+    const result = await processCommand(workspace[0].id, command, userId);
+
     return NextResponse.json({
-      success: true,
-      command,
-      response,
+      ...result,
       timestamp: new Date().toISOString(),
     });
 

@@ -306,19 +306,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (getMessagesQuery.data && selectedConversation) {
       const formattedMessages = getMessagesQuery.data.map((msg: any) => ({
         id: msg.id,
-        text: msg.data.text,
-        userId: msg.data.userId,
-        userName: msg.data.userName,
+        text: msg.data.content || msg.data.text, // Support both 'content' and 'text' fields
+        userId: msg.data.from || msg.data.userId || msg.createdBy || 'user',
+        userName: msg.data.userName || msg.data.from || 'User',
         userImage: msg.data.userImage,
         timestamp: new Date(msg.data.timestamp || msg.createdAt),
-        channelId: msg.data.channelId,
+        channelId: msg.data.channel || msg.data.channelId || selectedConversation.id,
         threadId: msg.data.threadId,
         mentions: msg.data.mentions,
         attachments: msg.data.attachments,
         aiCommand: msg.data.aiCommand,
         commandResult: msg.data.commandResult
       }))
-      setMessages(formattedMessages)
+      setMessages(formattedMessages.reverse()) // Reverse to show oldest first
     }
   }, [getMessagesQuery.data, selectedConversation])
 
@@ -342,8 +342,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       // Send via tRPC (which will handle Pusher broadcast)
       await sendMessageMutation.mutateAsync({
-        text,
-        channelId: selectedConversation.id
+        content: text, // Changed from 'text' to 'content'
+        conversationId: undefined, // Don't pass conversationId for channels
+        channelId: selectedConversation.id // This will be used for non-UUID channel IDs
       })
       
       // Refetch messages to get the persisted message with correct ID

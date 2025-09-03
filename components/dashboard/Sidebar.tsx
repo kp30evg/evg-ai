@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mail, Inbox, Send, FileText, Upload, Settings } from 'lucide-react'
+import { Mail, Inbox, Send, FileText, Upload, Settings, Calendar, Clock, Users, Plus, CalendarDays, Timer, Building2, User, TrendingUp, BarChart3, Brain, Target } from 'lucide-react'
 
 interface ModuleItem {
   label: string
@@ -47,6 +47,33 @@ export default function Sidebar() {
         { label: 'Sent', icon: <Send size={18} />, path: '/mail/sent' },
         { label: 'Drafts', icon: <FileText size={18} />, path: '/mail/drafts' },
         { label: 'Email Settings', icon: <Settings size={18} />, path: '/mail/settings' }
+      ]
+    },
+    {
+      id: 'evercal',
+      icon: <Calendar size={24} strokeWidth={2} />,
+      label: 'EverCal',
+      items: [
+        { label: 'My Calendar', icon: <CalendarDays size={18} />, path: '/dashboard/calendar' },
+        { label: 'Schedule Meeting', icon: <Plus size={18} />, path: '/dashboard/calendar?action=new' },
+        { label: 'Availability', icon: <Clock size={18} />, path: '/dashboard/calendar?view=availability' },
+        { label: 'Meeting History', icon: <Users size={18} />, path: '/dashboard/calendar?view=history' },
+        { label: 'Working Hours', icon: <Timer size={18} />, path: '/dashboard/calendar?view=settings' }
+      ]
+    },
+    {
+      id: 'evercore',
+      icon: <Users size={24} strokeWidth={2} />,
+      label: 'EverCore',
+      items: [
+        { label: 'Dashboard', icon: <BarChart3 size={18} />, path: '/dashboard/crm' },
+        { label: 'Contacts', icon: <User size={18} />, path: '/dashboard/crm/contacts' },
+        { label: 'Companies', icon: <Building2 size={18} />, path: '/dashboard/crm/companies' },
+        { label: 'Deals', icon: <Target size={18} />, path: '/dashboard/crm/deals' },
+        { label: 'Pipeline', icon: <TrendingUp size={18} />, path: '/dashboard/crm/pipeline' },
+        { label: 'Insights', icon: <Brain size={18} />, path: '/dashboard/crm/insights' },
+        { label: 'Import Data', icon: <Upload size={18} />, path: '/dashboard/crm/import' },
+        { label: 'Settings', icon: <Settings size={18} />, path: '/dashboard/crm/settings' }
       ]
     }
   ]
@@ -122,6 +149,12 @@ export default function Sidebar() {
             key={module.id}
             onMouseEnter={() => handleModuleHover(module.id)}
             onMouseLeave={handleModuleLeave}
+            onClick={() => {
+              // Navigate to the first item in the module on click
+              if (module.items.length > 0) {
+                router.push(module.items[0].path)
+              }
+            }}
             style={{
               width: '48px',
               height: '48px',

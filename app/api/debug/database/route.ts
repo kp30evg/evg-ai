@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { companies, users } from '@/lib/db/schema'
+import { workspaces, users } from '@/lib/db/schema/unified'
 
 export async function GET() {
   try {
@@ -25,7 +25,7 @@ export async function GET() {
         data: allUsers.map(u => ({
           email: u.email,
           clerkUserId: u.clerkUserId,
-          companyId: u.companyId,
+          workspaceId: u.workspaceId,
           hasCompletedTour: u.hasCompletedTour
         }))
       }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { companies } from '@/lib/db/schema'
+import { workspaces } from '@/lib/db/schema/unified'
 import { eq } from 'drizzle-orm'
 
 export async function GET(req: Request) {
@@ -18,21 +18,18 @@ export async function GET(req: Request) {
 
     console.log('Checking onboarding status for org:', orgId)
 
-    // Check if company exists and has completed onboarding
-    const [company] = await db
-      .select({
-        onboardingCompleted: companies.onboardingCompleted,
-        onboardingStep: companies.onboardingStep
-      })
-      .from(companies)
-      .where(eq(companies.clerkOrgId, orgId))
+    // Check if workspace exists  
+    const [workspace] = await db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
       .limit(1)
 
-    if (!company) {
-      console.log('Company not found in database for org:', orgId)
+    if (!workspace) {
+      console.log('Workspace not found in database for org:', orgId)
       
       // Get organization details from Clerk
-      let orgName = 'My Company'
+      let orgName = 'My Workspace'
       let orgSlug = orgId
       
       try {
@@ -46,42 +43,32 @@ export async function GET(req: Request) {
         console.log('Could not fetch organization details:', error)
       }
       
-      // Create the company if it doesn't exist
+      // Create the workspace if it doesn't exist
       try {
-        await db.insert(companies).values({
+        await db.insert(workspaces).values({
           clerkOrgId: orgId,
           name: orgName,
-          slug: orgSlug,
-          onboardingCompleted: false,
-          onboardingStep: 0,
-          connectedIntegrations: []
+          slug: orgSlug
         })
-        console.log('Created new company record for:', orgId, orgName)
+        console.log('Created new workspace record for:', orgId, orgName)
       } catch (error) {
-        console.error('Error creating company:', error)
+        console.error('Error creating workspace:', error)
       }
       
-      // Company doesn't exist in database yet - needs onboarding
+      // Workspace doesn't exist in database yet - skip onboarding for pure system
       return NextResponse.json({
-        needsOnboarding: true,
-        onboardingCompleted: false,
+        needsOnboarding: false,
+        onboardingCompleted: true,
         onboardingStep: 0,
-        reason: 'New company created'
+        reason: 'New workspace created - using pure single-table architecture'
       })
     }
 
-    const needsOnboarding = !company.onboardingCompleted
-    console.log('Company onboarding status:', {
-      orgId,
-      onboardingCompleted: company.onboardingCompleted,
-      onboardingStep: company.onboardingStep,
-      needsOnboarding
-    })
-
+    // With pure single-table architecture, no onboarding needed
     return NextResponse.json({
-      needsOnboarding,
-      onboardingCompleted: company.onboardingCompleted || false,
-      onboardingStep: company.onboardingStep || 0
+      needsOnboarding: false,
+      onboardingCompleted: true,
+      onboardingStep: 0
     })
   } catch (error) {
     console.error('Error checking onboarding status:', error)

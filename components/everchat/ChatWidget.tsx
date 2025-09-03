@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MessageSquare, X, Minimize2, Users, Hash, Send, Search, ChevronDown } from 'lucide-react'
+import { MessageSquare, X, Minimize2, Users, Hash, Send, Search, ChevronDown, Maximize2 } from 'lucide-react'
 import { useUser, useOrganization, useOrganizationList } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
 import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 import ConversationList from './ConversationList'
@@ -36,6 +37,7 @@ function ChatWidgetContent() {
   const { user } = useUser()
   const { organization } = useOrganization()
   const { selectedConversation, setSelectedConversation } = useChat()
+  const router = useRouter()
 
   // Widget positioning - bottom right like LinkedIn/Facebook
   const widgetPosition = {
@@ -193,6 +195,34 @@ function ChatWidgetContent() {
               </div>
 
               <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  onClick={() => {
+                    router.push('/chat')
+                    setIsOpen(false)
+                  }}
+                  title="Open in full page"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 200ms ease-out'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = colors.softGreen
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
+                >
+                  <Maximize2 size={18} color={colors.mediumGray} />
+                </button>
+
                 <button
                   onClick={() => setIsMinimized(!isMinimized)}
                   style={{

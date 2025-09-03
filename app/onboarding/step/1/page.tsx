@@ -77,24 +77,36 @@ export default function OnboardingStep1() {
   ]
 
   const handleSubmit = async () => {
+    console.log('handleSubmit called with formData:', formData)
+    
     if (!formData.companySize || !formData.industry || !formData.primaryUseCase) {
+      console.warn('Form incomplete:', {
+        companySize: formData.companySize,
+        industry: formData.industry,
+        primaryUseCase: formData.primaryUseCase
+      })
+      alert('Please select all required fields')
       return
     }
 
     setIsLoading(true)
     
     try {
+      const payload = {
+        ...formData,
+        companyName: organization?.name,
+        organizationId: organization?.id
+      }
+      console.log('Sending payload:', payload)
+      
       const response = await fetch('/api/onboarding/company', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          companyName: organization?.name,
-          organizationId: organization?.id
-        })
+        body: JSON.stringify(payload)
       })
 
       const data = await response.json()
+      console.log('Response:', response.status, data)
       
       if (response.ok && data.success) {
         // Add a small delay for visual feedback
@@ -102,9 +114,11 @@ export default function OnboardingStep1() {
         router.push('/onboarding/step/2')
       } else {
         console.error('Failed to save company data:', data.error)
+        alert(`Error: ${data.error || 'Failed to save data'}`)
       }
     } catch (error) {
       console.error('Error saving company data:', error)
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setIsLoading(false)
     }
@@ -322,9 +336,25 @@ export default function OnboardingStep1() {
           </div>
         </div>
 
+        {/* Debug Info - Remove in production */}
+        <div style={{
+          marginTop: '16px',
+          padding: '12px',
+          background: colors.softGreen,
+          borderRadius: '6px',
+          fontSize: '12px',
+          color: colors.charcoal,
+          fontFamily: 'monospace'
+        }}>
+          Debug: companySize={formData.companySize || 'none'}, 
+          industry={formData.industry || 'none'}, 
+          primaryUseCase={formData.primaryUseCase || 'none'}, 
+          isComplete={isFormComplete ? 'true' : 'false'}
+        </div>
+        
         {/* Continue Button with gradient */}
         <div style={{
-          marginTop: '24px',
+          marginTop: '16px',
           display: 'flex',
           justifyContent: 'flex-end'
         }}>

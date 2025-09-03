@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
 export async function GET(req: NextRequest) {
+  console.log('Gmail connect route called');
+  console.log('Request URL:', req.url);
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+  
   try {
     // Verify user is authenticated
     const { userId, orgId } = await auth();
+    console.log('Auth result:', { userId, orgId });
     
     if (!userId || !orgId) {
       return NextResponse.redirect(
@@ -14,7 +19,7 @@ export async function GET(req: NextRequest) {
     
     // Get OAuth configuration from environment variables
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback';
+    const redirectUri = process.env.GOOGLE_GMAIL_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback';
     
     if (!clientId) {
       console.error('Google Client ID not configured');

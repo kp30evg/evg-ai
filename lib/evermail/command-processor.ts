@@ -1,6 +1,6 @@
 import { OpenAI } from 'openai';
 import { db } from '@/lib/db';
-import { entities } from '@/lib/db/schema';
+import { entities } from '@/lib/db/schema/unified';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { GmailClient } from './gmail-client';
 
@@ -9,7 +9,7 @@ const openai = new OpenAI({
 });
 
 interface CommandContext {
-  companyId: string;
+  workspaceId: string;
   userId: string;
   userEmail: string;
 }
@@ -197,7 +197,7 @@ Keep it professional but friendly.`
       .from(entities)
       .where(
         and(
-          eq(entities.companyId, context.companyId),
+          eq(entities.workspaceId, context.workspaceId),
           eq(entities.type, 'email')
         )
       );
@@ -323,7 +323,7 @@ Keep it professional but friendly.`
       .where(
         and(
           eq(entities.id, params.emailId),
-          eq(entities.companyId, context.companyId)
+          eq(entities.workspaceId, context.workspaceId)
         )
       )
       .limit(1);
@@ -466,7 +466,7 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
           .from(entities)
           .where(
             and(
-              eq(entities.companyId, context.companyId),
+              eq(entities.workspaceId, context.workspaceId),
               eq(entities.type, 'email'),
               sql`data->'from'->>'email' ILIKE ${`%${params.from}%`}`
             )
@@ -493,7 +493,7 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
       .where(
         and(
           eq(entities.id, params.emailId),
-          eq(entities.companyId, context.companyId)
+          eq(entities.workspaceId, context.workspaceId)
         )
       )
       .limit(1);
@@ -628,13 +628,13 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
           .from(entities)
           .where(
             and(
-              eq(entities.companyId, context.companyId),
+              eq(entities.workspaceId, context.workspaceId),
               eq(entities.type, 'email'),
               sql`data->'from'->>'email' != ${context.userEmail}`,
               sql`(data->>'isRead')::boolean = true`,
               sql`NOT EXISTS (
                 SELECT 1 FROM entities e2 
-                WHERE e2.company_id = ${context.companyId}
+                WHERE e2.workspace_id = ${context.workspaceId}
                 AND e2.type = 'email'
                 AND e2.data->>'threadId' = entities.data->>'threadId'
                 AND e2.data->'from'->>'email' = ${context.userEmail}
@@ -692,7 +692,7 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
           .from(entities)
           .where(
             and(
-              eq(entities.companyId, context.companyId),
+              eq(entities.workspaceId, context.workspaceId),
               eq(entities.type, 'email'),
               sql`(data->>'isRead')::boolean = false OR (data->>'sentAt')::timestamp > NOW() - INTERVAL '2 days'`,
               sql`(${urgentConditions.reduce((acc, cond, i) => 
@@ -719,7 +719,7 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
           .from(entities)
           .where(
             and(
-              eq(entities.companyId, context.companyId),
+              eq(entities.workspaceId, context.workspaceId),
               eq(entities.type, 'email'),
               sql`(data->>'sentAt')::timestamp > NOW() - INTERVAL '7 days'`
             )
@@ -765,7 +765,7 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
           .from(entities)
           .where(
             and(
-              eq(entities.companyId, context.companyId),
+              eq(entities.workspaceId, context.workspaceId),
               eq(entities.type, 'email'),
               sql`data->'from'->>'email' = ${context.userEmail}`,
               sql`(data->>'sentAt')::timestamp > NOW() - INTERVAL '30 days'`
@@ -814,7 +814,7 @@ User's intent: ${params.replyIntent || 'Professional acknowledgment'}`
         cc: draft.cc,
         subject: draft.subject,
         body: draft.body,
-        companyId: context.companyId,
+        workspaceId: context.workspaceId,
         userId: context.userId // This ensures user-specific Gmail account is used
       });
       

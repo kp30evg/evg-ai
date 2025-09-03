@@ -60,10 +60,10 @@ export default function DashboardPage() {
   }
 
   const prompts = [
-    "What's our monthly burn rate?",
-    "Show revenue by customer segment",
-    "Who are our top 10 customers?",
-    "Optimize inventory for Q4"
+    "Show me my EverCore contacts with high deal potential",
+    "Which EverCore deals are at risk this month?",
+    "Generate follow-up tasks for my pipeline",
+    "What's the health score of my top accounts?"
   ]
 
   const thinkingSteps = [

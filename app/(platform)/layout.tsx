@@ -130,10 +130,10 @@ export default function PlatformLayout({
       color: tokens.colors.evergreen
     },
     { 
-      id: 'evercrm',
-      name: 'EverCRM',
+      id: 'evercore',
+      name: 'EverCore',
       icon: Users,
-      path: '/crm',
+      path: '/dashboard/crm',
       color: tokens.colors.evergreen
     },
     { 
@@ -173,6 +173,7 @@ export default function PlatformLayout({
     if (path === '/dashboard' && pathname === '/dashboard') return true;
     if (path === '/mail' && pathname.startsWith('/mail')) return true;
     if (path === '/dashboard/calendar' && pathname.startsWith('/dashboard/calendar')) return true;
+    if (path === '/dashboard/crm' && (pathname.startsWith('/dashboard/crm') || pathname.startsWith('/contacts'))) return true;
     return pathname.startsWith(path);
   };
 

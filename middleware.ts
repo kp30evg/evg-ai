@@ -10,9 +10,23 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/select-org',
   '/api/webhooks(.*)',
+  '/api/auth/gmail/callback',
+  '/test-chat',
+  '/api/test-entity',
+  '/api/test-command',
+]);
+
+const isProtectedApiRoute = createRouteMatcher([
+  '/api/auth/gmail/connect',
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
+  // For protected API routes, check auth but don't redirect
+  if (isProtectedApiRoute(request)) {
+    // Just verify auth exists, don't protect (which would redirect)
+    return;
+  }
+  
   // Protect non-public routes
   if (!isPublicRoute(request)) {
     await auth.protect();

@@ -41,7 +41,7 @@ export default function CommandInterface() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const executeMutation = trpc.command.execute.useMutation()
+  const executeMutation = trpc.unified.executeCommand.useMutation()
 
   const colors = {
     evergreen: '#1D5238',
@@ -55,20 +55,20 @@ export default function CommandInterface() {
 
   const prompts = [
     { 
-      text: "What's our monthly burn rate?", 
-      subtitle: "Financial analysis"
+      text: "Show all contacts", 
+      subtitle: "CRM - View contacts"
     },
     { 
-      text: "Show revenue by customer segment", 
-      subtitle: "Business intelligence"
+      text: "Create deal for Acme Corp worth $50000", 
+      subtitle: "CRM - New deal"
     },
     { 
-      text: "Who are our top 10 customers?", 
-      subtitle: "Customer insights"
+      text: "Show deals in negotiation", 
+      subtitle: "CRM - Pipeline view"
     },
     { 
-      text: "Optimize inventory for Q4", 
-      subtitle: "Operations planning"
+      text: "Send #sales a summary about Q4 targets", 
+      subtitle: "Chat - Team update"
     }
   ]
 
@@ -92,7 +92,7 @@ export default function CommandInterface() {
 
     try {
       const result = await executeMutation.mutateAsync({
-        input: commandText
+        command: commandText
       })
 
       // After thinking animation completes, show the answer

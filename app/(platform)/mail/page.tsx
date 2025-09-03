@@ -101,24 +101,26 @@ export default function MailPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="border-b border-gray-200" style={{padding: '32px'}}>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 bg-[#1D5238] rounded-lg flex items-center justify-center">
-            <Mail className="h-4 w-4 text-white" />
+      <div className="border-b border-gray-200" style={{padding: '16px 24px'}}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-[#E6F4EC] rounded-xl flex items-center justify-center">
+              <Mail className="h-6 w-6 text-[#1D5238]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-gray-900" style={{fontSize: '24px', fontWeight: 600}}>EverMail</h1>
+                <span className="text-xs font-medium text-[#1D5238] bg-[#E6F4EC] px-2 py-1 rounded-full">AI-Powered Email</span>
+              </div>
+              <p className="text-gray-600 text-sm">Smart filtering, instant search, and AI assistance for your inbox</p>
+            </div>
           </div>
-          <span className="text-sm font-medium text-[#1D5238] bg-[#E6F4EC] px-3 py-1 rounded-full">AI-Powered Email</span>
         </div>
-        <h1 className="text-[#222B2E] mb-2" style={{fontSize: '48px', lineHeight: '52px', fontWeight: 700, letterSpacing: '-0.02em'}}>
-          Your Inbox, <span style={{color: '#1D5238'}}>Simplified.</span>
-        </h1>
-        <p className="text-[#6B7280]" style={{fontSize: '18px', lineHeight: '28px', maxWidth: '800px'}}>
-          Experience email that works as fast as you do. Smart filtering, instant search, and AI assistance to help you stay on top of what matters.
-        </p>
       </div>
 
       {/* Tab Navigation */}
-      <div style={{paddingLeft: '32px', paddingRight: '32px'}}>
-        <div className="flex items-center" style={{gap: '8px', paddingTop: '32px', paddingBottom: '32px'}}>
+      <div style={{paddingLeft: '24px', paddingRight: '24px'}}>
+        <div className="flex items-center" style={{gap: '4px', paddingTop: '24px'}}>
           {[
             { key: 'dashboard', label: 'Dashboard' },
             { key: 'inbox', label: 'Inbox' },
@@ -142,18 +144,17 @@ export default function MailPage() {
                   setActiveTab(tab.key as any);
                 }
               }}
-              className={`transition-all duration-200 ${
+              className={`transition-colors ${
                 activeTab === tab.key 
-                  ? 'bg-[#1D5238] text-white' 
-                  : 'text-[#6B7280] hover:text-[#222B2E] hover:bg-gray-50'
+                  ? 'text-[#1D5238] bg-[#E6F4EC]' 
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               }`}
               style={{
-                padding: '10px 20px',
+                padding: '8px 16px',
                 fontSize: '14px',
                 lineHeight: '20px',
                 fontWeight: activeTab === tab.key ? 600 : 500,
-                borderRadius: '8px',
-                border: 'none'
+                borderRadius: '8px'
               }}
             >
               {tab.label}
@@ -163,46 +164,46 @@ export default function MailPage() {
       </div>
 
       {/* Tab Content */}
-      <div style={{padding: '32px'}}>
+      <div style={{padding: '24px'}}>
         {activeTab === 'dashboard' && (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '48px'}}>
+          <div className="space-y-8">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3" style={{gap: '32px'}}>
-              <div className="bg-white rounded-xl p-6" style={{border: '1px solid rgba(229, 231, 235, 0.6)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'}}>
+            <div className="grid grid-cols-1 md:grid-cols-3" style={{gap: '24px'}}>
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-4">
-                  <Inbox className="h-6 w-6 text-[#6B7280]" />
+                  <Inbox className="h-6 w-6 text-gray-600" />
                 </div>
-                <div className="text-[#222B2E] mb-1" style={{fontSize: '36px', lineHeight: '40px', fontWeight: 700}}>{stats.unread}</div>
-                <div className="text-[#6B7280]" style={{fontSize: '14px', fontWeight: 500}}>Unread emails</div>
+                <div className="text-4xl font-bold text-gray-900 mb-1">{stats.unread}</div>
+                <div className="text-gray-600 font-medium">Unread emails</div>
               </div>
               
-              <div className="bg-white rounded-xl p-6" style={{border: '1px solid rgba(229, 231, 235, 0.6)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'}}>
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <div className="w-12 h-12 bg-[#E6F4EC] rounded-xl flex items-center justify-center mb-4">
                   <TrendingUp className="h-6 w-6 text-[#1D5238]" />
                 </div>
-                <div className="text-[#222B2E] mb-1" style={{fontSize: '36px', lineHeight: '40px', fontWeight: 700}}>{stats.responseRate}%</div>
-                <div className="text-[#6B7280]" style={{fontSize: '14px', fontWeight: 500}}>Response rate</div>
+                <div className="text-4xl font-bold text-gray-900 mb-1">{stats.responseRate}%</div>
+                <div className="text-gray-600 font-medium">Response rate</div>
               </div>
               
-              <div className="bg-white rounded-xl p-6" style={{border: '1px solid rgba(229, 231, 235, 0.6)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'}}>
+              <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <div className="w-12 h-12 bg-[#E6F4EC] rounded-xl flex items-center justify-center mb-4">
                   <Clock className="h-6 w-6 text-[#1D5238]" />
                 </div>
-                <div className="text-[#222B2E] mb-1" style={{fontSize: '36px', lineHeight: '40px', fontWeight: 700}}>{stats.avgResponseTime}h</div>
-                <div className="text-[#6B7280]" style={{fontSize: '14px', fontWeight: 500}}>Avg response time</div>
+                <div className="text-4xl font-bold text-gray-900 mb-1">{stats.avgResponseTime}h</div>
+                <div className="text-gray-600 font-medium">Avg response time</div>
               </div>
             </div>
 
             {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3" style={{gap: '48px'}}>
+            <div className="grid grid-cols-1 lg:grid-cols-3" style={{gap: '32px'}}>
               {/* Smart Filters */}
               <div className="lg:col-span-2">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-[#222B2E]" style={{fontSize: '24px', lineHeight: '28px', fontWeight: 600}}>Smart Filters</h2>
-                  <button className="text-[#1D5238] bg-white hover:bg-[#E6F4EC] transition-colors duration-200" style={{padding: '8px 16px', fontSize: '14px', fontWeight: 500, borderRadius: '8px', border: '1px solid #E5E7EB'}}>Customize</button>
+                  <h2 className="text-2xl font-bold text-gray-900">Smart Filters</h2>
+                  <Button variant="outline" className="text-sm">Customize</Button>
                 </div>
                 
-                <div style={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   {[
                     { 
                       name: 'Important & Unread', 
@@ -234,37 +235,23 @@ export default function MailPage() {
                       icon: FileText
                     }
                   ].map((filter) => (
-                    <div key={filter.name} className="bg-white rounded-xl p-6 hover:shadow-lg transition-all duration-200 cursor-pointer" style={{border: '1px solid rgba(229, 231, 235, 0.6)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'}}>
+                    <div key={filter.name} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-sm transition-shadow cursor-pointer">
                       {filter.trending && (
-                        <div className="inline-block bg-[#1D5238] text-white text-xs font-medium rounded-full" style={{padding: '4px 8px', marginBottom: '12px'}}>
-                          Needs Attention
-                        </div>
+                        <div className="inline-block bg-[#1D5238] text-white text-xs font-medium rounded-full" style={{padding: '4px 8px', marginBottom: '12px'}}>Needs Attention</div>
                       )}
                       <div className="flex items-start" style={{gap: '16px'}}>
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                          filter.color === 'red' ? 'bg-red-100' :
-                          filter.color === 'yellow' ? 'bg-yellow-100' :
-                          filter.color === 'blue' ? 'bg-blue-100' :
-                          'bg-gray-100'
-                        }`}>
-                          <filter.icon className={`h-6 w-6 ${
-                            filter.color === 'red' ? 'text-red-600' :
-                            filter.color === 'yellow' ? 'text-yellow-600' :
-                            filter.color === 'blue' ? 'text-blue-600' :
-                            'text-gray-600'
-                          }`} />
+                        <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+                          <filter.icon className="h-6 w-6 text-gray-600" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center" style={{gap: '8px', marginBottom: '8px'}}>
-                            <h3 className="font-semibold text-[#222B2E]" style={{fontSize: '16px'}}>{filter.name}</h3>
-                            <span className="text-sm font-medium text-[#6B7280] bg-gray-100 px-2 py-1 rounded-full">
-                              {filter.count}
-                            </span>
+                            <h3 className="font-semibold text-gray-900">{filter.name}</h3>
+                            <span className="text-sm text-gray-500">{filter.count}</span>
                           </div>
-                          <p className="text-[#6B7280] text-sm" style={{marginBottom: '12px', lineHeight: '20px'}}>{filter.desc}</p>
+                          <p className="text-gray-600 text-sm" style={{marginBottom: '12px'}}>{filter.desc}</p>
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-500">Updated just now</span>
-                            <button className="text-[#1D5238] hover:bg-[#E6F4EC] transition-colors duration-200" style={{padding: '6px 12px', fontSize: '12px', fontWeight: 500, borderRadius: '6px', border: '1px solid #E5E7EB'}}>View All</button>
+                            <Button variant="outline" size="sm" className="text-xs">View All</Button>
                           </div>
                         </div>
                       </div>
@@ -276,20 +263,20 @@ export default function MailPage() {
               {/* Today's Activity */}
               <div>
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-[#222B2E]" style={{fontSize: '20px', lineHeight: '24px', fontWeight: 600}}>Today's Activity</h3>
+                  <h3 className="text-xl font-bold text-gray-900">Today's Activity</h3>
                   <div className="flex items-center" style={{gap: '8px'}}>
-                    <button className="hover:bg-gray-50 transition-colors duration-200" style={{width: '32px', height: '32px', padding: 0, borderRadius: '8px', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                      <ChevronLeft className="h-4 w-4 text-[#6B7280]" />
-                    </button>
-                    <span className="text-sm font-medium text-[#222B2E]">Today</span>
-                    <button className="hover:bg-gray-50 transition-colors duration-200" style={{width: '32px', height: '32px', padding: 0, borderRadius: '8px', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                      <ChevronRight className="h-4 w-4 text-[#6B7280]" />
-                    </button>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm font-medium">Today</span>
+                    <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 
                 {/* Email Activity Timeline */}
-                <div className="bg-white rounded-xl p-6 mb-6" style={{border: '1px solid rgba(229, 231, 235, 0.6)', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'}}>
+                <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
                   <div className="grid grid-cols-4 gap-2 mb-4">
                     {['9am', '12pm', '3pm', '6pm'].map((time, index) => (
                       <div key={time} className="text-center">
@@ -306,36 +293,27 @@ export default function MailPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="text-sm font-medium text-[#222B2E]">Peak hours: 9-10 AM</div>
-                  <div className="text-xs text-[#6B7280]">32 emails received, 28 processed</div>
+                  <div className="text-sm font-medium text-gray-900">Peak hours: 9-10 AM</div>
+                  <div className="text-xs text-gray-500">32 emails received, 28 processed</div>
                 </div>
                 
                 {/* Recent Threads */}
-                <div style={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
                   <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-[#222B2E]" style={{fontSize: '16px'}}>Recent Threads</h4>
-                    <button className="text-[#1D5238] hover:bg-[#E6F4EC] transition-colors duration-200" style={{padding: '6px 12px', fontSize: '12px', fontWeight: 500, borderRadius: '6px', border: '1px solid #E5E7EB'}}>
+                    <h4 className="font-semibold text-gray-900">Recent Threads</h4>
+                    <Button variant="outline" size="sm" className="text-xs">
                       View Inbox
-                    </button>
+                    </Button>
                   </div>
                   
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                     {recentThreads.slice(0, 3).map((thread) => (
-                      <div key={thread.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <div key={thread.id} className="flex items-center gap-3">
+                        <div className="text-sm font-medium text-gray-600 w-16">{thread.date}</div>
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            {thread.unread && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            )}
-                            <div className="font-medium text-sm text-[#222B2E]">{thread.from}</div>
-                            {thread.urgent && (
-                              <AlertCircle className="h-3 w-3 text-red-500" />
-                            )}
-                          </div>
-                          <div className="text-sm font-medium text-[#222B2E] mb-1">{thread.subject}</div>
-                          <div className="text-xs text-[#6B7280] line-clamp-1">{thread.preview}</div>
+                          <div className="font-medium text-gray-900">{thread.from} - {thread.subject}</div>
+                          <div className="text-xs text-gray-500">{thread.preview.substring(0, 60)}...</div>
                         </div>
-                        <div className="text-xs text-[#6B7280]">{thread.date}</div>
                       </div>
                     ))}
                   </div>

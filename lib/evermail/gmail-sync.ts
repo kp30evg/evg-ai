@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { db } from '@/lib/db';
-import { entities, integrations } from '@/lib/db/schema';
+import { entities } from '@/lib/db/schema/unified';
 import { eq, and } from 'drizzle-orm';
 
 const oauth2Client = new OAuth2Client(
@@ -13,7 +13,7 @@ const oauth2Client = new OAuth2Client(
 export class GmailSyncService {
   private gmail: any;
   
-  async connectGmail(authCode: string, companyId: string, userId: string) {
+  async connectGmail(authCode: string, workspaceId: string, userId: string) {
     try {
       // Exchange authorization code for tokens
       const { tokens } = await oauth2Client.getToken(authCode);
@@ -29,14 +29,14 @@ export class GmailSyncService {
         .from(integrations)
         .where(
           and(
-            eq(integrations.companyId, companyId),
+            eq(integrations.workspaceId, workspaceId),
             eq(integrations.provider, 'gmail')
           )
         )
         .limit(1);
       
       const integrationData = {
-        companyId,
+        workspaceId,
         provider: 'gmail' as const,
         credentials: this.encryptCredentials(tokens),
         status: 'connected' as const,
@@ -74,10 +74,10 @@ export class GmailSyncService {
     }
   }
   
-  async performInitialSync(companyId: string) {
+  async performInitialSync(workspaceId: string) {
     try {
       // Get integration credentials
-      const integration = await this.getIntegration(companyId);
+      const integration = await this.getIntegration(workspaceId);
       if (!integration) {
         throw new Error('Gmail integration not found');
       }
@@ -103,7 +103,7 @@ export class GmailSyncService {
         if (response.data.messages) {
           // Process messages in parallel (but limited)
           const messagePromises = response.data.messages.map((msg: any) =>
-            this.syncMessage(msg.id, companyId)
+            this.syncMessage(msg.id, workspaceId)
           );
           
           // Process in chunks of 10 to avoid rate limits
@@ -150,7 +150,7 @@ export class GmailSyncService {
       console.error('Initial sync error:', error);
       
       // Update integration with error
-      const integration = await this.getIntegration(companyId);
+      const integration = await this.getIntegration(workspaceId);
       if (integration) {
         await db
           .update(integrations)
@@ -168,9 +168,9 @@ export class GmailSyncService {
     }
   }
   
-  async performIncrementalSync(companyId: string) {
+  async performIncrementalSync(workspaceId: string) {
     try {
-      const integration = await this.getIntegration(companyId);
+      const integration = await this.getIntegration(workspaceId);
       if (!integration) {
         throw new Error('Gmail integration not found');
       }
@@ -184,7 +184,7 @@ export class GmailSyncService {
       
       if (!startHistoryId) {
         // No history ID, perform initial sync
-        return this.performInitialSync(companyId);
+        return this.performInitialSync(workspaceId);
       }
       
       // Get history changes
@@ -199,20 +199,20 @@ export class GmailSyncService {
           // Process message additions
           if (record.messagesAdded) {
             for (const msg of record.messagesAdded) {
-              await this.syncMessage(msg.message.id, companyId);
+              await this.syncMessage(msg.message.id, workspaceId);
             }
           }
           
           // Process message deletions
           if (record.messagesDeleted) {
             for (const msg of record.messagesDeleted) {
-              await this.deleteMessage(msg.message.id, companyId);
+              await this.deleteMessage(msg.message.id, workspaceId);
             }
           }
           
           // Process label changes
           if (record.labelsAdded || record.labelsRemoved) {
-            await this.updateMessageLabels(record, companyId);
+            await this.updateMessageLabels(record, workspaceId);
           }
         }
       }
@@ -237,7 +237,7 @@ export class GmailSyncService {
     }
   }
   
-  private async syncMessage(messageId: string, companyId: string) {
+  private async syncMessage(messageId: string, workspaceId: string) {
     try {
       const message = await this.gmail.users.messages.get({
         userId: 'me',
@@ -253,7 +253,7 @@ export class GmailSyncService {
         .from(entities)
         .where(
           and(
-            eq(entities.companyId, companyId),
+            eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email')
           )
         )
@@ -275,10 +275,10 @@ export class GmailSyncService {
       } else {
         // Create new email entity
         await db.insert(entities).values({
-          companyId,
+          workspaceId,
           type: 'email',
           data: emailData,
-          createdBy: companyId, // System created
+          createdBy: workspaceId, // System created
           metadata: {
             source: 'gmail_sync'
           }
@@ -382,14 +382,14 @@ export class GmailSyncService {
     return attachments;
   }
   
-  private async deleteMessage(messageId: string, companyId: string) {
+  private async deleteMessage(messageId: string, workspaceId: string) {
     // Soft delete in our database
     const emails = await db
       .select()
       .from(entities)
       .where(
         and(
-          eq(entities.companyId, companyId),
+          eq(entities.workspaceId, workspaceId),
           eq(entities.type, 'email')
         )
       );
@@ -405,7 +405,7 @@ export class GmailSyncService {
     }
   }
   
-  private async updateMessageLabels(record: any, companyId: string) {
+  private async updateMessageLabels(record: any, workspaceId: string) {
     // Update labels for a message
     const messageId = record.messages?.[0]?.id;
     if (!messageId) return;
@@ -415,7 +415,7 @@ export class GmailSyncService {
       .from(entities)
       .where(
         and(
-          eq(entities.companyId, companyId),
+          eq(entities.workspaceId, workspaceId),
           eq(entities.type, 'email')
         )
       );
@@ -454,13 +454,13 @@ export class GmailSyncService {
     return profile.data.historyId;
   }
   
-  private async getIntegration(companyId: string) {
+  private async getIntegration(workspaceId: string) {
     const result = await db
       .select()
       .from(integrations)
       .where(
         and(
-          eq(integrations.companyId, companyId),
+          eq(integrations.workspaceId, workspaceId),
           eq(integrations.provider, 'gmail')
         )
       )

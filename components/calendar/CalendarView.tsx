@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
-import { Calendar, Clock, Users, MapPin, Plus } from 'lucide-react';
+import { Calendar, Clock, Users, MapPin, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 // // import { Badge } from '@/components/ui/badge';
@@ -60,9 +60,9 @@ export function CalendarView({ events = [], onCreateEvent, onEventClick, workspa
 
   const getEventStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
+      case 'confirmed': return 'bg-[#E6F4EC] text-[#1D5238] border-[#1D5238]/20';
+      case 'pending': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'cancelled': return 'bg-gray-50 text-gray-600 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -70,15 +70,16 @@ export function CalendarView({ events = [], onCreateEvent, onEventClick, workspa
   return (
     <div className="space-y-6">
       {/* Clean Calendar Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between" style={{gap: '16px'}}>
         <h3 className="text-lg font-semibold text-gray-900">
           {format(currentDate, 'MMMM yyyy')}
         </h3>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center" style={{gap: '4px'}}>
           <Button
             variant="outline"
             onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50 h-8 px-3 text-xs"
+            className="border-gray-300 text-gray-700 hover:bg-gray-50 text-xs"
+            style={{height: '32px', padding: '0 12px'}}
             size="sm"
           >
             Previous
@@ -86,7 +87,8 @@ export function CalendarView({ events = [], onCreateEvent, onEventClick, workspa
           <Button
             variant="outline"
             onClick={() => setCurrentDate(new Date())}
-            className="bg-[#1D5238] text-white border-[#1D5238] hover:bg-[#1D5238]/90 h-8 px-3 text-xs"
+            className="bg-[#1D5238] text-white border-[#1D5238] hover:bg-[#1D5238]/90 text-xs"
+            style={{height: '32px', padding: '0 12px'}}
             size="sm"
           >
             Today
@@ -94,7 +96,8 @@ export function CalendarView({ events = [], onCreateEvent, onEventClick, workspa
           <Button
             variant="outline"
             onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50 h-8 px-3 text-xs"
+            className="border-gray-300 text-gray-700 hover:bg-gray-50 text-xs"
+            style={{height: '32px', padding: '0 12px'}}
             size="sm"
           >
             Next
@@ -103,10 +106,10 @@ export function CalendarView({ events = [], onCreateEvent, onEventClick, workspa
       </div>
 
       {/* Clean Calendar Grid */}
-      <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+      <div className="grid grid-cols-7 bg-gray-200 overflow-hidden" style={{gap: '1px', borderRadius: '12px'}}>
         {/* Day headers */}
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="bg-gray-50 p-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+          <div key={day} className="bg-gray-50 text-center text-xs font-medium text-gray-600 uppercase tracking-wider" style={{padding: '12px'}}>
             {day}
           </div>
         ))}
@@ -122,11 +125,12 @@ export function CalendarView({ events = [], onCreateEvent, onEventClick, workspa
             <div
               key={day.toISOString()}
               className={`
-                bg-white min-h-[80px] p-2 flex flex-col justify-start cursor-pointer transition-all duration-200 relative
-                ${isSelected ? 'bg-blue-50 ring-1 ring-blue-200' : 'hover:bg-gray-50'}
+                bg-white flex flex-col justify-start cursor-pointer transition-all duration-200 relative
+                ${isSelected ? 'bg-[#E6F4EC] ring-1 ring-[#1D5238]/20' : 'hover:bg-gray-50'}
                 ${!isCurrentMonth ? 'text-gray-400 bg-gray-50/50' : ''}
                 ${isCurrentDay ? 'bg-[#1D5238] text-white' : ''}
               `}
+              style={{minHeight: '80px', padding: '8px'}}
               onClick={() => handleDateClick(day)}
             >
               <div className={`
@@ -142,12 +146,13 @@ export function CalendarView({ events = [], onCreateEvent, onEventClick, workspa
                   <div
                     key={event.id}
                     className={`
-                      text-xs px-2 py-1 rounded truncate cursor-pointer transition-colors duration-200
-                      ${event.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                        event.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'}
+                      text-xs rounded truncate cursor-pointer transition-colors duration-200
+                      ${event.status === 'confirmed' ? 'bg-[#E6F4EC] text-[#1D5238]' :
+                        event.status === 'pending' ? 'bg-gray-100 text-gray-800' :
+                        'bg-gray-50 text-gray-600'}
                       ${isCurrentDay ? 'bg-white/20 text-white' : ''}
                     `}
+                    style={{padding: '4px 8px'}}
                     onClick={(e) => {
                       e.stopPropagation();
                       onEventClick?.(event);
