@@ -589,6 +589,48 @@ export async function handleCoreCommand(
     return await getContacts(workspaceId);
   }
 
+  // Summarize contacts
+  if (lowerCommand.includes('summarize') && lowerCommand.includes('contact')) {
+    const contacts = await getContacts(workspaceId);
+    
+    if (contacts.length === 0) {
+      return {
+        message: 'You have no contacts yet. Start by adding some contacts to your CRM.',
+        contacts: [],
+        suggestions: ['Create a new contact', 'Import contacts from Gmail']
+      };
+    }
+    
+    // Group contacts by company
+    const byCompany: Record<string, any[]> = {};
+    const noCompany: any[] = [];
+    
+    for (const contact of contacts) {
+      const companyName = contact.data.companyName || (contact.data.companyId ? 'Unknown Company' : null);
+      if (companyName) {
+        if (!byCompany[companyName]) {
+          byCompany[companyName] = [];
+        }
+        byCompany[companyName].push(contact);
+      } else {
+        noCompany.push(contact);
+      }
+    }
+    
+    return {
+      message: `You have ${contacts.length} total contacts`,
+      totalContacts: contacts.length,
+      byCompany,
+      withoutCompany: noCompany.length,
+      recentContacts: contacts.slice(0, 5).map(c => ({
+        name: `${c.data.firstName} ${c.data.lastName}`.trim(),
+        email: c.data.email,
+        company: c.data.companyName || 'No company'
+      })),
+      suggestions: ['Show contacts with high deal potential', 'Create a new contact', 'Show all deals']
+    };
+  }
+
   // Show companies
   if (lowerCommand.includes('show companies') || lowerCommand.includes('list companies')) {
     return await getCompanies(workspaceId);
@@ -598,6 +640,61 @@ export async function handleCoreCommand(
   if (lowerCommand.includes('show deals') || lowerCommand.includes('show pipeline') || lowerCommand.includes('list deals')) {
     const stageMatch = command.match(/(?:in|at|stage)\s+(\w+)/i);
     return await getDeals(workspaceId, stageMatch ? { stage: stageMatch[1] } : undefined);
+  }
+
+  // What's my biggest deal
+  if (lowerCommand.includes('biggest deal') || lowerCommand.includes('largest deal') || lowerCommand.includes('top deal')) {
+    const deals = await getDeals(workspaceId);
+    
+    if (deals.length === 0) {
+      return {
+        message: 'You have no deals in your pipeline yet. Start by creating a new deal.',
+        suggestions: ['Create a new deal', 'Add a contact', 'Import data from CRM']
+      };
+    }
+    
+    // Sort by value and get the biggest
+    const sortedDeals = deals.sort((a, b) => (b.data.value || 0) - (a.data.value || 0));
+    const biggestDeal = sortedDeals[0];
+    
+    // Get related contact and company info if available
+    let contactName = 'No contact assigned';
+    let companyName = 'No company assigned';
+    
+    if (biggestDeal.relationships?.primaryContact) {
+      const contact = await entityService.findById(workspaceId, biggestDeal.relationships.primaryContact);
+      if (contact) {
+        contactName = `${contact.data.firstName} ${contact.data.lastName}`.trim();
+      }
+    }
+    
+    if (biggestDeal.relationships?.company) {
+      const company = await entityService.findById(workspaceId, biggestDeal.relationships.company);
+      if (company) {
+        companyName = company.data.name;
+      }
+    }
+    
+    return {
+      deal: biggestDeal,
+      message: `Your biggest deal is "${biggestDeal.data.name}" worth $${(biggestDeal.data.value || 0).toLocaleString()}`,
+      details: {
+        name: biggestDeal.data.name,
+        value: biggestDeal.data.value || 0,
+        stage: biggestDeal.data.stage || 'Unknown',
+        probability: biggestDeal.data.probability || 0,
+        contact: contactName,
+        company: companyName,
+        closeDate: biggestDeal.data.closeDate,
+        nextStep: biggestDeal.data.nextStep || 'No next step defined'
+      },
+      otherTopDeals: sortedDeals.slice(1, 4).map(d => ({
+        name: d.data.name,
+        value: d.data.value || 0,
+        stage: d.data.stage
+      })),
+      suggestions: ['Show deals at risk', 'Update deal stage', 'Show all deals']
+    };
   }
 
   // EverCore specific commands

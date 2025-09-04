@@ -177,6 +177,114 @@ export async function processCommand(
       const result = await evercore.handleCoreCommand(workspaceId, command, userId);
       
       // Format the response for better display
+      
+      // Handle contact summary
+      if (result.totalContacts !== undefined && result.byCompany) {
+        let message = `📊 **Contact Summary**\n\n`;
+        message += `You have **${result.totalContacts} total contacts**\n\n`;
+        
+        if (result.recentContacts && result.recentContacts.length > 0) {
+          message += `**Recent Contacts:**\n`;
+          result.recentContacts.forEach((contact: any, index: number) => {
+            message += `${index + 1}. **${contact.name}** (${contact.company})\n`;
+            if (contact.email) {
+              message += `   📧 ${contact.email}\n`;
+            }
+          });
+          message += `\n`;
+        }
+        
+        const companyNames = Object.keys(result.byCompany);
+        if (companyNames.length > 0) {
+          message += `**Contacts by Company:**\n`;
+          companyNames.forEach(company => {
+            message += `• ${company}: ${result.byCompany[company].length} contacts\n`;
+          });
+        }
+        
+        if (result.withoutCompany > 0) {
+          message += `\n${result.withoutCompany} contacts without a company assigned\n`;
+        }
+        
+        return {
+          success: true,
+          data: result,
+          message,
+          suggestions: result.suggestions || ['Show all deals', 'Create new contact']
+        };
+      }
+      
+      // Handle biggest deal
+      if (result.deal && result.details) {
+        let message = `💰 **${result.message}**\n\n`;
+        message += `**Deal Details:**\n`;
+        message += `• **Name:** ${result.details.name}\n`;
+        message += `• **Value:** $${result.details.value.toLocaleString()}\n`;
+        message += `• **Stage:** ${result.details.stage}\n`;
+        message += `• **Probability:** ${result.details.probability}%\n`;
+        message += `• **Contact:** ${result.details.contact}\n`;
+        message += `• **Company:** ${result.details.company}\n`;
+        
+        if (result.details.closeDate) {
+          message += `• **Close Date:** ${new Date(result.details.closeDate).toLocaleDateString()}\n`;
+        }
+        
+        if (result.details.nextStep) {
+          message += `• **Next Step:** ${result.details.nextStep}\n`;
+        }
+        
+        if (result.otherTopDeals && result.otherTopDeals.length > 0) {
+          message += `\n**Other Top Deals:**\n`;
+          result.otherTopDeals.forEach((deal: any, index: number) => {
+            message += `${index + 2}. ${deal.name} - $${deal.value.toLocaleString()} (${deal.stage})\n`;
+          });
+        }
+        
+        return {
+          success: true,
+          data: result,
+          message,
+          suggestions: result.suggestions || ['Show deals at risk', 'Update deal stage']
+        };
+      }
+      
+      if (result.contacts && Array.isArray(result.contacts)) {
+        // Handle multiple contacts (e.g., high deal potential query)
+        let message = `📊 **${result.message || 'CRM Results'}**\n\n`;
+        
+        if (result.contacts.length === 0) {
+          message += `No contacts found matching your criteria.\n`;
+        } else {
+          message += `Found ${result.contacts.length} contacts:\n\n`;
+          result.contacts.slice(0, 10).forEach((contact: any, index: number) => {
+            const name = `${contact.data.firstName} ${contact.data.lastName}`.trim();
+            const company = contact.data.companyName || 'No Company';
+            const dealPotential = contact.dealPotential || 0;
+            
+            message += `${index + 1}. **${name}** - ${company}\n`;
+            message += `   📈 Deal Potential Score: ${dealPotential}%\n`;
+            if (contact.data.email) {
+              message += `   📧 ${contact.data.email}\n`;
+            }
+            if (contact.data.phone) {
+              message += `   📞 ${contact.data.phone}\n`;
+            }
+            message += `\n`;
+          });
+        }
+        
+        return {
+          success: true,
+          data: result,
+          message,
+          suggestions: [
+            'Create a new deal for high-potential contact',
+            'Show all deals',
+            'View pipeline'
+          ]
+        };
+      }
+      
       if (result.contact || result.company) {
         const entity = result.contact || result.company;
         const type = result.contact ? 'Contact' : 'Company';
@@ -270,7 +378,46 @@ export async function processCommand(
       return await handleCalendarCommand(workspaceId, command, userId);
     }
 
-    // If no pattern matches, try generic entity service query
+    // If no pattern matches, use AI to answer the question
+    // This acts as a general ChatGPT-like fallback for any question
+    if (openai) {
+      try {
+        console.log('Using OpenAI for general question:', command);
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: [
+            {
+              role: "system",
+              content: "You are evergreenOS, an AI business assistant. Answer questions helpfully and concisely. If the question is about business operations, provide practical advice. Format your responses with markdown for clarity."
+            },
+            {
+              role: "user",
+              content: command
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 800,
+        });
+        
+        const aiResponse = completion.choices[0]?.message?.content || 'I could not generate a response.';
+        
+        return {
+          success: true,
+          data: {
+            type: 'ai_answer',
+            question: command,
+            answer: aiResponse
+          },
+          message: aiResponse,
+          suggestions: getGeneralSuggestions(command),
+        };
+      } catch (error) {
+        console.error('OpenAI general question error:', error);
+        // Fall through to entity query if AI fails
+      }
+    }
+    
+    // Final fallback: try generic entity service query
     const results = await entityService.naturalLanguageQuery(workspaceId, command);
     return {
       success: true,
@@ -299,12 +446,17 @@ async function handleEmailCommand(
     
     // Handle "send email to X about Y" pattern
     if (lowerCommand.includes('send') && (lowerCommand.includes('@') || lowerCommand.includes('email'))) {
-      // Try to extract email address and topic
+      // Try to extract email address and topic - more flexible patterns
       let emailMatch = command.match(/send\s+(?:an?\s+)?(?:email\s+)?(?:to\s+)?([\w._%+-]+@[\w.-]+\.[A-Za-z]{2,})\s+(?:an?\s+)?(?:email\s+)?about\s+(.+)/i);
       
       if (!emailMatch) {
         // Try alternative pattern: "send X an email about Y"
         emailMatch = command.match(/send\s+([\w._%+-]+@[\w.-]+\.[A-Za-z]{2,})\s+(?:an?\s+)?email\s+about\s+(.+)/i);
+      }
+      
+      if (!emailMatch) {
+        // Try pattern: "send X an email about Y" with more flexibility
+        emailMatch = command.match(/send\s+([\w._%+-]+@[\w.-]+\.[A-Za-z]{2,})\s+an?\s+email\s+about\s+(.+)/i);
       }
       
       if (emailMatch) {
@@ -314,8 +466,11 @@ async function handleEmailCommand(
         // Generate AI-powered email content
         let emailContent: { subject: string; body: string };
         
+        console.log('OpenAI client exists:', !!openai);
+        
         if (openai) {
           try {
+            console.log('Calling OpenAI API for email generation...');
             const completion = await openai.chat.completions.create({
               model: "gpt-4",
               messages: [
@@ -341,7 +496,8 @@ async function handleEmailCommand(
             
             emailContent = { subject, body };
           } catch (error) {
-            console.error('OpenAI API error:', error);
+            console.error('OpenAI API error details:', error);
+            console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
             // Fallback content
             emailContent = {
               subject: `Regarding ${topic}`,

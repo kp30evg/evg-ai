@@ -182,3 +182,71 @@ CREATE TABLE entities (
 
 
 so many more to come. 
+
+# ⚠️ CRITICAL: Dashboard AI Integration - DO NOT BREAK
+
+## The Dashboard MUST Always Work
+The main dashboard at `/app/(platform)/dashboard/page.tsx` is the heart of evergreenOS. It MUST:
+1. **Always respond to natural language commands** using the OpenAI integration
+2. **Always handle general questions** like ChatGPT would (fallback to OpenAI)
+3. **Always process business commands** for EverCore, EverChat, EverCal, EverMail modules
+4. **Always show real data** from the database, never fake responses
+
+## Command Processing Chain (DO NOT MODIFY WITHOUT TESTING)
+```
+User Input → /lib/modules-simple/command-processor.ts → Module Handlers → OpenAI Fallback
+```
+
+### Key Files That MUST Stay Connected:
+1. **Dashboard UI**: `/app/(platform)/dashboard/page.tsx`
+   - Uses: `trpc.unified.executeCommand.useMutation()`
+   - NEVER change this mutation call
+
+2. **API Router**: `/lib/api/routers/unified.ts`
+   - Endpoint: `executeCommand`
+   - Calls: `processCommand(workspaceId, input.command, userId)`
+   - NEVER break this connection
+
+3. **Command Processor**: `/lib/modules-simple/command-processor.ts`
+   - Handles ALL natural language input
+   - Routes to: EverChat, EverCore, EverCal, EverMail
+   - Falls back to OpenAI for general questions
+   - MUST have OPENAI_API_KEY in environment
+
+4. **Module Handlers**:
+   - `/lib/modules-simple/evercore.ts` - CRM commands
+   - `/lib/modules-simple/everchat.ts` - Chat/messaging
+   - `/lib/modules-simple/evercal.ts` - Calendar
+   - `/lib/evermail/command-processor.ts` - Email
+
+## Testing Commands That MUST Work:
+```
+✅ "What are voice agents?" → OpenAI general knowledge response
+✅ "Summarize my contacts" → Real contact data from database
+✅ "What is my biggest deal?" → Real deal data from database
+✅ "Show my meetings today" → Real calendar events
+✅ "Send john@example.com an email about pricing" → Email draft creation
+```
+
+## Environment Variables Required:
+```
+OPENAI_API_KEY=sk-... (MUST be set for AI to work)
+DATABASE_URL=postgresql://...
+CLERK_SECRET_KEY=...
+```
+
+## If Dashboard Stops Working:
+1. Check `npm run dev` console for errors
+2. Verify OPENAI_API_KEY is set in `.env.local`
+3. Check these connections are intact:
+   - Dashboard → unified.executeCommand
+   - unified.executeCommand → processCommand
+   - processCommand → OpenAI client initialization
+4. Test with: "What is 2+2?" (should use OpenAI)
+5. Test with: "Summarize my contacts" (should use EverCore)
+
+## Common Issues & Fixes:
+- **"Command not recognized"**: Check command processor regex patterns
+- **500 error on commands**: Check OPENAI_API_KEY is set
+- **No real data shown**: Verify database connection and workspace creation
+- **Commands return generic text**: Check module handler response formatting
