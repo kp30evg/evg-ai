@@ -28,19 +28,26 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Gmail scopes needed for full email functionality
+    // Get return URL from query params
+    const searchParams = req.nextUrl.searchParams;
+    const returnUrl = searchParams.get('return') || '/mail';
+    
+    // Gmail and Calendar scopes for full functionality
     const scopes = [
       'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/gmail.send',
       'https://www.googleapis.com/auth/gmail.modify',
-      'https://www.googleapis.com/auth/userinfo.email'
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.events'
     ].join(' ');
     
-    // Create state parameter to prevent CSRF attacks
+    // Create state parameter to prevent CSRF attacks and store return URL
     const state = Buffer.from(JSON.stringify({
       userId,
       orgId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      returnUrl
     })).toString('base64');
     
     // Build Google OAuth URL

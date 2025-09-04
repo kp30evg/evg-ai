@@ -527,7 +527,7 @@ npm run dev
 11. **🆕 Advanced Tables**: Implemented 23+ field types with Airtable-level sophistication
 12. **🆕 Professional UI**: CRM interface matches world-class enterprise software standards
 
-## 🚨 **WHERE WE ARE NOW** (January 6, 2025)
+## 🚨 **WHERE WE ARE NOW** (January 9, 2025)
 
 ### ✅ **WHAT'S COMPLETE AND WORKING**
 - **3 Full Modules**: EverChat, EverMail, EverCore CRM all production-ready
@@ -537,13 +537,73 @@ npm run dev
 - **Real-time**: Messaging, notifications, live updates all functional
 - **🔒 Security**: COMPLETE user data isolation - each user's data is private and secure
 - **User Management**: Full sync between Clerk and Neon database (12 users active)
+- **OAuth Gating**: EverMail and EverCal require OAuth connection before access
+- **Mandatory Sync**: Users must sync during connection for immediate data availability
+- **Gmail Integration**: Full email sync with proper user isolation (50+ emails per user)
+
+### 🔥 **TODAY'S SESSION FIXES** (January 9, 2025)
+
+#### 1. **OAuth Connection Flow Issues**
+- **Problem**: Redirect loop after Gmail OAuth - kept bouncing back to dashboard
+- **Fix**: Added `isLoaded` check in layout to prevent premature redirects
+- **Files**: `/app/(platform)/layout.tsx`
+
+#### 2. **Gmail Sync Not Saving Emails**
+- **Problem**: Sync showed "50 emails synced" but database had 0 emails
+- **Fix**: Fixed SQL syntax errors in gmail-sync-with-isolation.ts using SQL template literals
+- **Files**: `/lib/evermail/gmail-sync-with-isolation.ts`
+- **Before**: `eq(entities.data.gmailId, messageId)` (syntax error)
+- **After**: `sql\`data->>'gmailId' = ${messageId}\`` (correct JSONB query)
+
+#### 3. **Inbox Showing "No emails"**
+- **Problem**: Even after successful sync, inbox displayed empty
+- **Root Cause**: `getEmails` query was filtering by `ctx.user?.emailAddresses?.[0]?.emailAddress` which was undefined
+- **Fix**: Removed broken email filter, now properly shows all non-draft/trash/spam emails
+- **Files**: `/lib/api/routers/evermail.ts`
+
+#### 4. **Dashboard Stats Showing Zeros**
+- **Problem**: Dashboard showed 0 unread, 0% response rate, etc.
+- **Fix**: Added userId filtering to email count queries
+- **Files**: `/lib/api/routers/evermail.ts`, `/app/api/gmail/stats/route.ts`
+
+#### 5. **Syncing Page Stuck at 75%**
+- **Problem**: Sync page stayed at 75% for 20+ minutes
+- **Fix**: Added maximum 20-second timeout with automatic redirect
+- **Files**: `/app/(platform)/mail/syncing/page.tsx`
 
 ### 🎯 **IMMEDIATE NEXT STEPS** (Pick up from here)
-1. **Polish EverCore**: Add deal pipeline visualization, activity timeline
-2. **Email-CRM Integration**: Link emails to contacts/deals automatically  
-3. **Module 4 - EverTask**: Task management integrated with CRM
-4. **Module 5 - EverCal**: Calendar integration with CRM scheduling
-5. **Cross-Module Search**: Universal search across all business data
+1. **Test Complete Flow**: Verify Omid and Kian can both see their own emails properly
+2. **Polish EverCore**: Add deal pipeline visualization, activity timeline
+3. **Email-CRM Integration**: Link emails to contacts/deals automatically  
+4. **Module 4 - EverTask**: Task management integrated with CRM
+5. **Module 5 - EverCal**: Complete calendar module with proper sync
+6. **Cross-Module Search**: Universal search across all business data
+
+### 💻 **KEY TECHNICAL DETAILS FOR NEXT DEVELOPER**
+
+**Critical Files to Know:**
+- `/lib/api/routers/evermail.ts` - Main email API (getEmails query is critical)
+- `/lib/evermail/gmail-sync-with-isolation.ts` - Gmail sync logic with user isolation
+- `/app/api/auth/gmail/callback/route.ts` - OAuth callback that triggers sync
+- `/app/(platform)/mail/syncing/page.tsx` - Syncing progress page
+- `/app/(platform)/mail/page.tsx` - Main mail dashboard
+- `/app/(platform)/mail/inbox/page.tsx` - Inbox view
+
+**Important Patterns:**
+1. **Always use SQL template literals for JSONB queries**: `sql\`data->>'field' = ${value}\``
+2. **Always filter by userId**: Every query must include `eq(entities.userId, dbUser.id)`
+3. **Use actual database IDs**: Don't use `stringToUuid()` - get real workspace/user IDs from DB
+4. **OAuth tokens are encrypted**: Use base64 encode/decode for token storage
+
+**Current Data Flow:**
+1. User clicks "Connect Gmail" → OAuth flow
+2. OAuth callback creates `email_account` entity with tokens
+3. Callback triggers `GmailSyncService.syncEmails()` 
+4. Sync fetches 50 emails from Gmail API
+5. Each email saved as entity with userId for isolation
+6. Syncing page polls for completion then redirects
+7. Mail page loads emails via tRPC `evermail.getEmails`
+8. Inbox displays emails filtered by current user
 
 ---
 

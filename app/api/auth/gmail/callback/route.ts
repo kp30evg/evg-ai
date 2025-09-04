@@ -231,12 +231,51 @@ export async function GET(req: NextRequest) {
         console.log('Connected new Gmail account:', userInfo.data.email);
       }
       
-      // Trigger initial sync in the background (optional)
-      // You can implement a queue system or background job here
+      // CRITICAL: Trigger immediate sync to populate user's data
+      console.log('Starting initial Gmail sync for user:', userInfo.data.email);
       
-      // Redirect back to settings with success message
+      try {
+        // Import the proper sync service with user isolation
+        const { GmailSyncService } = await import('@/lib/evermail/gmail-sync-with-isolation');
+        
+        // Initialize sync service with the fresh tokens
+        const syncService = new GmailSyncService({
+          workspaceId: workspaceId,
+          userId: userId, // This is the database user ID, not Clerk ID
+          tokens: tokens,
+          userEmail: userInfo.data.email!
+        });
+        
+        // Start sync (this will run asynchronously)
+        console.log('Triggering Gmail sync...');
+        syncService.syncEmails().then(() => {
+          console.log('Gmail sync completed for:', userInfo.data.email);
+        }).catch((error) => {
+          console.error('Gmail sync failed:', error);
+        });
+        
+        // Also sync calendar events if calendar scope is present
+        if (tokens.scope?.includes('calendar')) {
+          console.log('Calendar scope detected, syncing calendar events...');
+          // Import calendar sync
+          const { syncGoogleCalendarEvents } = await import('@/lib/integrations/google-calendar-sync');
+          
+          // Sync calendar events
+          syncGoogleCalendarEvents(workspaceId, userId, tokens).then(() => {
+            console.log('Calendar sync completed for:', userInfo.data.email);
+          }).catch((error) => {
+            console.error('Calendar sync failed:', error);
+          });
+        }
+      } catch (syncError) {
+        console.error('Failed to start sync:', syncError);
+        // Don't fail the OAuth flow if sync fails - user can manually sync later
+      }
+      
+      // Redirect to a syncing page that shows progress
+      const returnUrl = stateData.returnUrl || '/mail';
       return NextResponse.redirect(
-        new URL('/mail/settings?success=gmail_connected', req.url)
+        new URL(`/mail/syncing?return=${encodeURIComponent(returnUrl)}&email=${encodeURIComponent(userInfo.data.email!)}`, req.url)
       );
       
     } catch (tokenError: any) {

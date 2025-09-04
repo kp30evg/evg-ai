@@ -5,6 +5,8 @@ import { useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Mail, Send, Inbox, FileText, Archive, Trash2, Star, Clock, TrendingUp, Users, ChevronLeft, ChevronRight, CheckCircle2, MessageSquare, Paperclip, AlertCircle, Sparkles, MailOpen } from 'lucide-react';
+import OAuthConnectionPrompt from '@/components/oauth/OAuthConnectionPrompt';
+import { trpc } from '@/lib/trpc/client';
 
 interface EmailStats {
   totalInbox: number;
@@ -31,73 +33,158 @@ interface EmailThread {
 export default function MailPage() {
   const { userId, orgId } = useAuth();
   const [stats, setStats] = useState<EmailStats>({
-    totalInbox: 247,
-    unread: 12,
-    sent: 89,
-    drafts: 3,
-    starred: 8,
-    responseRate: 94,
-    avgResponseTime: 2.3
+    totalInbox: 0,
+    unread: 0,
+    sent: 0,
+    drafts: 0,
+    starred: 0,
+    responseRate: 0,
+    avgResponseTime: 0
   });
   const [recentThreads, setRecentThreads] = useState<EmailThread[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasGmailConnection, setHasGmailConnection] = useState(false);
+  const [hasSyncedData, setHasSyncedData] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inbox' | 'sent' | 'drafts' | 'scheduled' | 'analytics'>('dashboard');
   const router = useRouter();
 
-  useEffect(() => {
-    loadRecentThreads();
-  }, []);
+  // Check OAuth connection status
+  const { data: oauthStatus, isLoading: checkingAuth } = trpc.oauth.checkConnection.useQuery(
+    { service: 'gmail' },
+    { 
+      enabled: !!userId && !!orgId,
+      refetchInterval: false 
+    }
+  );
+  
+  // Check Gmail sync status
+  const { data: gmailStatus } = trpc.evermail.getGmailStatus.useQuery(
+    undefined,
+    { 
+      enabled: !!userId && !!orgId,
+      refetchInterval: false 
+    }
+  );
 
-  const loadRecentThreads = () => {
-    // Sample data for demo
-    setRecentThreads([
-      {
-        id: '1',
-        subject: 'Q3 Marketing Strategy Review',
-        from: 'Sarah Chen',
-        preview: "I've reviewed the latest metrics and I think we should discuss our approach for the upcoming quarter...",
-        date: '10:30 AM',
-        unread: true,
-        starred: true,
-        hasAttachment: true,
-        urgent: false
-      },
-      {
-        id: '2',
-        subject: 'Project Apollo - Status Update',
-        from: 'Michael Rodriguez',
-        preview: "Great progress this week! The team has completed the initial prototype and we're ready for testing...",
-        date: '9:15 AM',
-        unread: true,
-        starred: false,
-        hasAttachment: false,
-        urgent: true
-      },
-      {
-        id: '3',
-        subject: 'Re: Partnership Proposal',
-        from: 'Emily Watson',
-        preview: "Thank you for sending over the proposal. I've shared it with our executive team and we're very interested...",
-        date: 'Yesterday',
-        unread: false,
-        starred: false,
-        hasAttachment: true,
-        urgent: false
-      },
-      {
-        id: '4',
-        subject: 'Weekly Team Sync Notes',
-        from: 'David Park',
-        preview: "Here are the action items from today's sync: 1) Complete user research by Friday 2) Review designs...",
-        date: 'Yesterday',
-        unread: false,
-        starred: true,
-        hasAttachment: false,
-        urgent: false
+  useEffect(() => {
+    if (!checkingAuth && oauthStatus !== undefined && gmailStatus !== undefined) {
+      if (oauthStatus?.connected) {
+        // User is connected
+        setHasGmailConnection(true);
+        
+        // Check if we have synced data
+        if (gmailStatus?.emailCount && gmailStatus.emailCount > 0) {
+          setHasSyncedData(true);
+          loadRecentThreads();
+          loadEmailStats();
+        } else {
+          // Connected but no data yet - could still be syncing or need to sync
+          setHasSyncedData(false);
+          // Don't redirect if we're already on the mail page, just show the interface
+          // The user can manually trigger sync if needed
+          loadRecentThreads();
+          loadEmailStats();
+        }
+      } else {
+        setHasGmailConnection(false);
+        setHasSyncedData(false);
       }
-    ]);
+      setIsLoading(false);
+    }
+  }, [oauthStatus, gmailStatus, checkingAuth]);
+
+  const handleConnectGmail = () => {
+    window.location.href = '/api/auth/gmail/connect?return=/mail';
   };
 
+  const loadRecentThreads = async () => {
+    try {
+      // Load real email threads from Gmail
+      const response = await fetch('/api/gmail/threads?limit=5');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.threads && data.threads.length > 0) {
+          const formattedThreads = data.threads.map((thread: any) => ({
+            id: thread.id,
+            subject: thread.subject || '(no subject)',
+            from: thread.from || 'Unknown sender',
+            preview: thread.snippet || '',
+            date: thread.date || 'Recently',
+            unread: thread.unread || false,
+            starred: thread.starred || false,
+            hasAttachment: thread.hasAttachment || false,
+            urgent: thread.important || false
+          }));
+          setRecentThreads(formattedThreads);
+        } else {
+          // If no emails, show empty state
+          setRecentThreads([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading email threads:', error);
+      // On error, show empty state rather than mock data
+      setRecentThreads([]);
+    }
+  };
+
+  const loadEmailStats = async () => {
+    try {
+      // Load real stats from Gmail API
+      const response = await fetch('/api/gmail/stats');
+      if (response.ok) {
+        const data = await response.json();
+        setStats({
+          totalInbox: data.totalInbox || 0,
+          unread: data.unread || 0,
+          sent: data.sent || 0,
+          drafts: data.drafts || 0,
+          starred: data.starred || 0,
+          responseRate: data.responseRate || 0,
+          avgResponseTime: data.avgResponseTime || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error loading email stats:', error);
+      // Set to zero on error rather than fake data
+      setStats({
+        totalInbox: 0,
+        unread: 0,
+        sent: 0,
+        drafts: 0,
+        starred: 0,
+        responseRate: 0,
+        avgResponseTime: 0
+      });
+    }
+  };
+
+  // Show loading state while checking auth
+  if (checkingAuth || isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking connection status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connection prompt if not connected
+  if (!hasGmailConnection) {
+    return (
+      <div className="min-h-screen bg-white">
+        <OAuthConnectionPrompt 
+          type="gmail" 
+          onConnect={handleConnectGmail}
+          userEmail={oauthStatus?.userEmail}
+        />
+      </div>
+    );
+  }
+
+  // Main mail interface (only shown when connected)
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -207,30 +294,30 @@ export default function MailPage() {
                   {[
                     { 
                       name: 'Important & Unread', 
-                      count: 8, 
+                      count: Math.min(stats.unread, 10), 
                       desc: 'High-priority messages that need your attention right away.', 
                       color: 'red',
                       icon: AlertCircle,
-                      trending: true 
+                      trending: stats.unread > 5 
                     },
                     { 
                       name: 'From VIPs', 
-                      count: 3, 
+                      count: stats.starred, 
                       desc: 'Messages from your most important contacts and key stakeholders.', 
                       color: 'yellow',
                       icon: Star
                     },
                     { 
                       name: 'Needs Response', 
-                      count: 12, 
+                      count: Math.floor(stats.unread * 0.6), 
                       desc: 'Emails waiting for your reply, sorted by urgency and sender importance.', 
                       color: 'blue',
                       icon: MessageSquare
                     },
                     { 
-                      name: 'Newsletters & Updates', 
-                      count: 34, 
-                      desc: 'Subscriptions and automated emails for when you have time.', 
+                      name: 'All Messages', 
+                      count: stats.totalInbox, 
+                      desc: 'Your complete inbox including all messages.', 
                       color: 'gray',
                       icon: FileText
                     }
@@ -307,15 +394,19 @@ export default function MailPage() {
                   </div>
                   
                   <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                    {recentThreads.slice(0, 3).map((thread) => (
-                      <div key={thread.id} className="flex items-center gap-3">
-                        <div className="text-sm font-medium text-gray-600 w-16">{thread.date}</div>
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{thread.from} - {thread.subject}</div>
-                          <div className="text-xs text-gray-500">{thread.preview.substring(0, 60)}...</div>
+                    {recentThreads.length > 0 ? (
+                      recentThreads.slice(0, 3).map((thread) => (
+                        <div key={thread.id} className="flex items-center gap-3">
+                          <div className="text-sm font-medium text-gray-600 w-16">{thread.date}</div>
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{thread.from} - {thread.subject}</div>
+                            <div className="text-xs text-gray-500">{thread.preview.substring(0, 60)}...</div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-500 italic">No recent emails yet. Sync in progress...</div>
+                    )}
                   </div>
                 </div>
 

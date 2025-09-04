@@ -88,17 +88,20 @@ export default function PlatformLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { userId, orgId } = useAuth();
+  const { userId, orgId, isLoaded } = useAuth();
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
 
   useEffect(() => {
+    // Wait for auth to load before redirecting
+    if (!isLoaded) return;
+    
     if (!userId) {
       redirect('/sign-in');
     }
     if (!orgId) {
       redirect('/select-org');
     }
-  }, [userId, orgId]);
+  }, [userId, orgId, isLoaded]);
 
   const modules = [
     { 
@@ -176,6 +179,24 @@ export default function PlatformLayout({
     if (path === '/dashboard/crm' && (pathname.startsWith('/dashboard/crm') || pathname.startsWith('/contacts'))) return true;
     return pathname.startsWith(path);
   };
+
+  // Show loading state while auth is being checked
+  if (!isLoaded) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        backgroundColor: tokens.colors.white
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
+          <p style={{ marginTop: '16px', color: tokens.colors.gray600 }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{

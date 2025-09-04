@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw, Calendar, Clock, Star, Users, Video, MessageSquare, FileText, ChevronLeft, ChevronRight, CalendarDays, CalendarClock, CheckCircle2 } from 'lucide-react';
+import OAuthConnectionPrompt from '@/components/oauth/OAuthConnectionPrompt';
+import { trpc } from '@/lib/trpc/client';
 
 interface Event {
   id: string;
@@ -19,22 +22,70 @@ interface Event {
 
 export default function CalendarPage() {
   const { userId, orgId } = useAuth();
+  const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('view');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasCalendarConnection, setHasCalendarConnection] = useState(false);
+  const [hasSyncedData, setHasSyncedData] = useState(false);
   const [todaysEvents, setTodaysEvents] = useState<Event[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'calendar' | 'book' | 'availability' | 'stats'>('dashboard');
 
-  // Load calendar events
-  useEffect(() => {
-    if (orgId) {
-      loadEvents();
+  // Check OAuth connection status
+  const { data: oauthStatus, isLoading: checkingAuth } = trpc.oauth.checkConnection.useQuery(
+    { service: 'calendar' },
+    { 
+      enabled: !!userId && !!orgId,
+      refetchInterval: false 
     }
-  }, [orgId]);
+  );
+  
+  // Check if we have any calendar data synced
+  const { data: calendarData } = trpc.unified.executeCommand.useMutation().data;
+
+  // Load calendar events when connected
+  useEffect(() => {
+    const checkCalendarStatus = async () => {
+      if (oauthStatus?.connected) {
+        // Check if we have synced calendar data
+        try {
+          const response = await fetch('/api/calendar/events');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.events && data.events.length > 0) {
+              setHasCalendarConnection(true);
+              setHasSyncedData(true);
+              loadEvents();
+            } else {
+              // Connected but no data - trigger sync
+              setHasCalendarConnection(true);
+              setHasSyncedData(false);
+              // Redirect to syncing page
+              router.push('/mail/syncing?return=/dashboard/calendar');
+            }
+          }
+        } catch (error) {
+          console.error('Error checking calendar status:', error);
+        }
+      } else {
+        setHasCalendarConnection(false);
+        setHasSyncedData(false);
+      }
+      setIsLoading(false);
+    };
+    
+    checkCalendarStatus();
+  }, [oauthStatus, orgId, router]);
+
+  const handleConnectCalendar = () => {
+    // For now, use the same Gmail OAuth which includes calendar scope
+    // In production, you might want separate calendar-specific OAuth
+    window.location.href = '/api/auth/gmail/connect?return=/dashboard/calendar';
+  };
 
   // Update today's and upcoming events when events change
   useEffect(() => {
@@ -179,6 +230,32 @@ export default function CalendarPage() {
     }
   };
 
+  // Show loading state while checking auth
+  if (checkingAuth || isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking connection status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connection prompt if not connected
+  if (!hasCalendarConnection) {
+    return (
+      <div className="min-h-screen bg-white">
+        <OAuthConnectionPrompt 
+          type="calendar" 
+          onConnect={handleConnectCalendar}
+          userEmail={oauthStatus?.userEmail}
+        />
+      </div>
+    );
+  }
+
+  // Main calendar interface (only shown when connected)
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}

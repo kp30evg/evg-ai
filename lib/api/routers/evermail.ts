@@ -1,13 +1,24 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { db } from '@/lib/db';
-import { entities } from '@/lib/db/schema/unified';
+import { entities, users, workspaces } from '@/lib/db/schema/unified';
 import { eq, and, desc, or, sql, inArray } from 'drizzle-orm';
 import { GmailSyncService } from '@/lib/evermail/gmail-sync-simple';
 import { EmailCommandProcessor } from '@/lib/evermail/command-processor';
 import { GmailClient } from '@/lib/evermail/gmail-client';
 
-// Helper to create a deterministic UUID from any string ID
+// Helper to get workspace ID from Clerk org ID
+async function getWorkspaceId(clerkOrgId: string): Promise<string | null> {
+  const [workspace] = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.clerkOrgId, clerkOrgId))
+    .limit(1);
+  
+  return workspace?.id || null;
+}
+
+// Helper to create a deterministic UUID from any string ID (kept for backward compat)
 function stringToUuid(str: string): string {
   const crypto = require('crypto');
   const hash = crypto.createHash('sha256').update(str).digest('hex');
@@ -49,10 +60,34 @@ export const evermailRouter = router({
   // Get Gmail connection status
   getGmailStatus: protectedProcedure.query(async ({ ctx }) => {
     const { orgId, userId } = ctx;
-    const workspaceId = stringToUuid(orgId);
-    const userUuid = stringToUuid(userId);
+    
+    // Get the ACTUAL workspace ID from database, not generated
+    const workspaceId = await getWorkspaceId(orgId);
+    
+    if (!workspaceId) {
+      return {
+        connected: false,
+        lastSyncAt: null,
+        emailCount: 0
+      };
+    }
+    
+    // Get database user first
+    const [dbUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkUserId, userId))
+      .limit(1);
+    
+    if (!dbUser) {
+      return {
+        connected: false,
+        lastSyncAt: null,
+        emailCount: 0
+      };
+    }
 
-    // Check for email_account entity FOR THIS USER ONLY
+    // Check for email_account entity FOR THIS USER ONLY using userId field
     const emailAccount = await db
       .select()
       .from(entities)
@@ -60,7 +95,7 @@ export const evermailRouter = router({
         and(
           eq(entities.workspaceId, workspaceId),
           eq(entities.type, 'email_account'),
-          sql`metadata->>'createdBy' = ${userUuid}` // CRITICAL: User-specific via metadata
+          eq(entities.userId, dbUser.id) // Use the actual userId field
         )
       )
       .limit(1);
@@ -77,13 +112,14 @@ export const evermailRouter = router({
     // Use email_account entity data
     const accountData = emailAccount[0].data as any;
 
-    // Get email count
+    // Get email count FOR THIS USER
     const emailCount = await db
       .select({ count: sql<number>`count(*)` })
       .from(entities)
       .where(
         and(
           eq(entities.workspaceId, workspaceId),
+          eq(entities.userId, dbUser.id), // Count only this user's emails
           eq(entities.type, 'email')
         )
       );
@@ -156,8 +192,32 @@ export const evermailRouter = router({
   // Trigger manual sync
   syncEmails: protectedProcedure.mutation(async ({ ctx }) => {
     const { orgId, userId } = ctx;
-    const workspaceId = stringToUuid(orgId);
-    const userUuid = stringToUuid(userId);
+    
+    // Get the actual workspace from database (not stringToUuid)
+    const { workspaces } = await import('@/lib/db/schema/unified');
+    const [workspace] = await db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.clerkOrgId, orgId))
+      .limit(1);
+    
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+    
+    const workspaceId = workspace.id;
+    
+    // Get the actual user from database
+    const { users } = await import('@/lib/db/schema/unified');
+    const [dbUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkUserId, userId))
+      .limit(1);
+    
+    if (!dbUser) {
+      throw new Error('User not found');
+    }
     
     try {
       // Get email account with tokens FOR THIS USER ONLY
@@ -168,7 +228,7 @@ export const evermailRouter = router({
           and(
             eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email_account'),
-            sql`metadata->>'createdBy' = ${userUuid}` // CRITICAL: User-specific
+            eq(entities.userId, dbUser.id) // Use actual user ID
           )
         )
         .limit(1);
@@ -182,156 +242,24 @@ export const evermailRouter = router({
       // Decrypt tokens (simple base64 decode for now)
       const tokens = JSON.parse(Buffer.from(accountData.tokens, 'base64').toString());
       
-      // Initialize Gmail client
-      const { google } = require('googleapis');
-      const oauth2Client = new google.auth.OAuth2(
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/gmail/callback'
-      );
-      oauth2Client.setCredentials(tokens);
+      // Use the proper sync service with user isolation
+      const { GmailSyncService } = await import('@/lib/evermail/gmail-sync-with-isolation');
       
-      const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-      
-      // Fetch messages (start with recent 50)
-      const messagesResponse = await gmail.users.messages.list({
-        userId: 'me',
-        maxResults: 50,
-        q: 'in:inbox OR in:sent OR in:drafts'
+      const syncService = new GmailSyncService({
+        workspaceId: workspaceId,
+        userId: dbUser.id, // Use actual database user ID
+        tokens: tokens,
+        userEmail: accountData.email || accountData.userEmail
       });
       
-      if (!messagesResponse.data.messages) {
-        return { success: true, synced: 0 };
-      }
+      // Run the sync with proper user isolation
+      const result = await syncService.syncEmails();
       
-      // Fetch full message details for each message
-      let syncedCount = 0;
-      const messagePromises = messagesResponse.data.messages.slice(0, 20).map(async (msg: any) => {
-        try {
-          const fullMessage = await gmail.users.messages.get({
-            userId: 'me',
-            id: msg.id,
-            format: 'full'
-          });
-          
-          // Parse message data
-          const headers = fullMessage.data.payload.headers.reduce((acc: any, header: any) => {
-            acc[header.name.toLowerCase()] = header.value;
-            return acc;
-          }, {});
-          
-          // Extract body
-          let textBody = '';
-          let htmlBody = '';
-          
-          const extractBody = (parts: any[]) => {
-            for (const part of parts || []) {
-              if (part.mimeType === 'text/plain' && part.body.data) {
-                textBody = Buffer.from(part.body.data, 'base64').toString('utf-8');
-              } else if (part.mimeType === 'text/html' && part.body.data) {
-                htmlBody = Buffer.from(part.body.data, 'base64').toString('utf-8');
-              } else if (part.parts) {
-                extractBody(part.parts);
-              }
-            }
-          };
-          
-          if (fullMessage.data.payload.parts) {
-            extractBody(fullMessage.data.payload.parts);
-          } else if (fullMessage.data.payload.body?.data) {
-            textBody = Buffer.from(fullMessage.data.payload.body.data, 'base64').toString('utf-8');
-          }
-          
-          // Parse recipients
-          const parseRecipients = (field: string) => {
-            if (!field) return [];
-            return field.split(',').map((r: string) => {
-              const match = r.match(/(.*?)<(.+?)>/);
-              if (match) {
-                return { name: match[1].trim(), email: match[2].trim() };
-              }
-              return { email: r.trim() };
-            });
-          };
-          
-          const emailData = {
-            messageId: fullMessage.data.id,
-            threadId: fullMessage.data.threadId,
-            subject: headers.subject || '(No subject)',
-            from: parseRecipients(headers.from)[0] || { email: '' },
-            to: parseRecipients(headers.to),
-            cc: parseRecipients(headers.cc),
-            bcc: parseRecipients(headers.bcc),
-            body: {
-              text: textBody,
-              html: htmlBody || textBody,
-              snippet: fullMessage.data.snippet
-            },
-            labels: fullMessage.data.labelIds || [],
-            isRead: !fullMessage.data.labelIds?.includes('UNREAD'),
-            isStarred: fullMessage.data.labelIds?.includes('STARRED'),
-            isDraft: fullMessage.data.labelIds?.includes('DRAFT'),
-            isTrash: fullMessage.data.labelIds?.includes('TRASH'),
-            isSpam: fullMessage.data.labelIds?.includes('SPAM'),
-            sentAt: new Date(parseInt(fullMessage.data.internalDate)),
-            attachments: []
-          };
-          
-          // Check if email already exists
-          const existing = await db
-            .select()
-            .from(entities)
-            .where(
-              and(
-                eq(entities.workspaceId, workspaceId),
-                eq(entities.type, 'email'),
-                sql`data->>'messageId' = ${fullMessage.data.id}`
-              )
-            )
-            .limit(1);
-          
-          if (existing.length === 0) {
-            // Create new email entity
-            await db.insert(entities).values({
-              workspaceId,
-              type: 'email',
-              data: emailData,
-              metadata: {
-                source: 'gmail_sync',
-                createdBy: stringToUuid(ctx.userId)
-              }
-            });
-            syncedCount++;
-          } else {
-            // Update existing email
-            await db
-              .update(entities)
-              .set({
-                data: emailData,
-                updatedAt: new Date()
-              })
-              .where(eq(entities.id, existing[0].id));
-          }
-        } catch (err) {
-          console.error('Error syncing message:', err);
-        }
-      });
-      
-      await Promise.all(messagePromises);
-      
-      // Update last sync time
-      await db
-        .update(entities)
-        .set({
-          data: {
-            ...accountData,
-            lastSyncAt: new Date().toISOString()
-          },
-          updatedAt: new Date()
-        })
-        .where(eq(entities.id, emailAccount[0].id));
-      
-      return { success: true, synced: syncedCount, redirectTo: '/mail/inbox' };
+      return { 
+        success: result.success, 
+        synced: result.totalSynced, 
+        redirectTo: '/mail/inbox' 
+      };
     } catch (error: any) {
       console.error('Sync error:', error);
       throw new Error(`Sync failed: ${error.message}`);
@@ -343,8 +271,31 @@ export const evermailRouter = router({
     .input(searchEmailsSchema)
     .query(async ({ ctx, input }) => {
       const { orgId, userId } = ctx;
-      const workspaceId = stringToUuid(orgId);
-      const userUuid = stringToUuid(userId);
+      
+      // Get the actual workspace from database
+      const { workspaces, users } = await import('@/lib/db/schema/unified');
+      const [workspace] = await db
+        .select()
+        .from(workspaces)
+        .where(eq(workspaces.clerkOrgId, orgId))
+        .limit(1);
+      
+      if (!workspace) {
+        throw new Error('Workspace not found');
+      }
+      
+      const workspaceId = workspace.id;
+      
+      // Get the actual user from database
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
 
       // CRITICAL: Only show emails that belong to this user
       let query = db
@@ -354,23 +305,26 @@ export const evermailRouter = router({
           and(
             eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email'),
-            sql`metadata->>'createdBy' = ${userUuid}` // User-specific emails only
+            eq(entities.userId, dbUser.id) // Use actual user ID for proper isolation
           )
         );
 
       // Apply folder filter
       if (input.folder && input.folder !== 'all') {
-        // Filter based on email data fields
+        // Filter based on email labels from Gmail
         if (input.folder === 'inbox') {
+          // For inbox, just exclude drafts, trash and spam
+          // Don't filter by 'to' field as that breaks Gmail sync
           query = query.where(
             sql`(data->>'isDraft')::boolean IS NOT TRUE AND 
                 (data->>'isTrash')::boolean IS NOT TRUE AND
-                (data->>'isSpam')::boolean IS NOT TRUE AND
-                (data->'to')::jsonb @> ${JSON.stringify([{ email: ctx.user?.emailAddresses?.[0]?.emailAddress }])}`
+                (data->>'isSpam')::boolean IS NOT TRUE`
           );
         } else if (input.folder === 'sent') {
+          // Check if email has SENT label or user is in from field
           query = query.where(
-            sql`(data->'from'->>'email') = ${ctx.user?.emailAddresses?.[0]?.emailAddress}`
+            sql`(data->'labels')::jsonb ? 'SENT' OR 
+                (data->'from'->>'email') = ${dbUser.email}`
           );
         } else if (input.folder === 'drafts') {
           query = query.where(sql`(data->>'isDraft')::boolean = true`);

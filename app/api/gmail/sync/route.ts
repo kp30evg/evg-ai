@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { GmailSyncService } from '@/lib/evermail/gmail-sync-simple';
+import { GmailSyncService } from '@/lib/evermail/gmail-sync-with-isolation';
 import { db } from '@/lib/db';
-import { workspaces } from '@/lib/db/schema/unified';
-import { eq } from 'drizzle-orm';
+import { workspaces, users, entities } from '@/lib/db/schema/unified';
+import { eq, and } from 'drizzle-orm';
 
 export async function POST(req: Request) {
   try {
@@ -29,12 +29,56 @@ export async function POST(req: Request) {
         { status: 404 }
       );
     }
+    
+    // Get the actual user from database
+    const [dbUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkUserId, userId))
+      .limit(1);
+    
+    if (!dbUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Get email account with tokens FOR THIS USER ONLY
+    const emailAccount = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.workspaceId, workspace.id),
+          eq(entities.type, 'email_account'),
+          eq(entities.userId, dbUser.id) // Use actual user ID
+        )
+      )
+      .limit(1);
+    
+    if (!emailAccount || emailAccount.length === 0) {
+      return NextResponse.json(
+        { error: 'Gmail account not connected' },
+        { status: 400 }
+      );
+    }
+    
+    const accountData = emailAccount[0].data as any;
+    
+    // Decrypt tokens (simple base64 decode for now)
+    const tokens = JSON.parse(Buffer.from(accountData.tokens, 'base64').toString());
 
-    // Initialize Gmail sync service
-    const gmailSync = new GmailSyncService();
+    // Initialize Gmail sync service with user isolation
+    const gmailSync = new GmailSyncService({
+      workspaceId: workspace.id,
+      userId: dbUser.id, // Use actual database user ID
+      tokens: tokens,
+      userEmail: accountData.email || accountData.userEmail
+    });
     
     // Perform initial sync to get real emails
-    const result = await gmailSync.performInitialSync(workspace.id, userId);
+    const result = await gmailSync.syncEmails();
     
     return NextResponse.json({
       success: true,
@@ -74,11 +118,22 @@ export async function GET(req: Request) {
         { status: 404 }
       );
     }
-
-    // Check Gmail connection status
-    const { entities } = await import('@/lib/db/schema/unified');
-    const { and, sql } = await import('drizzle-orm');
     
+    // Get the actual user from database
+    const [dbUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkUserId, userId))
+      .limit(1);
+    
+    if (!dbUser) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Check Gmail connection status FOR THIS USER
     const gmailAccount = await db
       .select()
       .from(entities)
@@ -86,7 +141,7 @@ export async function GET(req: Request) {
         and(
           eq(entities.workspaceId, workspace.id),
           eq(entities.type, 'email_account'),
-          sql`data->>'isActive' = 'true'`
+          eq(entities.userId, dbUser.id) // User-specific account
         )
       )
       .limit(1);
@@ -100,23 +155,24 @@ export async function GET(req: Request) {
     
     const accountData = gmailAccount[0].data as any;
     
-    // Count synced emails
+    // Count synced emails FOR THIS USER
     const emailCount = await db
       .select()
       .from(entities)
       .where(
         and(
           eq(entities.workspaceId, workspace.id),
-          eq(entities.type, 'email')
+          eq(entities.type, 'email'),
+          eq(entities.userId, dbUser.id) // User-specific emails
         )
       );
     
     return NextResponse.json({
       connected: true,
-      email: accountData.email,
+      email: accountData.email || accountData.userEmail,
       lastSyncAt: accountData.lastSyncAt,
       totalEmails: emailCount.length,
-      message: `Gmail connected: ${accountData.email}`
+      message: `Gmail connected: ${accountData.email || accountData.userEmail}`
     });
   } catch (error) {
     console.error('Gmail status error:', error);
