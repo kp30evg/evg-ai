@@ -27,7 +27,7 @@ export default function CreateDealSheet({ isOpen, onClose, onSuccess, initialSta
   
   const [currentTag, setCurrentTag] = useState('')
   
-  const createDealMutation = trpc.unified.createDeal.useMutation({
+  const executeCommand = trpc.unified.executeCommand.useMutation({
     onSuccess: () => {
       onSuccess?.()
       onClose()
@@ -72,7 +72,7 @@ export default function CreateDealSheet({ isOpen, onClose, onSuccess, initialSta
     { id: 'closing', name: 'Closing', probability: 80, color: colors.gold }
   ]
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     // Basic validation
@@ -81,13 +81,30 @@ export default function CreateDealSheet({ isOpen, onClose, onSuccess, initialSta
       return
     }
     
-    createDealMutation.mutate({
-      name: formData.name,
-      value: parseFloat(formData.value),
-      stage: formData.stage,
-      closeDate: formData.closeDate ? new Date(formData.closeDate) : undefined,
-      companyId: undefined, // TODO: Link to company
-    })
+    try {
+      // Create deal via natural language command
+      let command = `create deal "${formData.name}" for $${formData.value} in ${formData.stage} stage`
+      
+      if (formData.companyName) {
+        command += ` with company "${formData.companyName}"`
+      }
+      
+      if (formData.contactName) {
+        command += ` for contact "${formData.contactName}"`
+      }
+      
+      if (formData.closeDate) {
+        command += ` closing on ${formData.closeDate}`
+      }
+      
+      if (formData.nextStep) {
+        command += ` with next step "${formData.nextStep}"`
+      }
+      
+      await executeCommand.mutateAsync({ command })
+    } catch (error) {
+      console.error('Error creating deal:', error)
+    }
   }
   
   const handleStageChange = (stageId: string) => {
@@ -670,22 +687,22 @@ export default function CreateDealSheet({ isOpen, onClose, onSuccess, initialSta
               <motion.button
                 type="submit"
                 onClick={handleSubmit}
-                disabled={createDealMutation.isPending}
+                disabled={executeCommand.isPending}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 style={{
                   padding: '10px 20px',
-                  backgroundColor: createDealMutation.isPending ? colors.mediumGray : colors.evergreen,
+                  backgroundColor: executeCommand.isPending ? colors.mediumGray : colors.evergreen,
                   border: 'none',
                   borderRadius: '8px',
                   fontSize: '14px',
                   fontWeight: '500',
                   color: colors.white,
-                  cursor: createDealMutation.isPending ? 'not-allowed' : 'pointer',
+                  cursor: executeCommand.isPending ? 'not-allowed' : 'pointer',
                   transition: 'all 200ms ease',
                 }}
               >
-                {createDealMutation.isPending ? 'Creating...' : 'Create Deal'}
+                {executeCommand.isPending ? 'Creating...' : 'Create Deal'}
               </motion.button>
             </div>
           </motion.div>

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { entityService } from '@/lib/entities/entity-service';
 import { workspaceService } from '@/lib/services/workspace-service';
+import { db } from '@/lib/db';
+import { users, entities } from '@/lib/db/schema/unified';
+import { eq, and } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,28 +19,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     }
 
+    // Get user from database
+    const [dbUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkUserId, userId))
+      .limit(1);
+
+    if (!dbUser) {
+      return NextResponse.json({ error: 'User not found in database' }, { status: 404 });
+    }
+
     // Get URL search params for filtering
     const searchParams = request.nextUrl.searchParams;
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    // Base query for calendar events
-    let query: any = {
-      workspaceId,
-      type: 'calendar_event'
-    };
-
-    // Add date filters if provided
-    if (startDate || endDate) {
-      // For now, get all events and filter in memory
-      // In a production system, you'd want database-level filtering
-    }
-
-    // Fetch calendar events
-    const events = await entityService.find(query);
+    // Fetch calendar events for this specific user
+    const events = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, 'calendar_event'),
+          eq(entities.userId, dbUser.id) // CRITICAL: Filter by user ID
+        )
+      );
 
     // Transform events for the frontend
-    const transformedEvents = events.map(event => ({
+    const transformedEvents = events.map((event: any) => ({
       id: event.id,
       title: event.data.title || event.data.summary || 'Untitled Event',
       description: event.data.description || '',

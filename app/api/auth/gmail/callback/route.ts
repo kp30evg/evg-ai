@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { google } from 'googleapis';
 import { db } from '@/lib/db';
-import { entities } from '@/lib/db/schema/unified';
+import { entities, users } from '@/lib/db/schema/unified';
 import { eq, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
 
@@ -144,7 +144,33 @@ export async function GET(req: NextRequest) {
       }
       
       const workspaceId = workspace.id;
-      const userId = stringToUuid(finalUserId);
+      
+      // Get or create user in database
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, finalUserId))
+        .limit(1);
+      
+      let userId: string;
+      if (!dbUser) {
+        // Create user if doesn't exist
+        const [newUser] = await db
+          .insert(users)
+          .values({
+            clerkUserId: finalUserId,
+            email: userInfo.data.email!,
+            workspaceId: workspaceId,
+            firstName: userInfo.data.name?.split(' ')[0],
+            lastName: userInfo.data.name?.split(' ').slice(1).join(' '),
+            imageUrl: userInfo.data.picture,
+            role: 'member'
+          })
+          .returning();
+        userId = newUser.id;
+      } else {
+        userId = dbUser.id;
+      }
       
       // Check if email account already exists FOR THIS SPECIFIC USER
       const existingAccount = await db
@@ -154,18 +180,16 @@ export async function GET(req: NextRequest) {
           and(
             eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email_account'),
-            sql`metadata->>'createdBy' = ${userId}` // CRITICAL: Filter by user ID
+            eq(entities.userId, userId) // CRITICAL: Filter by user ID
           )
         )
-        .limit(10); // Get recent email accounts and filter in JS
+        .limit(1);
       
-      // Filter for matching email AND user
-      const matchingAccount = existingAccount.find(
-        (acc: any) => acc.data?.email === userInfo.data.email && acc.data?.userId === finalUserId
-      );
+      const matchingAccount = existingAccount[0];
       
       const accountData = {
         workspaceId,
+        userId, // CRITICAL: Set user ID at entity level
         type: 'email_account' as const,
         data: {
           provider: 'gmail',
@@ -179,13 +203,12 @@ export async function GET(req: NextRequest) {
           connectedAt: new Date().toISOString(),
           lastSyncAt: null,
           isActive: true,
-          userId: finalUserId, // CRITICAL: Store user ID in data
+          clerkUserId: finalUserId, // Store Clerk user ID for reference
           userEmail: userInfo.data.email // Store user's actual email
         },
         metadata: {
           source: 'oauth',
           scopes: tokens.scope?.split(' ') || [],
-          userId: finalUserId, // Also store in metadata for redundancy
           createdBy: userId
         }
       };

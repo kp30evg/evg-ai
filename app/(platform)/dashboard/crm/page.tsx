@@ -6,6 +6,11 @@ import { useOrganization } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { trpc } from '@/lib/trpc/client'
 import CreateContactSheet from '@/components/evercore/CreateContactSheet'
+import CreateDealSheet from '@/components/evercore/CreateDealSheet'
+import EnhancedTableHeader from '@/components/evercore/table/EnhancedTableHeader'
+import AddColumnDropdown from '@/components/evercore/table/AddColumnDropdown'
+import FieldConfigModal from '@/components/evercore/table/FieldConfigModal'
+import { TableColumn, ColumnTypeDefinition } from '@/components/evercore/types/column-types'
 import { 
   Users, 
   Building2, 
@@ -76,6 +81,305 @@ export default function CRMDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
   const [showCreateContact, setShowCreateContact] = useState(false)
+  const [showCreateDeal, setShowCreateDeal] = useState(false)
+  const [showCreateCompany, setShowCreateCompany] = useState(false)
+  
+  // Enhanced Table State
+  const [showAddColumn, setShowAddColumn] = useState(false)
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [selectedFieldType, setSelectedFieldType] = useState<ColumnTypeDefinition | undefined>()
+  const [editingColumn, setEditingColumn] = useState<TableColumn | undefined>()
+  const [currentSort, setCurrentSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | undefined>()
+  const [addColumnPosition, setAddColumnPosition] = useState({ x: 0, y: 0 })
+
+  // Deals Table State
+  const [dealsColumns, setDealsColumns] = useState<TableColumn[]>([
+    {
+      id: 'dealName',
+      name: 'Deal Name',
+      type: 'text',
+      config: { required: true, maxLength: 100 },
+      width: 200,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: true,
+      position: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'company',
+      name: 'Company',
+      type: 'text',
+      config: { maxLength: 100 },
+      width: 150,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 1,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'stage',
+      name: 'Stage',
+      type: 'singleSelect',
+      config: {
+        options: [
+          { id: 'lead', label: 'Lead', color: '#6B7280' },
+          { id: 'qualified', label: 'Qualified', color: '#0EA5E9' },
+          { id: 'proposal', label: 'Proposal', color: '#F97316' },
+          { id: 'negotiation', label: 'Negotiation', color: '#EAB308' },
+          { id: 'closed-won', label: 'Closed Won', color: '#16A34A' },
+          { id: 'closed-lost', label: 'Closed Lost', color: '#DC2626' }
+        ],
+        colorCoded: true
+      },
+      width: 120,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 2,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'value',
+      name: 'Value',
+      type: 'currency',
+      config: { currency: 'USD', precision: 0 },
+      width: 120,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 3,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'probability',
+      name: 'Probability',
+      type: 'percentage',
+      config: { precision: 0, min: 0, max: 100 },
+      width: 100,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 4,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'closeDate',
+      name: 'Close Date',
+      type: 'date',
+      config: { format: 'MMM DD, YYYY', includeTime: false },
+      width: 130,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 5,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ])
+
+  // Companies Table State
+  const [companiesColumns, setCompaniesColumns] = useState<TableColumn[]>([
+    {
+      id: 'company',
+      name: 'Company',
+      type: 'text',
+      config: { required: true, maxLength: 100 },
+      width: 200,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: true,
+      position: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'industry',
+      name: 'Industry',
+      type: 'text',
+      config: { maxLength: 50 },
+      width: 150,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 1,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'size',
+      name: 'Size',
+      type: 'singleSelect',
+      config: {
+        options: [
+          { id: 'startup', label: 'Startup (1-10)', color: '#0EA5E9' },
+          { id: 'small', label: 'Small (11-50)', color: '#16A34A' },
+          { id: 'medium', label: 'Medium (51-200)', color: '#F97316' },
+          { id: 'large', label: 'Large (201-1000)', color: '#EAB308' },
+          { id: 'enterprise', label: 'Enterprise (1000+)', color: '#8B5CF6' }
+        ],
+        colorCoded: true
+      },
+      width: 140,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 2,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'location',
+      name: 'Location',
+      type: 'address',
+      config: { format: 'US', showMap: false },
+      width: 150,
+      visible: true,
+      sortable: false,
+      filterable: true,
+      required: false,
+      position: 3,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'deals',
+      name: 'Deals',
+      type: 'number',
+      config: { precision: 0, min: 0, allowNegative: false },
+      width: 80,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 4,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'totalValue',
+      name: 'Total Value',
+      type: 'currency',
+      config: { currency: 'USD', precision: 0 },
+      width: 130,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 5,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ])
+  
+  // Default contact table columns
+  const [contactColumns, setContactColumns] = useState<TableColumn[]>([
+    {
+      id: 'contact',
+      name: 'Contact',
+      type: 'text',
+      config: { required: true },
+      width: 200,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: true,
+      position: 0,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'company',
+      name: 'Company',
+      type: 'text',
+      config: {},
+      width: 150,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 1,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'status',
+      name: 'Status',
+      type: 'singleSelect',
+      config: {
+        options: [
+          { id: 'hot', label: 'Hot', color: '#DC2626' },
+          { id: 'warm', label: 'Warm', color: '#F97316' },
+          { id: 'cold', label: 'Cold', color: '#0EA5E9' }
+        ]
+      },
+      width: 120,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 2,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'dealValue',
+      name: 'Deal Value',
+      type: 'currency',
+      config: { currency: 'USD', precision: 0 },
+      width: 130,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 3,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'lastContact',
+      name: 'Last Contact',
+      type: 'date',
+      config: { format: 'relative', includeTime: false },
+      width: 140,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 4,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 'source',
+      name: 'Source',
+      type: 'text',
+      config: {},
+      width: 100,
+      visible: true,
+      sortable: true,
+      filterable: true,
+      required: false,
+      position: 5,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ])
   
   const colors = {
     evergreen: '#1D5238',
@@ -92,6 +396,9 @@ export default function CRMDashboard() {
     red: '#EF4444'
   }
 
+  // Get trpc client
+  const executeCommand = trpc.unified.executeCommand.useMutation()
+  
   // Fetch real data from API
   const { data: contactsData, isLoading: contactsLoading, refetch: refetchContacts } = trpc.unified.getContacts.useQuery(
     { limit: 100 },
@@ -114,44 +421,69 @@ export default function CRMDashboard() {
   );
 
   // Transform API data to match UI structure
-  const contacts: Contact[] = contactsData?.map((entity: any) => ({
-    id: entity.id,
-    name: `${entity.data.firstName || ''} ${entity.data.lastName || ''}`.trim() || 'Unknown',
-    email: entity.data.email || '',
-    company: entity.data.companyName || 'No Company',
-    title: entity.data.jobTitle || '',
-    phone: entity.data.phone || '',
-    lastContact: entity.data.lastContactedAt ? new Date(entity.data.lastContactedAt) : new Date(entity.createdAt),
-    dealValue: 0, // TODO: Calculate from related deals
-    status: entity.data.sentimentScore > 70 ? 'Hot' : entity.data.sentimentScore > 40 ? 'Warm' : 'Cold',
-    source: entity.data.source || 'manual'
-  })) || [];
+  const contacts: Contact[] = contactsData?.map((entity: any) => {
+    // Calculate total deal value for this contact
+    const relatedDeals = dealsData?.filter((deal: any) => 
+      Array.isArray(deal.relationships) && deal.relationships.some((rel: any) => rel.id === entity.id && rel.type === 'primaryContact')
+    ) || [];
+    const totalDealValue = relatedDeals.reduce((sum: number, deal: any) => sum + (deal.data.value || 0), 0);
+    
+    return {
+      id: entity.id,
+      name: `${entity.data.firstName || ''} ${entity.data.lastName || ''}`.trim() || 'Unknown',
+      email: entity.data.email || '',
+      company: entity.data.companyName || entity.data.company || 'No Company',
+      title: entity.data.jobTitle || '',
+      phone: entity.data.phone || '',
+      lastContact: entity.data.lastContactedAt ? new Date(entity.data.lastContactedAt) : new Date(entity.createdAt),
+      dealValue: totalDealValue,
+      status: entity.data.sentimentScore > 70 ? 'Hot' : entity.data.sentimentScore > 40 ? 'Warm' : 'Cold',
+      source: entity.data.source || 'manual'
+    }
+  }) || [];
 
   // Transform companies data
-  const companies: Company[] = companiesData?.map((entity: any) => ({
-    id: entity.id,
-    name: entity.data.name || 'Unknown Company',
-    domain: entity.data.domain || '',
-    industry: entity.data.industry || 'Unknown',
-    size: entity.data.employeeCount ? `${entity.data.employeeCount} employees` : 'Unknown',
-    location: entity.data.address || 'Unknown',
-    deals: 0, // TODO: Count related deals
-    value: 0, // TODO: Sum related deal values
-    lastActivity: new Date(entity.updatedAt)
-  })) || [];
+  const companies: Company[] = companiesData?.map((entity: any) => {
+    // Count deals and calculate total value for this company
+    const relatedDeals = dealsData?.filter((deal: any) => 
+      (Array.isArray(deal.relationships) && deal.relationships.some((rel: any) => rel.id === entity.id && rel.type === 'company')) ||
+      deal.data.companyName === entity.data.name
+    ) || [];
+    const totalValue = relatedDeals.reduce((sum: number, deal: any) => sum + (deal.data.value || 0), 0);
+    
+    return {
+      id: entity.id,
+      name: entity.data.name || 'Unknown Company',
+      domain: entity.data.domain || '',
+      industry: entity.data.industry || 'Unknown',
+      size: entity.data.employeeCount ? `${entity.data.employeeCount} employees` : 'Unknown',
+      location: entity.data.address || entity.data.location || 'Unknown',
+      deals: relatedDeals.length,
+      value: totalValue,
+      lastActivity: new Date(entity.updatedAt)
+    }
+  }) || [];
 
   // Transform deals data
-  const deals: Deal[] = dealsData?.map((entity: any) => ({
-    id: entity.id,
-    name: entity.data.name || 'Untitled Deal',
-    company: 'Unknown Company', // TODO: Get company name from relationship
-    value: entity.data.value || 0,
-    stage: entity.data.stage || 'Prospecting',
-    probability: entity.data.probability || 0,
-    closeDate: entity.data.closeDate ? new Date(entity.data.closeDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    owner: 'You',
-    lastActivity: new Date(entity.updatedAt)
-  })) || [];
+  const deals: Deal[] = dealsData?.map((entity: any) => {
+    // Find related company
+    const relatedCompany = companiesData?.find((company: any) => 
+      (Array.isArray(entity.relationships) && entity.relationships.some((rel: any) => rel.id === company.id && rel.type === 'company')) ||
+      entity.data.companyName === company.data.name
+    );
+    
+    return {
+      id: entity.id,
+      name: entity.data.name || 'Untitled Deal',
+      company: entity.data.companyName || relatedCompany?.data.name || 'Unknown Company',
+      value: entity.data.value || 0,
+      stage: entity.data.stage || 'Prospecting',
+      probability: entity.data.probability || 0,
+      closeDate: entity.data.closeDate ? new Date(entity.data.closeDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      owner: 'You',
+      lastActivity: new Date(entity.updatedAt)
+    }
+  }) || [];
   const isLoading = contactsLoading || companiesLoading || dealsLoading;
 
   const getStatusColor = (status: string) => {
@@ -194,6 +526,130 @@ export default function CRMDashboard() {
     if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`
     
     return date.toLocaleDateString()
+  }
+
+  // Enhanced Table Handlers
+  const handleAddColumn = (event?: React.MouseEvent) => {
+    if (event) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      setAddColumnPosition({
+        x: rect.left - 200,
+        y: rect.bottom + 8
+      })
+    }
+    setShowAddColumn(true)
+    setSelectedFieldType(undefined)
+    setEditingColumn(undefined)
+  }
+
+  const handleSelectFieldType = (type: ColumnTypeDefinition) => {
+    setSelectedFieldType(type)
+    setEditingColumn(undefined)
+    setShowAddColumn(false)
+    setShowConfigModal(true)
+  }
+
+
+  const handleSaveColumn = async (columnData: Partial<TableColumn>) => {
+    if (editingColumn) {
+      // Update existing column
+      if (activeTab === 'contacts') {
+        setContactColumns(prevColumns =>
+          prevColumns.map(col =>
+            col.id === editingColumn.id ? { ...col, ...columnData } : col
+          )
+        )
+      } else if (activeTab === 'deals') {
+        setDealsColumns(prevColumns =>
+          prevColumns.map(col =>
+            col.id === editingColumn.id ? { ...col, ...columnData } : col
+          )
+        )
+      } else if (activeTab === 'companies') {
+        setCompaniesColumns(prevColumns =>
+          prevColumns.map(col =>
+            col.id === editingColumn.id ? { ...col, ...columnData } : col
+          )
+        )
+      }
+    } else {
+      // Add new column
+      const newColumn: TableColumn = {
+        id: `col-${Date.now()}`,
+        ...columnData,
+        position: getCurrentColumns().length,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } as TableColumn
+      
+      if (activeTab === 'contacts') {
+        setContactColumns(prevColumns => [...prevColumns, newColumn])
+      } else if (activeTab === 'deals') {
+        setDealsColumns(prevColumns => [...prevColumns, newColumn])
+      } else if (activeTab === 'companies') {
+        setCompaniesColumns(prevColumns => [...prevColumns, newColumn])
+      }
+    }
+    setShowConfigModal(false)
+  }
+
+  const handleToggleColumn = (columnId: string, visible: boolean) => {
+    if (activeTab === 'contacts') {
+      setContactColumns(prevColumns =>
+        prevColumns.map(col =>
+          col.id === columnId ? { ...col, visible } : col
+        )
+      )
+    } else if (activeTab === 'deals') {
+      setDealsColumns(prevColumns =>
+        prevColumns.map(col =>
+          col.id === columnId ? { ...col, visible } : col
+        )
+      )
+    } else if (activeTab === 'companies') {
+      setCompaniesColumns(prevColumns =>
+        prevColumns.map(col =>
+          col.id === columnId ? { ...col, visible } : col
+        )
+      )
+    }
+  }
+
+  const handleDeleteColumn = (columnId: string) => {
+    if (window.confirm('Are you sure you want to delete this column? This action cannot be undone.')) {
+      if (activeTab === 'contacts') {
+        setContactColumns(prevColumns => prevColumns.filter(col => col.id !== columnId))
+      } else if (activeTab === 'deals') {
+        setDealsColumns(prevColumns => prevColumns.filter(col => col.id !== columnId))
+      } else if (activeTab === 'companies') {
+        setCompaniesColumns(prevColumns => prevColumns.filter(col => col.id !== columnId))
+      }
+    }
+  }
+
+  const handleConfigureColumn = (columnId: string) => {
+    const currentColumns = getCurrentColumns()
+    const column = currentColumns.find(col => col.id === columnId)
+    if (column) {
+      setEditingColumn(column)
+      setSelectedFieldType(undefined)
+      setShowConfigModal(true)
+    }
+  }
+
+  const getCurrentColumns = (): TableColumn[] => {
+    if (activeTab === 'contacts') return contactColumns
+    if (activeTab === 'deals') return dealsColumns
+    if (activeTab === 'companies') return companiesColumns
+    return []
+  }
+
+  const handleSort = (columnId: string, direction: 'asc' | 'desc') => {
+    setCurrentSort({ columnId, direction })
+  }
+
+  const handleFilter = (columnId: string) => {
+    console.log(`Filtering ${columnId}`)
   }
 
   const filteredContacts = contacts.filter(contact =>
@@ -403,6 +859,50 @@ export default function CRMDashboard() {
               <Plus size={18} />
               New Contact
             </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowCreateDeal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                backgroundColor: colors.white,
+                color: colors.evergreen,
+                border: `1px solid ${colors.evergreen}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              <Target size={18} />
+              New Deal
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowCreateCompany(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                backgroundColor: colors.white,
+                color: colors.evergreen,
+                border: `1px solid ${colors.evergreen}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              <Building2 size={18} />
+              New Company
+            </motion.button>
           </div>
         </div>
 
@@ -532,272 +1032,193 @@ export default function CRMDashboard() {
                 width: '100%',
                 borderCollapse: 'collapse'
               }}>
-                <thead>
-                  <tr style={{
-                    backgroundColor: '#F9FAFB',
-                    borderBottom: `1px solid ${colors.lightGray}`
-                  }}>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      Contact
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      Company
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      Status
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      Deal Value
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      Last Contact
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      Source
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'center',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
+                <EnhancedTableHeader
+                  columns={contactColumns}
+                  onSort={handleSort}
+                  onAddColumn={handleAddColumn}
+                  onConfigureColumn={handleConfigureColumn}
+                  onToggleColumn={handleToggleColumn}
+                  onDeleteColumn={handleDeleteColumn}
+                  onFilter={handleFilter}
+                  currentSort={currentSort}
+                />
                 <tbody>
-                  {filteredContacts.map((contact, index) => (
-                    <motion.tr
-                      key={contact.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: index * 0.02 }}
-                      style={{
-                        borderBottom: `1px solid ${colors.lightGray}`,
-                        transition: 'background-color 200ms ease',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => router.push(`/contacts/${contact.id}`)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = colors.softGreen + '30'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <td style={{
-                        padding: '16px 24px'
-                      }}>
-                        <div>
-                          <div style={{
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            color: colors.charcoal,
-                            marginBottom: '2px'
+                  {filteredContacts.map((contact, index) => {
+                    const visibleColumns = contactColumns.filter(col => col.visible)
+                    
+                    return (
+                      <motion.tr
+                        key={contact.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: index * 0.02 }}
+                        style={{
+                          borderBottom: `1px solid ${colors.lightGray}`,
+                          transition: 'background-color 200ms ease',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => router.push(`/contacts/${contact.id}`)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = colors.softGreen + '30'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
+                      >
+                        {visibleColumns.map((column) => (
+                          <td key={column.id} style={{
+                            padding: '16px 24px',
+                            width: column.width || 'auto'
                           }}>
-                            {contact.name}
-                          </div>
-                          <div style={{
-                            fontSize: '13px',
-                            color: colors.mediumGray
-                          }}>
-                            {contact.email}
-                          </div>
-                          {contact.phone && (
-                            <div style={{
-                              fontSize: '13px',
-                              color: colors.mediumGray
-                            }}>
-                              {contact.phone}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{
-                        padding: '16px 24px'
-                      }}>
-                        <div>
-                          <div style={{
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            color: colors.charcoal,
-                            marginBottom: '2px'
-                          }}>
-                            {contact.company}
-                          </div>
-                          <div style={{
-                            fontSize: '13px',
-                            color: colors.mediumGray
-                          }}>
-                            {contact.title}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{
-                        padding: '16px 24px'
-                      }}>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          backgroundColor: getStatusColor(contact.status) + '15',
-                          color: getStatusColor(contact.status)
+                            {column.id === 'contact' && (
+                              <div>
+                                <div style={{
+                                  fontSize: '14px',
+                                  fontWeight: '500',
+                                  color: colors.charcoal,
+                                  marginBottom: '2px'
+                                }}>
+                                  {contact.name}
+                                </div>
+                                <div style={{
+                                  fontSize: '13px',
+                                  color: colors.mediumGray
+                                }}>
+                                  {contact.email}
+                                </div>
+                                {contact.phone && (
+                                  <div style={{
+                                    fontSize: '13px',
+                                    color: colors.mediumGray
+                                  }}>
+                                    {contact.phone}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {column.id === 'company' && (
+                              <div>
+                                <div style={{
+                                  fontSize: '14px',
+                                  fontWeight: '500',
+                                  color: colors.charcoal,
+                                  marginBottom: '2px'
+                                }}>
+                                  {contact.company}
+                                </div>
+                                <div style={{
+                                  fontSize: '13px',
+                                  color: colors.mediumGray
+                                }}>
+                                  {contact.title}
+                                </div>
+                              </div>
+                            )}
+                            {column.id === 'status' && (
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                backgroundColor: getStatusColor(contact.status) + '15',
+                                color: getStatusColor(contact.status)
+                              }}>
+                                {contact.status}
+                              </span>
+                            )}
+                            {column.id === 'dealValue' && (
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                color: colors.charcoal
+                              }}>
+                                {formatCurrency(contact.dealValue)}
+                              </span>
+                            )}
+                            {column.id === 'lastContact' && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.mediumGray
+                              }}>
+                                {formatDate(contact.lastContact)}
+                              </span>
+                            )}
+                            {column.id === 'source' && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.mediumGray
+                              }}>
+                                {contact.source}
+                              </span>
+                            )}
+                            {/* Handle custom columns */}
+                            {!['contact', 'company', 'status', 'dealValue', 'lastContact', 'source'].includes(column.id) && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.mediumGray
+                              }}>
+                                -
+                              </span>
+                            )}
+                          </td>
+                        ))}
+                        <td style={{
+                          padding: '16px 24px',
+                          textAlign: 'center',
+                          width: '50px'
                         }}>
-                          {contact.status}
-                        </span>
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        color: colors.charcoal
-                      }}>
-                        {formatCurrency(contact.dealValue)}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: colors.mediumGray
-                      }}>
-                        {formatDate(contact.lastContact)}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: colors.mediumGray
-                      }}>
-                        {contact.source}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                          <button style={{
-                            padding: '6px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            color: colors.mediumGray,
-                            transition: 'all 200ms ease'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/contacts/${contact.id}`)
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = colors.softGreen
-                            e.currentTarget.style.color = colors.evergreen
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent'
-                            e.currentTarget.style.color = colors.mediumGray
-                          }}>
-                            <Eye size={16} />
-                          </button>
-                          <button style={{
-                            padding: '6px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            color: colors.mediumGray,
-                            transition: 'all 200ms ease'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            // Edit functionality can be added here
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = colors.softGreen
-                            e.currentTarget.style.color = colors.evergreen
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent'
-                            e.currentTarget.style.color = colors.mediumGray
-                          }}>
-                            <Edit size={16} />
-                          </button>
-                          <button style={{
-                            padding: '6px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            color: colors.mediumGray,
-                            transition: 'all 200ms ease'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/mail/compose?to=${contact.email}`)
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = colors.softGreen
-                            e.currentTarget.style.color = colors.evergreen
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent'
-                            e.currentTarget.style.color = colors.mediumGray
-                          }}>
-                            <Mail size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button style={{
+                              padding: '6px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: colors.mediumGray,
+                              transition: 'all 200ms ease'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/contacts/${contact.id}`)
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = colors.softGreen
+                              e.currentTarget.style.color = colors.evergreen
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.color = colors.mediumGray
+                            }}>
+                              <Eye size={16} />
+                            </button>
+                            <button style={{
+                              padding: '6px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: colors.mediumGray,
+                              transition: 'all 200ms ease'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/mail/compose?to=${contact.email}`)
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = colors.softGreen
+                              e.currentTarget.style.color = colors.evergreen
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.color = colors.mediumGray
+                            }}>
+                              <Mail size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -833,178 +1254,155 @@ export default function CRMDashboard() {
                 width: '100%',
                 borderCollapse: 'collapse'
               }}>
-                <thead>
-                  <tr style={{
-                    backgroundColor: '#F9FAFB',
-                    borderBottom: `1px solid ${colors.lightGray}`
-                  }}>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Deal Name
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Company
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Stage
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Value
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Probability
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Close Date
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'center',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
+                <EnhancedTableHeader
+                  columns={dealsColumns}
+                  onSort={handleSort}
+                  onAddColumn={handleAddColumn}
+                  onConfigureColumn={handleConfigureColumn}
+                  onToggleColumn={handleToggleColumn}
+                  onDeleteColumn={handleDeleteColumn}
+                  onFilter={handleFilter}
+                  currentSort={currentSort}
+                />
                 <tbody>
-                  {deals.map((deal, index) => (
-                    <tr
-                      key={deal.id}
-                      style={{
-                        borderBottom: `1px solid ${colors.lightGray}`,
-                        transition: 'background-color 200ms ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = colors.softGreen + '30'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        color: colors.charcoal
-                      }}>
-                        {deal.name}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: colors.charcoal
-                      }}>
-                        {deal.company}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px'
-                      }}>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: '500',
-                          backgroundColor: getStageColor(deal.stage) + '15',
-                          color: getStageColor(deal.stage)
+                  {deals.map((deal, index) => {
+                    const visibleColumns = dealsColumns.filter(col => col.visible)
+                    return (
+                      <motion.tr
+                        key={deal.id}
+                        style={{
+                          borderBottom: `1px solid ${colors.lightGray}`,
+                          cursor: 'pointer',
+                          transition: 'all 200ms ease'
+                        }}
+                        whileHover={{
+                          backgroundColor: colors.softGreen + '30'
+                        }}
+                      >
+                        {visibleColumns.map((column) => (
+                          <td
+                            key={column.id}
+                            style={{
+                              padding: '16px 24px',
+                              fontSize: '14px',
+                              color: colors.charcoal,
+                              width: column.width || 'auto'
+                            }}
+                          >
+                            {column.id === 'dealName' && (
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                color: colors.charcoal
+                              }}>
+                                {deal.name}
+                              </span>
+                            )}
+                            {column.id === 'company' && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.charcoal
+                              }}>
+                                {deal.company}
+                              </span>
+                            )}
+                            {column.id === 'stage' && (
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                backgroundColor: getStageColor(deal.stage) + '15',
+                                color: getStageColor(deal.stage)
+                              }}>
+                                {deal.stage}
+                              </span>
+                            )}
+                            {column.id === 'value' && (
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                color: colors.charcoal
+                              }}>
+                                {formatCurrency(deal.value)}
+                              </span>
+                            )}
+                            {column.id === 'probability' && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.charcoal
+                              }}>
+                                {deal.probability}%
+                              </span>
+                            )}
+                            {column.id === 'closeDate' && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.mediumGray
+                              }}>
+                                {deal.closeDate.toLocaleDateString()}
+                              </span>
+                            )}
+                            {/* Handle custom columns */}
+                            {!['dealName', 'company', 'stage', 'value', 'probability', 'closeDate'].includes(column.id) && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.mediumGray
+                              }}>
+                                -
+                              </span>
+                            )}
+                          </td>
+                        ))}
+                        <td style={{
+                          padding: '16px 24px',
+                          textAlign: 'center',
+                          width: '50px'
                         }}>
-                          {deal.stage}
-                        </span>
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        color: colors.charcoal
-                      }}>
-                        {formatCurrency(deal.value)}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: colors.charcoal
-                      }}>
-                        {deal.probability}%
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: colors.mediumGray
-                      }}>
-                        {deal.closeDate.toLocaleDateString()}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                          <button style={{
-                            padding: '6px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            color: colors.mediumGray
-                          }}>
-                            <Eye size={16} />
-                          </button>
-                          <button style={{
-                            padding: '6px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            color: colors.mediumGray
-                          }}>
-                            <Edit size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button style={{
+                              padding: '6px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: colors.mediumGray,
+                              transition: 'all 200ms ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = colors.softGreen
+                              e.currentTarget.style.color = colors.evergreen
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.color = colors.mediumGray
+                            }}>
+                              <Eye size={16} />
+                            </button>
+                            <button style={{
+                              padding: '6px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: colors.mediumGray,
+                              transition: 'all 200ms ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = colors.softGreen
+                              e.currentTarget.style.color = colors.evergreen
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.color = colors.mediumGray
+                            }}>
+                              <Edit size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1040,184 +1438,161 @@ export default function CRMDashboard() {
                 width: '100%',
                 borderCollapse: 'collapse'
               }}>
-                <thead>
-                  <tr style={{
-                    backgroundColor: '#F9FAFB',
-                    borderBottom: `1px solid ${colors.lightGray}`
-                  }}>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Company
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Industry
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Size
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Location
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Deals
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Total Value
-                    </th>
-                    <th style={{
-                      padding: '12px 24px',
-                      textAlign: 'center',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: colors.mediumGray,
-                      textTransform: 'uppercase'
-                    }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
+                <EnhancedTableHeader
+                  columns={companiesColumns}
+                  onSort={handleSort}
+                  onAddColumn={handleAddColumn}
+                  onConfigureColumn={handleConfigureColumn}
+                  onToggleColumn={handleToggleColumn}
+                  onDeleteColumn={handleDeleteColumn}
+                  onFilter={handleFilter}
+                  currentSort={currentSort}
+                />
                 <tbody>
-                  {companies.map((company, index) => (
-                    <tr
-                      key={company.id}
-                      style={{
-                        borderBottom: `1px solid ${colors.lightGray}`,
-                        transition: 'background-color 200ms ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = colors.softGreen + '30'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                      }}
-                    >
-                      <td style={{
-                        padding: '16px 24px'
-                      }}>
-                        <div>
-                          <div style={{
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            color: colors.charcoal,
-                            marginBottom: '2px'
-                          }}>
-                            {company.name}
+                  {companies.map((company, index) => {
+                    const visibleColumns = companiesColumns.filter(col => col.visible)
+                    return (
+                      <motion.tr
+                        key={company.id}
+                        style={{
+                          borderBottom: `1px solid ${colors.lightGray}`,
+                          cursor: 'pointer',
+                          transition: 'all 200ms ease'
+                        }}
+                        whileHover={{
+                          backgroundColor: colors.softGreen + '30'
+                        }}
+                      >
+                        {visibleColumns.map((column) => (
+                          <td
+                            key={column.id}
+                            style={{
+                              padding: '16px 24px',
+                              fontSize: '14px',
+                              color: colors.charcoal,
+                              width: column.width || 'auto'
+                            }}
+                          >
+                            {column.id === 'company' && (
+                              <div>
+                                <div style={{
+                                  fontSize: '14px',
+                                  fontWeight: '500',
+                                  color: colors.charcoal,
+                                  marginBottom: '2px'
+                                }}>
+                                  {company.name}
+                                </div>
+                                <div style={{
+                                  fontSize: '13px',
+                                  color: colors.mediumGray
+                                }}>
+                                  {company.domain}
+                                </div>
+                              </div>
+                            )}
+                            {column.id === 'industry' && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.charcoal
+                              }}>
+                                {company.industry}
+                              </span>
+                            )}
+                            {column.id === 'size' && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.charcoal
+                              }}>
+                                {company.size}
+                              </span>
+                            )}
+                            {column.id === 'location' && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.mediumGray
+                              }}>
+                                {company.location}
+                              </span>
+                            )}
+                            {column.id === 'deals' && (
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                color: colors.charcoal
+                              }}>
+                                {company.deals}
+                              </span>
+                            )}
+                            {column.id === 'totalValue' && (
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                color: colors.charcoal
+                              }}>
+                                {formatCurrency(company.value)}
+                              </span>
+                            )}
+                            {/* Handle custom columns */}
+                            {!['company', 'industry', 'size', 'location', 'deals', 'totalValue'].includes(column.id) && (
+                              <span style={{
+                                fontSize: '14px',
+                                color: colors.mediumGray
+                              }}>
+                                -
+                              </span>
+                            )}
+                          </td>
+                        ))}
+                        <td style={{
+                          padding: '16px 24px',
+                          textAlign: 'center',
+                          width: '50px'
+                        }}>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                            <button style={{
+                              padding: '6px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: colors.mediumGray,
+                              transition: 'all 200ms ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = colors.softGreen
+                              e.currentTarget.style.color = colors.evergreen
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.color = colors.mediumGray
+                            }}>
+                              <Eye size={16} />
+                            </button>
+                            <button style={{
+                              padding: '6px',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: colors.mediumGray,
+                              transition: 'all 200ms ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = colors.softGreen
+                              e.currentTarget.style.color = colors.evergreen
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent'
+                              e.currentTarget.style.color = colors.mediumGray
+                            }}>
+                              <ExternalLink size={16} />
+                            </button>
                           </div>
-                          <div style={{
-                            fontSize: '13px',
-                            color: colors.mediumGray
-                          }}>
-                            {company.domain}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: colors.charcoal
-                      }}>
-                        {company.industry}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: colors.charcoal
-                      }}>
-                        {company.size}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        color: colors.mediumGray
-                      }}>
-                        {company.location}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        color: colors.charcoal
-                      }}>
-                        {company.deals}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        color: colors.charcoal
-                      }}>
-                        {formatCurrency(company.value)}
-                      </td>
-                      <td style={{
-                        padding: '16px 24px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                          <button style={{
-                            padding: '6px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            color: colors.mediumGray
-                          }}>
-                            <Eye size={16} />
-                          </button>
-                          <button style={{
-                            padding: '6px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            color: colors.mediumGray
-                          }}>
-                            <ExternalLink size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </motion.tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1635,8 +2010,221 @@ export default function CRMDashboard() {
         onClose={() => setShowCreateContact(false)}
         onSuccess={() => {
           refetchContacts()
+          refetchCompanies() // Refresh companies in case a new one was created
           setShowCreateContact(false)
         }}
+      />
+      
+      {/* Create Deal Sheet */}
+      <CreateDealSheet
+        isOpen={showCreateDeal}
+        onClose={() => setShowCreateDeal(false)}
+        onSuccess={() => {
+          refetchDeals()
+          refetchContacts() // Refresh contacts to show updated deal values
+          refetchCompanies() // Refresh companies to show updated deal counts
+          setShowCreateDeal(false)
+        }}
+      />
+      
+      {/* Create Company Sheet */}
+      {showCreateCompany && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          onClick={() => setShowCreateCompany(false)}
+        >
+          <div
+            style={{
+              backgroundColor: colors.white,
+              borderRadius: '12px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'auto'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              color: colors.charcoal,
+              marginBottom: '24px'
+            }}>
+              Create New Company
+            </h2>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault()
+              const formData = new FormData(e.target as HTMLFormElement)
+              
+              try {
+                // Create company via natural language command
+                const companyName = formData.get('name') as string
+                const domain = formData.get('domain') as string
+                const industry = formData.get('industry') as string
+                
+                const command = `create company "${companyName}" with domain "${domain}" in ${industry} industry`
+                
+                const result = await executeCommand.mutateAsync({ command })
+                
+                if (result.success) {
+                  refetchCompanies()
+                  refetchContacts() // In case contacts get linked
+                  setShowCreateCompany(false)
+                } else {
+                  alert('Failed to create company')
+                }
+              } catch (error) {
+                console.error('Error creating company:', error)
+                alert('Error creating company')
+              }
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: colors.charcoal,
+                    marginBottom: '8px'
+                  }}>
+                    Company Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: `1px solid ${colors.lightGray}`,
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                    placeholder="Acme Inc"
+                  />
+                </div>
+                
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: colors.charcoal,
+                    marginBottom: '8px'
+                  }}>
+                    Domain
+                  </label>
+                  <input
+                    type="text"
+                    name="domain"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: `1px solid ${colors.lightGray}`,
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                    placeholder="acme.com"
+                  />
+                </div>
+                
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: colors.charcoal,
+                    marginBottom: '8px'
+                  }}>
+                    Industry
+                  </label>
+                  <select
+                    name="industry"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: `1px solid ${colors.lightGray}`,
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="">Select Industry</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Financial Services">Financial Services</option>
+                    <option value="Manufacturing">Manufacturing</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Education">Education</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                marginTop: '24px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCompany(false)}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: colors.white,
+                    color: colors.mediumGray,
+                    border: `1px solid ${colors.lightGray}`,
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: colors.evergreen,
+                    color: colors.white,
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Create Company
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      
+      {/* Enhanced Table Modals */}
+      <AddColumnDropdown
+        isOpen={showAddColumn}
+        onClose={() => setShowAddColumn(false)}
+        onSelectType={handleSelectFieldType}
+        position={addColumnPosition}
+      />
+
+      <FieldConfigModal
+        isOpen={showConfigModal}
+        onClose={() => setShowConfigModal(false)}
+        onSave={handleSaveColumn}
+        fieldType={selectedFieldType}
+        existingColumn={editingColumn}
       />
     </div>
   )

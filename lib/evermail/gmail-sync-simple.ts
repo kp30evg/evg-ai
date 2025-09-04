@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { db } from '@/lib/db';
-import { entities } from '@/lib/db/schema/unified';
+import { entities, users } from '@/lib/db/schema/unified';
 import { eq, and, sql } from 'drizzle-orm';
 import * as evercore from '@/lib/modules-simple/evercore';
 
@@ -27,7 +27,7 @@ export class GmailSyncService {
     ].join('-');
   }
 
-  async connectGmail(authCode: string, workspaceId: string, userId: string) {
+  async connectGmail(authCode: string, workspaceId: string, clerkUserId: string) {
     try {
       // Exchange auth code for tokens
       const { tokens } = await oauth2Client.getToken(authCode);
@@ -37,7 +37,16 @@ export class GmailSyncService {
       const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
       const profile = await gmail.users.getProfile({ userId: 'me' });
       
-      const userUuid = this.stringToUuid(userId);
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, clerkUserId))
+        .limit(1);
+        
+      if (!dbUser) {
+        throw new Error('User not found in database');
+      }
       
       // Check if email account already exists for this user
       const existing = await db
@@ -47,7 +56,7 @@ export class GmailSyncService {
           and(
             eq(entities.workspaceId, workspaceId),
             eq(entities.type, 'email_account'),
-            sql`metadata->>'createdBy' = ${userUuid}`
+            eq(entities.userId, dbUser.id) // Filter by actual user ID
           )
         )
         .limit(1);
@@ -75,11 +84,12 @@ export class GmailSyncService {
         // Create new email account entity
         await db.insert(entities).values({
           workspaceId,
+          userId: dbUser.id, // Set user ID at entity level
           type: 'email_account',
           data: accountData,
           metadata: {
             provider: 'gmail',
-            createdBy: userUuid
+            createdBy: dbUser.id
           }
         });
       }
@@ -95,8 +105,19 @@ export class GmailSyncService {
     }
   }
 
-  async performInitialSync(workspaceId: string, userId: string) {
+  async performInitialSync(workspaceId: string, clerkUserId: string) {
     try {
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, clerkUserId))
+        .limit(1);
+        
+      if (!dbUser) {
+        throw new Error('User not found in database');
+      }
+      
       // Get the email account entity
       const userUuid = this.stringToUuid(userId);
       const account = await db

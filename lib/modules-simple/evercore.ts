@@ -385,11 +385,11 @@ export async function getCompanyInsights(
   const company = await entityService.findById(workspaceId, companyId);
   if (!company) return null;
 
-  // Get all contacts at this company
-  const contacts = await getContacts(workspaceId, { companyId });
+  // Get all contacts at this company  
+  const contacts = await getContacts(workspaceId, { companyId, userId: undefined }); // Company insights should see all contacts
   
   // Get all deals for this company
-  const deals = await getDeals(workspaceId, { companyId });
+  const deals = await getDeals(workspaceId, { companyId, userId: undefined }); // Company insights should see all deals
   
   // Get all related entities
   const related = await entityService.findRelated(workspaceId, companyId);
@@ -702,8 +702,8 @@ export async function handleCoreCommand(
     // Ensure we have some sample data for demonstration
     await ensureSampleData(workspaceId, userId);
     
-    const contacts = await getContacts(workspaceId, { limit: 20 });
-    const deals = await getDeals(workspaceId);
+    const contacts = await getContacts(workspaceId, { limit: 20, userId });
+    const deals = await getDeals(workspaceId, { userId });
     
     // Calculate deal potential based on contact engagement and existing deal values
     const contactsWithPotential = contacts.map(contact => {

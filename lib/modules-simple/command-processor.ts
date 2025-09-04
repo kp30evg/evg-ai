@@ -9,6 +9,9 @@ import * as everchat from './everchat';
 import * as evercore from './evercore';
 import * as evercal from './evercal';
 import OpenAI from 'openai';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/unified';
+import { eq } from 'drizzle-orm';
 
 // Initialize OpenAI client
 const openai = process.env.OPENAI_API_KEY 
@@ -32,10 +35,21 @@ export interface CommandResult {
 export async function processCommand(
   workspaceId: string,
   command: string,
-  userId?: string
+  clerkUserId?: string
 ): Promise<CommandResult> {
   try {
-    console.log('Processing command:', command, 'for workspace:', workspaceId, 'user:', userId);
+    // Get database user ID from Clerk user ID
+    let dbUserId: string | undefined;
+    if (clerkUserId) {
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, clerkUserId))
+        .limit(1);
+      dbUserId = dbUser?.id;
+    }
+    
+    console.log('Processing command:', command, 'for workspace:', workspaceId, 'user:', dbUserId);
     const lowerCommand = command.toLowerCase();
     
     // Debug logging

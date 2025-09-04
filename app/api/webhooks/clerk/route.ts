@@ -50,19 +50,21 @@ export async function POST(req: Request) {
     const { id, name, slug } = evt.data
     
     try {
-      // Create company record
-      await db.insert(companies).values({
+      // Create workspace record
+      await db.insert(workspaces).values({
         clerkOrgId: id,
         name: name,
         slug: slug || name.toLowerCase().replace(/\s+/g, '-'),
-        onboardingCompleted: false,
-        onboardingStep: 0,
-        connectedIntegrations: []
+        settings: {
+          onboardingCompleted: false,
+          onboardingStep: 0,
+          connectedIntegrations: []
+        }
       })
       
       console.log(`Organization created: ${name} (${id})`)
     } catch (error) {
-      console.error('Error creating company:', error)
+      console.error('Error creating workspace:', error)
     }
   }
   
@@ -86,8 +88,6 @@ export async function POST(req: Request) {
           lastName: last_name,
           imageUrl: image_url,
           workspaceId: null, // Will be set when they join an organization
-          hasCompletedTour: false,
-          firstCommandExecuted: false,
           role: 'member'
         })
         
@@ -124,14 +124,14 @@ export async function POST(req: Request) {
     const { organization, public_user_data } = evt.data
     
     try {
-      // Check if company exists
-      const [company] = await db
+      // Check if workspace exists
+      const [workspace] = await db
         .select({ id: workspaces.id })
-        .from(companies)
+        .from(workspaces)
         .where(eq(workspaces.clerkOrgId, organization.id))
         .limit(1)
       
-      if (company) {
+      if (workspace) {
         // Check if user exists
         const [existingUser] = await db
           .select({ id: users.id })
@@ -144,7 +144,7 @@ export async function POST(req: Request) {
           await db
             .update(users)
             .set({
-              workspaceId: company.id,
+              workspaceId: workspace.id,
               updatedAt: new Date()
             })
             .where(eq(users.clerkUserId, public_user_data.user_id))
@@ -158,9 +158,7 @@ export async function POST(req: Request) {
             firstName: public_user_data.first_name,
             lastName: public_user_data.last_name,
             imageUrl: public_user_data.image_url,
-            workspaceId: company.id,
-            hasCompletedTour: false,
-            firstCommandExecuted: false,
+            workspaceId: workspace.id,
             role: 'member'
           })
           

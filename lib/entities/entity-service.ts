@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export interface EntityQuery {
   workspaceId: string;
+  userId?: string; // Add userId to query interface
   type?: string | string[];
   where?: Record<string, any>;
   relationships?: Record<string, string>;
@@ -41,6 +42,7 @@ export class EntityService {
     
     const [entity] = await db.insert(entities).values({
       workspaceId,
+      userId: metadata.userId || null, // Use the userId field directly
       type,
       data,
       relationships,
@@ -64,6 +66,11 @@ export class EntityService {
 
     // Workspace filter (required)
     conditions.push(eq(entities.workspaceId, query.workspaceId));
+    
+    // User filter (if provided)
+    if (query.userId) {
+      conditions.push(eq(entities.userId, query.userId));
+    }
 
     // Type filter
     if (query.type) {

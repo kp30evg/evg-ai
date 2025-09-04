@@ -41,6 +41,7 @@ export const users = pgTable('users', {
 export const entities = pgTable('entities', {
   id: uuid('id').primaryKey().defaultRandom(),
   workspaceId: uuid('workspace_id').notNull(),
+  userId: uuid('user_id'), // User who owns this entity (critical for data isolation)
   type: varchar('type', { length: 50 }).notNull(), // 'customer', 'message', 'task', 'invoice', etc.
   data: jsonb('data').notNull().$type<Record<string, any>>(), // ALL entity data
   relationships: jsonb('relationships').default({}).$type<Record<string, any>>(), // Links between entities
@@ -55,8 +56,10 @@ export const entities = pgTable('entities', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   workspaceIdx: index('idx_entities_workspace').on(table.workspaceId),
+  userIdx: index('idx_entities_user').on(table.userId),
   typeIdx: index('idx_entities_type').on(table.type),
   workspaceTypeIdx: index('idx_entities_workspace_type').on(table.workspaceId, table.type),
+  workspaceUserIdx: index('idx_entities_workspace_user').on(table.workspaceId, table.userId),
   dataGinIdx: index('idx_entities_data').using('gin', table.data),
   relationshipsGinIdx: index('idx_entities_relationships').using('gin', table.relationships),
   createdAtIdx: index('idx_entities_created').on(table.createdAt),
