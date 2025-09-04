@@ -48,6 +48,179 @@ evergreenOS represents the most fundamental shift in enterprise technology since
 - Zero configuration required  
 
 
+## 🔒 CRITICAL: Multi-Tenancy & User Data Isolation Architecture
+
+### Organization Structure
+evergreenOS implements a **hierarchical multi-tenant architecture** with complete data isolation:
+
+```
+┌─────────────────────────────────────────────┐
+│           CLERK AUTHENTICATION              │
+│                                              │
+│  Organization (Clerk Org)                   │
+│  ├── User A (Clerk User)                    │
+│  │   ├── Personal Gmail Account             │
+│  │   ├── Personal Calendar                  │
+│  │   └── Created Contacts/Deals             │
+│  │                                           │
+│  ├── User B (Clerk User)                    │
+│  │   ├── Personal Gmail Account             │
+│  │   ├── Personal Calendar                  │
+│  │   └── Created Contacts/Deals             │
+│  │                                           │
+│  └── User C (Admin)                         │
+│      └── Can see organization-wide data     │
+│                                              │
+└─────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────┐
+│            NEON DATABASE                     │
+│                                              │
+│  workspaces table                           │
+│  ├── Maps Clerk Org → Workspace UUID        │
+│  └── Organization settings                  │
+│                                              │
+│  users table                                 │
+│  ├── Maps Clerk User → Database User UUID   │
+│  ├── Links to workspace_id                  │
+│  └── User preferences                       │
+│                                              │
+│  entities table                              │
+│  ├── workspace_id (organization isolation)  │
+│  ├── user_id (user-level ownership)         │
+│  └── All business data                      │
+│                                              │
+└─────────────────────────────────────────────┘
+```
+
+### Data Isolation Levels
+
+#### 1. **Workspace Isolation** (Organization-level)
+- All queries MUST filter by `workspace_id`
+- Prevents data leakage between organizations
+- Implemented at database query level
+
+#### 2. **User Isolation** (Personal data)
+- OAuth accounts (Gmail, Calendar) filtered by `user_id`
+- Personal emails, calendar events owned by specific user
+- Contacts/deals can be user-specific or organization-wide
+
+#### 3. **Shared Organization Data**
+- Some entities (like company profiles) may be workspace-wide
+- Team messages in channels visible to all users
+- Shared deals visible to sales team
+
+### Critical Implementation Requirements
+
+```typescript
+// EVERY data query MUST include user context
+interface QueryContext {
+  workspaceId: string;  // REQUIRED - from Clerk org
+  userId?: string;      // REQUIRED for personal data
+  role?: string;        // For permission checks
+}
+
+// Example: Fetching user's emails
+const emails = await db
+  .select()
+  .from(entities)
+  .where(
+    and(
+      eq(entities.workspaceId, ctx.workspaceId),  // Organization isolation
+      eq(entities.userId, ctx.userId),             // User isolation
+      eq(entities.type, 'email')
+    )
+  );
+
+// Example: Creating an entity
+const entity = await entityService.create(
+  workspaceId,
+  'contact',
+  data,
+  relationships,
+  { userId: ctx.userId }  // CRITICAL: Always pass userId
+);
+```
+
+### User Sync Process
+
+1. **Clerk Webhook** (`/app/api/webhooks/clerk/route.ts`)
+   - Listens for user creation/updates from Clerk
+   - Creates/updates records in `users` table
+   - Links users to workspaces
+
+2. **Manual Sync** (if webhook fails)
+   ```bash
+   npx tsx scripts/sync-users-simple.ts
+   ```
+
+3. **Database User Lookup**
+   ```typescript
+   // Convert Clerk user ID to database user ID
+   const [dbUser] = await db
+     .select()
+     .from(users)
+     .where(eq(users.clerkUserId, clerkUserId))
+     .limit(1);
+   ```
+
+### OAuth Account Isolation
+
+Each user's OAuth accounts (Gmail, Calendar, etc.) are **completely isolated**:
+
+```typescript
+// Gmail account storage
+{
+  workspace_id: "org-uuid",
+  user_id: "user-uuid",        // CRITICAL: User ownership
+  type: "email_account",
+  data: {
+    email: "user@gmail.com",
+    tokens: "encrypted",       // User's personal OAuth tokens
+    provider: "gmail"
+  }
+}
+```
+
+### Security Checklist for New Features
+
+- [ ] Does the feature filter by `workspace_id`?
+- [ ] Does it filter by `user_id` for personal data?
+- [ ] Are OAuth tokens stored per user?
+- [ ] Is the users table populated from Clerk?
+- [ ] Are all API endpoints checking user context?
+- [ ] Is sensitive data properly isolated?
+
+### Common Mistakes to Avoid
+
+❌ **DON'T** query without workspace_id
+```typescript
+// WRONG - exposes data across organizations
+const data = await db.select().from(entities);
+```
+
+❌ **DON'T** share OAuth tokens between users
+```typescript
+// WRONG - everyone sees same Gmail account
+const account = { type: 'email_account', data: { tokens } };
+```
+
+❌ **DON'T** forget to sync users from Clerk
+```typescript
+// WRONG - users table empty, no isolation possible
+// MUST run sync script after adding users
+```
+
+✅ **DO** always include proper context
+```typescript
+// CORRECT - properly isolated query
+const data = await entityService.find({
+  workspaceId: ctx.workspaceId,
+  userId: ctx.userId,
+  type: 'email'
+});
+```
+
 ## Architecture Foundation
 
 ### The Universal Data Model
@@ -55,14 +228,14 @@ evergreenOS represents the most fundamental shift in enterprise technology since
 -- This ONE table holds EVERYTHING - contacts, emails, tasks, invoices, messages, files
 CREATE TABLE entities (
   id UUID PRIMARY KEY,
-  company_id UUID NOT NULL,
-  type VARCHAR(50), -- infinitely extensible: 'contact', 'email', 'task', 'invoice', etc.
-  data JSONB,       -- flexible schema for any data structure
-  relationships JSONB[], -- connections between entities
-  metadata JSONB,   -- system metadata
-  search_vector tsvector, -- full-text search
-  embedding vector(1536), -- semantic search
-  created_by UUID,
+  workspace_id UUID NOT NULL,  -- Organization/workspace isolation
+  user_id UUID,                 -- User-level data ownership (CRITICAL for privacy)
+  type VARCHAR(50),             -- infinitely extensible: 'contact', 'email', 'task', 'invoice', etc.
+  data JSONB,                   -- flexible schema for any data structure
+  relationships JSONB[],         -- connections between entities
+  metadata JSONB,                -- system metadata
+  search_vector tsvector,        -- full-text search
+  embedding vector(1536),        -- semantic search
   created_at TIMESTAMP,
   updated_at TIMESTAMP
 );
@@ -76,6 +249,15 @@ CREATE TABLE entities (
 
 ### The Module System
 ```typescript
+// Context MUST include user information for ALL operations
+interface Context {
+  workspaceId: string;    // Organization identifier (from Clerk)
+  userId: string;         // Database user UUID (from users table)
+  clerkUserId?: string;   // Original Clerk user ID
+  role?: 'admin' | 'member' | 'viewer';
+  userEmail?: string;     // For email-specific operations
+}
+
 // Every module MUST implement this interface
 interface Module {
   // Identity
@@ -89,7 +271,7 @@ interface Module {
   // Natural language commands this module handles
   commands: CommandDefinition[]
   
-  // Core CRUD operations
+  // Core CRUD operations - ALL require Context with userId
   create(type: string, data: any, context: Context): Promise<Entity>
   read(id: string, context: Context): Promise<Entity>
   update(id: string, data: any, context: Context): Promise<Entity>
@@ -250,3 +432,49 @@ CLERK_SECRET_KEY=...
 - **500 error on commands**: Check OPENAI_API_KEY is set
 - **No real data shown**: Verify database connection and workspace creation
 - **Commands return generic text**: Check module handler response formatting
+- **Users seeing same data**: Check user_id filtering and users table sync
+- **Empty users table**: Run `npx tsx scripts/sync-users-simple.ts`
+- **OAuth shared between users**: Ensure userId is stored with OAuth accounts
+
+---
+
+# 🚨 CRITICAL SECURITY REMINDERS FOR ALL DEVELOPMENT
+
+## User Data Isolation is NON-NEGOTIABLE
+
+**EVERY feature you build MUST:**
+1. Filter by `workspace_id` to prevent cross-organization data leaks
+2. Filter by `user_id` for personal data (emails, calendar, OAuth accounts)
+3. Ensure the `users` table is synced from Clerk before testing
+4. Store OAuth tokens PER USER, never per workspace
+5. Pass user context through ALL module operations
+
+**Before ANY data query:**
+```typescript
+// ALWAYS get the database user first
+const [dbUser] = await db
+  .select()
+  .from(users)
+  .where(eq(users.clerkUserId, clerkUserId))
+  .limit(1);
+
+// Then use their ID for queries
+const data = await entityService.find({
+  workspaceId: workspaceId,
+  userId: dbUser.id,  // CRITICAL
+  type: 'email'
+});
+```
+
+**Testing Multi-User Scenarios:**
+1. Create 2+ users in the same workspace
+2. Each user connects their own Gmail/Calendar
+3. Verify User A CANNOT see User B's data
+4. Test with admin vs regular member roles
+
+**Quick Check Commands:**
+- Check users table: `SELECT * FROM users;`
+- Check user isolation: `SELECT DISTINCT user_id FROM entities WHERE type = 'email';`
+- Verify workspace: `SELECT * FROM workspaces WHERE clerk_org_id = 'org_...';`
+
+## Remember: One security breach can destroy trust forever. Always verify isolation.
