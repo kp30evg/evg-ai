@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc/client';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import ComposeModal from '@/components/mail/ComposeModal';
 import { 
   Mail, 
   Star, 
@@ -54,7 +55,7 @@ const tokens = {
   },
   
   typography: {
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     sizes: {
       xs: '12px',
       sm: '14px',
@@ -116,9 +117,18 @@ export default function InboxPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState<any>(null);
 
-  // Get Gmail status
-  const { data: gmailStatus } = trpc.evermail.getGmailStatus.useQuery();
+  // Get Gmail status with caching
+  const { data: gmailStatus } = trpc.evermail.getGmailStatus.useQuery(
+    undefined,
+    {
+      staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
+      cacheTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
+      refetchInterval: false
+    }
+  );
   
   // Get emails
   const { data: emails, isLoading, refetch } = trpc.evermail.getEmails.useQuery({
@@ -284,8 +294,8 @@ export default function InboxPage() {
     }}>
       {/* Email List */}
       <div style={{
-        width: selectedEmail ? '380px' : '100%',
-        minWidth: selectedEmail ? '380px' : 'auto',
+        width: selectedEmail ? '420px' : '100%',
+        minWidth: selectedEmail ? '420px' : 'auto',
         borderRight: selectedEmail ? `1px solid ${tokens.colors.gray200}` : 'none',
         backgroundColor: tokens.colors.white,
         display: 'flex',
@@ -311,11 +321,12 @@ export default function InboxPage() {
               flex: 1
             }}>
               <h1 style={{
-                fontSize: tokens.typography.sizes.lg,
+                fontSize: tokens.typography.sizes['2xl'],
                 fontWeight: tokens.typography.weights.semibold,
                 color: tokens.colors.charcoal,
                 margin: 0,
-                letterSpacing: '-0.01em'
+                letterSpacing: '-0.01em',
+                lineHeight: tokens.typography.lineHeights.tight
               }}>
                 Inbox
               </h1>
@@ -324,40 +335,47 @@ export default function InboxPage() {
               <span style={{
                 fontSize: tokens.typography.sizes.xs,
                 fontWeight: tokens.typography.weights.medium,
-                color: tokens.colors.gray500,
-                backgroundColor: tokens.colors.gray100,
-                padding: `2px ${tokens.spacing.sm}`,
-                borderRadius: tokens.radii.full
+                color: tokens.colors.evergreen,
+                backgroundColor: tokens.colors.softGreen,
+                padding: `${tokens.spacing.xs} ${tokens.spacing.md}`,
+                borderRadius: tokens.radii.full,
+                border: `1px solid ${tokens.colors.evergreen}20`
               }}>
                 {filteredEmails.filter((e: any) => !e.data.isRead).length} unread
               </span>
             )}
             <motion.button
-              onClick={() => window.location.href = '/mail/compose'}
+              onClick={() => setIsComposeOpen(true)}
               style={{
-                padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
+                padding: `${tokens.spacing.md} ${tokens.spacing.xl}`,
                 backgroundColor: tokens.colors.evergreen,
                 color: tokens.colors.white,
                 border: 'none',
                 borderRadius: tokens.radii.md,
                 fontSize: tokens.typography.sizes.sm,
-                fontWeight: tokens.typography.weights.medium,
+                fontWeight: tokens.typography.weights.semibold,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: tokens.spacing.xs
+                gap: tokens.spacing.sm,
+                boxShadow: tokens.shadows.sm
               }}
-              whileHover={{ opacity: 0.9 }}
+              whileHover={{ 
+                backgroundColor: tokens.colors.evergreen,
+                transform: 'translateY(-1px)',
+                boxShadow: tokens.shadows.md
+              }}
               whileTap={{ scale: 0.98 }}
+              transition={{ duration: 0.15 }}
             >
-              <Plus size={14} strokeWidth={2} />
+              <Plus size={16} strokeWidth={2} />
               Compose
             </motion.button>
             <motion.button
               onClick={handleRefresh}
               disabled={isRefreshing}
               style={{
-                padding: tokens.spacing.sm,
+                padding: tokens.spacing.md,
                 backgroundColor: 'transparent',
                 border: `1px solid ${tokens.colors.gray200}`,
                 borderRadius: tokens.radii.md,
@@ -365,14 +383,18 @@ export default function InboxPage() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: tokens.transitions.fast
+                transition: tokens.transitions.fast,
+                opacity: isRefreshing ? 0.6 : 1
               }}
-              whileHover={{ backgroundColor: tokens.colors.gray50 }}
+              whileHover={{ 
+                backgroundColor: tokens.colors.gray50,
+                borderColor: tokens.colors.gray500
+              }}
               whileTap={{ scale: 0.95 }}
             >
               <RefreshCw 
-                size={14} 
-                color={tokens.colors.gray600}
+                size={16} 
+                color={tokens.colors.gray500}
                 strokeWidth={2}
                 className={isRefreshing ? 'animate-spin' : ''}
               />
@@ -479,23 +501,23 @@ export default function InboxPage() {
                   transition={{ delay: index * 0.02, duration: 0.2 }}
                   onClick={() => handleEmailClick(email)}
                   style={{
-                    padding: `${tokens.spacing.md} ${tokens.spacing.lg}`,
-                    borderBottom: `1px solid ${tokens.colors.gray100}`,
+                    padding: `${tokens.spacing.lg} ${tokens.spacing.xl}`,
+                    borderBottom: `1px solid ${tokens.colors.gray200}`,
                     cursor: 'pointer',
                     backgroundColor: 
-                      selectedEmail?.id === email.id ? tokens.colors.gray50 :
-                      !email.data.isRead ? tokens.colors.white : tokens.colors.white,
+                      selectedEmail?.id === email.id ? tokens.colors.softGreen :
+                      !email.data.isRead ? tokens.colors.white : tokens.colors.gray50,
                     transition: tokens.transitions.fast,
                     position: 'relative'
                   }}
                   onMouseEnter={(e) => {
                     if (selectedEmail?.id !== email.id) {
-                      e.currentTarget.style.backgroundColor = tokens.colors.gray50;
+                      e.currentTarget.style.backgroundColor = !email.data.isRead ? tokens.colors.gray50 : tokens.colors.gray100;
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (selectedEmail?.id !== email.id) {
-                      e.currentTarget.style.backgroundColor = tokens.colors.white;
+                      e.currentTarget.style.backgroundColor = !email.data.isRead ? tokens.colors.white : tokens.colors.gray50;
                     }
                   }}
                 >
@@ -506,10 +528,10 @@ export default function InboxPage() {
                       left: 0,
                       top: 0,
                       bottom: 0,
-                      width: '3px',
+                      width: '4px',
                       backgroundColor: tokens.colors.evergreen,
-                      borderTopLeftRadius: tokens.radii.sm,
-                      borderBottomLeftRadius: tokens.radii.sm
+                      borderTopRightRadius: tokens.radii.sm,
+                      borderBottomRightRadius: tokens.radii.sm
                     }} />
                   )}
 
@@ -549,9 +571,9 @@ export default function InboxPage() {
                         />
                       </motion.button>
                       <span style={{
-                        fontSize: tokens.typography.sizes.sm,
+                        fontSize: tokens.typography.sizes.base,
                         fontWeight: !email.data.isRead ? tokens.typography.weights.semibold : tokens.typography.weights.medium,
-                        color: !email.data.isRead ? tokens.colors.charcoal : tokens.colors.gray700,
+                        color: !email.data.isRead ? tokens.colors.charcoal : tokens.colors.gray500,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -574,19 +596,19 @@ export default function InboxPage() {
                     marginBottom: tokens.spacing.xs
                   }}>
                     <span style={{
-                      fontSize: tokens.typography.sizes.sm,
-                      fontWeight: !email.data.isRead ? tokens.typography.weights.medium : tokens.typography.weights.regular,
-                      color: !email.data.isRead ? tokens.colors.charcoal : tokens.colors.gray600,
+                      fontSize: tokens.typography.sizes.base,
+                      fontWeight: !email.data.isRead ? tokens.typography.weights.semibold : tokens.typography.weights.regular,
+                      color: !email.data.isRead ? tokens.colors.charcoal : tokens.colors.gray500,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       flex: 1,
-                      lineHeight: tokens.typography.lineHeights.tight
+                      lineHeight: tokens.typography.lineHeights.base
                     }}>
                       {email.data.subject || '(No subject)'}
                     </span>
                     {email.data.attachments?.length > 0 && (
-                      <Paperclip size={12} color={tokens.colors.gray400} strokeWidth={2} />
+                      <Paperclip size={14} color={tokens.colors.gray500} strokeWidth={2} />
                     )}
                   </div>
                   <p style={{
@@ -621,8 +643,8 @@ export default function InboxPage() {
           }}>
           {/* Email Header */}
           <div style={{
-            padding: tokens.spacing.xl,
-            borderBottom: `1px solid ${tokens.colors.gray100}`,
+            padding: `${tokens.spacing['2xl']} ${tokens.spacing['3xl']}`,
+            borderBottom: `1px solid ${tokens.colors.gray200}`,
             backgroundColor: tokens.colors.white
           }}>
             <div style={{
@@ -632,12 +654,13 @@ export default function InboxPage() {
               marginBottom: tokens.spacing.lg
             }}>
               <h2 style={{
-                fontSize: tokens.typography.sizes.xl,
+                fontSize: tokens.typography.sizes['2xl'],
                 fontWeight: tokens.typography.weights.semibold,
                 color: tokens.colors.charcoal,
                 margin: 0,
                 letterSpacing: '-0.01em',
-                lineHeight: tokens.typography.lineHeights.tight
+                lineHeight: tokens.typography.lineHeights.tight,
+                maxWidth: '70%'
               }}>{selectedEmail.data.subject || '(No subject)'}</h2>
               <div style={{
                 display: 'flex',
@@ -775,15 +798,28 @@ export default function InboxPage() {
                       hour12: true
                     })}
                   </span>
-                  {selectedEmail.data.to?.length > 0 && (
+                  {selectedEmail.data.to && (
                     <>
                       <span style={{ color: tokens.colors.gray300 }}>•</span>
                       <span style={{
                         fontSize: tokens.typography.sizes.xs,
                         color: tokens.colors.gray500
                       }}>
-                        To: {selectedEmail.data.to.slice(0, 2).map((r: any) => r.name || r.email).join(', ')}
-                        {selectedEmail.data.to.length > 2 && ` +${selectedEmail.data.to.length - 2} more`}
+                        To: {(() => {
+                          // Handle both string and array formats
+                          const toField = selectedEmail.data.to;
+                          if (typeof toField === 'string') {
+                            return toField.length > 50 ? toField.substring(0, 50) + '...' : toField;
+                          } else if (Array.isArray(toField)) {
+                            const recipients = toField.slice(0, 2).map((r: any) => 
+                              typeof r === 'string' ? r : (r.name || r.email)
+                            ).join(', ');
+                            return toField.length > 2 
+                              ? `${recipients} +${toField.length - 2} more` 
+                              : recipients;
+                          }
+                          return 'Unknown';
+                        })()}
                       </span>
                     </>
                   )}
@@ -800,26 +836,481 @@ export default function InboxPage() {
             backgroundColor: tokens.colors.gray50
           }}>
             <div style={{
-              maxWidth: '720px',
+              maxWidth: '800px',
               margin: '0 auto',
               backgroundColor: tokens.colors.white,
-              borderRadius: tokens.radii.lg,
-              padding: tokens.spacing['2xl'],
-              boxShadow: tokens.shadows.sm
+              borderRadius: tokens.radii.xl,
+              padding: `${tokens.spacing['3xl']} ${tokens.spacing['4xl']}`,
+              boxShadow: tokens.shadows.md,
+              border: `1px solid ${tokens.colors.gray200}`
             }}>
-              <div 
-                style={{
-                  fontSize: tokens.typography.sizes.base,
-                  lineHeight: tokens.typography.lineHeights.relaxed,
-                  color: tokens.colors.charcoal,
-                  fontFamily: tokens.typography.fontFamily
-                }}
-                dangerouslySetInnerHTML={{ 
-                  __html: selectedEmail.data.body?.html || 
-                         selectedEmail.data.body?.text?.replace(/\n/g, '<br>') || 
-                         '<p style="color: #9CA3AF">No content available</p>'
-                }}
-              />
+              {(() => {
+                const body = selectedEmail.data.body;
+                if (!body) {
+                  return (
+                    <p style={{ color: tokens.colors.gray500, fontSize: tokens.typography.sizes.base }}>
+                      No content available
+                    </p>
+                  );
+                }
+
+                // Handle the case where body is stored as indexed string characters
+                let bodyText = '';
+                let bodyHtml = '';
+                
+                if (body.html && body.html.trim().length > 0) {
+                  bodyHtml = body.html;
+                } else if (body.text && body.text.trim().length > 0) {
+                  bodyText = body.text;
+                } else if (typeof body === 'string') {
+                  bodyText = body;
+                } else if (Array.isArray(body)) {
+                  bodyText = body.join('');
+                } else if (typeof body === 'object' && Object.keys(body).length > 0) {
+                  // Handle case where body is stored as indexed properties {0: 'a', 1: 'b', 2: 'c', ...}
+                  const keys = Object.keys(body).filter(key => !isNaN(parseInt(key))).sort((a, b) => parseInt(a) - parseInt(b));
+                  if (keys.length > 0) {
+                    bodyText = keys.map(key => body[key]).join('');
+                  } else if (body.snippet) {
+                    bodyText = body.snippet;
+                  }
+                }
+
+                // Check if bodyText contains HTML markup
+                const containsHtml = bodyText.includes('<') && (
+                  bodyText.includes('<html') || 
+                  bodyText.includes('<body') || 
+                  bodyText.includes('<div') || 
+                  bodyText.includes('<p>') || 
+                  bodyText.includes('<img') || 
+                  bodyText.includes('<a href') || 
+                  bodyText.includes('<a>') ||
+                  bodyText.includes('<table') ||
+                  bodyText.includes('<span') ||
+                  bodyText.includes('<strong') ||
+                  bodyText.includes('<em>') ||
+                  bodyText.includes('<h1') ||
+                  bodyText.includes('<h2') ||
+                  bodyText.includes('<h3') ||
+                  bodyText.includes('<br') ||
+                  bodyText.includes('<ul') ||
+                  bodyText.includes('<ol') ||
+                  bodyText.includes('<li>') ||
+                  // Check for common HTML entities
+                  bodyText.includes('&nbsp;') ||
+                  bodyText.includes('&amp;') ||
+                  bodyText.includes('&lt;') ||
+                  bodyText.includes('&gt;') ||
+                  // Check for style attributes
+                  bodyText.includes('style=') ||
+                  bodyText.includes('class=')
+                );
+                
+                // If no explicit HTML but text contains HTML tags, use it as HTML
+                if (!bodyHtml && containsHtml) {
+                  bodyHtml = bodyText;
+                  bodyText = ''; // Clear text since we're using it as HTML
+                }
+
+                // Debug logging
+                console.log('Processed body data:', {
+                  hasBodyText: bodyText.length > 0,
+                  bodyTextLength: bodyText.length,
+                  hasBodyHtml: bodyHtml.length > 0,
+                  bodyHtmlLength: bodyHtml.length,
+                  containsHtml: containsHtml,
+                  bodyTextPreview: bodyText.substring(0, 200) + '...',
+                  bodyHtmlPreview: bodyHtml.substring(0, 200) + '...'
+                });
+
+                const hasHtmlContent = bodyHtml && bodyHtml.trim().length > 0;
+                
+                if (hasHtmlContent) {
+                  // Render rich HTML content in a secure iframe for proper styling
+                  const htmlContent = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                      <meta charset="utf-8">
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                      <style>
+                        /* Reset and base styles */
+                        * { box-sizing: border-box; }
+                        body { 
+                          margin: 0; 
+                          padding: 20px; 
+                          font-family: ${tokens.typography.fontFamily}; 
+                          font-size: ${tokens.typography.sizes.base}; 
+                          line-height: ${tokens.typography.lineHeights.relaxed}; 
+                          color: ${tokens.colors.charcoal}; 
+                          background: transparent;
+                          word-wrap: break-word;
+                          overflow-wrap: break-word;
+                        }
+                        
+                        /* Typography improvements */
+                        h1, h2, h3, h4, h5, h6 { 
+                          color: ${tokens.colors.charcoal}; 
+                          line-height: ${tokens.typography.lineHeights.tight}; 
+                          margin: 1.5em 0 0.5em 0; 
+                        }
+                        h1:first-child, h2:first-child, h3:first-child, h4:first-child, h5:first-child, h6:first-child {
+                          margin-top: 0;
+                        }
+                        
+                        p { 
+                          margin: 1em 0; 
+                          line-height: ${tokens.typography.lineHeights.relaxed}; 
+                        }
+                        p:first-child { margin-top: 0; }
+                        p:last-child { margin-bottom: 0; }
+                        
+                        /* Links */
+                        a { 
+                          color: ${tokens.colors.evergreen}; 
+                          text-decoration: underline; 
+                        }
+                        a:hover { 
+                          color: ${tokens.colors.charcoal}; 
+                        }
+                        
+                        /* Images */
+                        img { 
+                          max-width: 100%; 
+                          height: auto; 
+                          border-radius: ${tokens.radii.sm};
+                          box-shadow: ${tokens.shadows.xs};
+                        }
+                        
+                        /* Tables */
+                        table { 
+                          width: 100%; 
+                          border-collapse: collapse; 
+                          margin: 1em 0;
+                        }
+                        td, th { 
+                          padding: 8px 12px; 
+                          border: 1px solid ${tokens.colors.gray200}; 
+                          text-align: left;
+                        }
+                        th { 
+                          background-color: ${tokens.colors.gray50}; 
+                          font-weight: ${tokens.typography.weights.semibold}; 
+                        }
+                        
+                        /* Lists */
+                        ul, ol { 
+                          margin: 1em 0; 
+                          padding-left: 2em; 
+                        }
+                        li { 
+                          margin: 0.5em 0; 
+                        }
+                        
+                        /* Code */
+                        code { 
+                          background-color: ${tokens.colors.gray100}; 
+                          padding: 2px 4px; 
+                          border-radius: ${tokens.radii.sm}; 
+                          font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+                          font-size: 0.9em;
+                        }
+                        pre { 
+                          background-color: ${tokens.colors.gray100}; 
+                          padding: 1em; 
+                          border-radius: ${tokens.radii.md}; 
+                          overflow-x: auto;
+                          white-space: pre-wrap;
+                        }
+                        
+                        /* Blockquotes */
+                        blockquote { 
+                          border-left: 4px solid ${tokens.colors.evergreen}; 
+                          margin: 1em 0; 
+                          padding-left: 1em; 
+                          color: ${tokens.colors.gray600}; 
+                        }
+                        
+                        /* Gmail-specific improvements */
+                        .gmail_default, .gmail_quote { 
+                          font-family: ${tokens.typography.fontFamily}; 
+                        }
+                        
+                        /* Responsive design */
+                        @media (max-width: 600px) {
+                          body { padding: 10px; font-size: 14px; }
+                          table, td, th { font-size: 14px; }
+                        }
+                        
+                        /* Hide potentially problematic elements */
+                        script, iframe, object, embed { display: none !important; }
+                      </style>
+                    </head>
+                    <body>
+                      ${bodyHtml}
+                    </body>
+                    </html>
+                  `;
+                  
+                  return (
+                    <iframe
+                      srcDoc={htmlContent}
+                      style={{
+                        width: '100%',
+                        minHeight: '400px',
+                        border: 'none',
+                        borderRadius: tokens.radii.sm,
+                        backgroundColor: 'transparent'
+                      }}
+                      sandbox="allow-same-origin"
+                      onLoad={(e) => {
+                        // Auto-resize iframe to content height
+                        const iframe = e.target as HTMLIFrameElement;
+                        try {
+                          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+                          if (doc) {
+                            const height = doc.documentElement.scrollHeight;
+                            iframe.style.height = Math.max(height, 400) + 'px';
+                          }
+                        } catch (error) {
+                          // Ignore cross-origin errors
+                          console.debug('Cannot access iframe content for height calculation');
+                        }
+                      }}
+                    />
+                  );
+                } else if (bodyText && bodyText.length > 0) {
+                  // Check if bodyText looks like HTML
+                  const isHtmlLike = bodyText.includes('<') && bodyText.includes('>') && 
+                    (bodyText.includes('<html>') || bodyText.includes('<div') || bodyText.includes('<p') || 
+                     bodyText.includes('<table') || bodyText.includes('<img') || bodyText.includes('<a'));
+                  
+                  if (isHtmlLike) {
+                    // Render as HTML in iframe
+                    const htmlContent = `
+                      <!DOCTYPE html>
+                      <html>
+                      <head>
+                        <meta charset="utf-8">
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                          /* Apply same styles as above */
+                          * { box-sizing: border-box; }
+                          body { 
+                            margin: 0; 
+                            padding: 20px; 
+                            font-family: ${tokens.typography.fontFamily}; 
+                            font-size: ${tokens.typography.sizes.base}; 
+                            line-height: ${tokens.typography.lineHeights.relaxed}; 
+                            color: ${tokens.colors.charcoal}; 
+                            background: transparent;
+                            word-wrap: break-word;
+                            overflow-wrap: break-word;
+                          }
+                          h1, h2, h3, h4, h5, h6 { 
+                            color: ${tokens.colors.charcoal}; 
+                            line-height: ${tokens.typography.lineHeights.tight}; 
+                            margin: 1.5em 0 0.5em 0; 
+                          }
+                          p { margin: 1em 0; line-height: ${tokens.typography.lineHeights.relaxed}; }
+                          a { color: ${tokens.colors.evergreen}; text-decoration: underline; }
+                          img { max-width: 100%; height: auto; border-radius: ${tokens.radii.sm}; }
+                          table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+                          td, th { padding: 8px 12px; border: 1px solid ${tokens.colors.gray200}; }
+                          script, iframe, object, embed { display: none !important; }
+                        </style>
+                      </head>
+                      <body>
+                        ${bodyText}
+                      </body>
+                      </html>
+                    `;
+                    
+                    return (
+                      <iframe
+                        srcDoc={htmlContent}
+                        style={{
+                          width: '100%',
+                          minHeight: '400px',
+                          border: 'none',
+                          borderRadius: tokens.radii.sm,
+                          backgroundColor: 'transparent'
+                        }}
+                        sandbox="allow-same-origin"
+                        onLoad={(e) => {
+                          const iframe = e.target as HTMLIFrameElement;
+                          try {
+                            const doc = iframe.contentDocument || iframe.contentWindow?.document;
+                            if (doc) {
+                              const height = doc.documentElement.scrollHeight;
+                              iframe.style.height = Math.max(height, 400) + 'px';
+                            }
+                          } catch (error) {
+                            console.debug('Cannot access iframe content for height calculation');
+                          }
+                        }}
+                      />
+                    );
+                  } else {
+                    // Render formatted plain text content with newsletter-style formatting
+                    const formatNewsletterText = (text: string) => {
+                      // Split into lines for processing
+                      const lines = text.split('\n');
+                      const formattedLines: JSX.Element[] = [];
+                      
+                      lines.forEach((line, index) => {
+                        const trimmedLine = line.trim();
+                        
+                        // Skip empty lines
+                        if (!trimmedLine) {
+                          formattedLines.push(<br key={index} />);
+                          return;
+                        }
+                        
+                        // Headers (lines starting with ## or **ALL CAPS**)
+                        if (trimmedLine.startsWith('##') || (trimmedLine.startsWith('**') && trimmedLine.endsWith('**') && trimmedLine.length < 100)) {
+                          const headerText = trimmedLine.replace(/^##\s*/, '').replace(/^\*\*/, '').replace(/\*\*$/, '');
+                          formattedLines.push(
+                            <h3 key={index} style={{ 
+                              fontSize: tokens.typography.sizes.lg,
+                              fontWeight: 600,
+                              color: tokens.colors.charcoal,
+                              margin: '24px 0 12px 0',
+                              lineHeight: '1.3'
+                            }}>
+                              {headerText}
+                            </h3>
+                          );
+                          return;
+                        }
+                        
+                        // Image references
+                        if (trimmedLine.includes('View image:') || trimmedLine.includes('Follow image link:')) {
+                          const urlMatch = trimmedLine.match(/https?:\/\/[^\s)]+/);
+                          if (urlMatch) {
+                            formattedLines.push(
+                              <div key={index} style={{ 
+                                padding: '16px',
+                                backgroundColor: tokens.colors.softGreen,
+                                borderRadius: '8px',
+                                margin: '16px 0',
+                                border: `1px solid ${tokens.colors.lightGray}`
+                              }}>
+                                <div style={{ 
+                                  fontSize: tokens.typography.sizes.sm,
+                                  color: tokens.colors.evergreen,
+                                  marginBottom: '8px',
+                                  fontWeight: 500
+                                }}>
+                                  📸 Newsletter Image
+                                </div>
+                                <a 
+                                  href={urlMatch[0]} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  style={{ 
+                                    color: tokens.colors.evergreen,
+                                    textDecoration: 'none',
+                                    fontSize: tokens.typography.sizes.sm,
+                                    fontWeight: 500
+                                  }}
+                                >
+                                  View Image →
+                                </a>
+                              </div>
+                            );
+                            return;
+                          }
+                        }
+                        
+                        // Links (standalone URLs or [text](url) format)
+                        if (trimmedLine.includes('http') && trimmedLine.length < 200) {
+                          const urlMatch = trimmedLine.match(/https?:\/\/[^\s)]+/);
+                          if (urlMatch) {
+                            formattedLines.push(
+                              <div key={index} style={{ margin: '8px 0' }}>
+                                <a 
+                                  href={urlMatch[0]} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  style={{ 
+                                    color: tokens.colors.evergreen,
+                                    textDecoration: 'underline',
+                                    fontSize: tokens.typography.sizes.base
+                                  }}
+                                >
+                                  {trimmedLine.replace(urlMatch[0], '').trim() || 'View Link'}
+                                </a>
+                              </div>
+                            );
+                            return;
+                          }
+                        }
+                        
+                        // Section separators
+                        if (trimmedLine.includes('---') || trimmedLine.includes('———')) {
+                          formattedLines.push(
+                            <hr key={index} style={{ 
+                              border: 'none',
+                              borderTop: `1px solid ${tokens.colors.lightGray}`,
+                              margin: '32px 0'
+                            }} />
+                          );
+                          return;
+                        }
+                        
+                        // Captions (lines starting with "Caption:")
+                        if (trimmedLine.startsWith('Caption:')) {
+                          const captionText = trimmedLine.replace('Caption:', '').trim();
+                          formattedLines.push(
+                            <div key={index} style={{ 
+                              fontSize: tokens.typography.sizes.sm,
+                              color: tokens.colors.mediumGray,
+                              fontStyle: 'italic',
+                              margin: '8px 0',
+                              paddingLeft: '16px',
+                              borderLeft: `3px solid ${tokens.colors.lightGray}`
+                            }}>
+                              {captionText}
+                            </div>
+                          );
+                          return;
+                        }
+                        
+                        // Regular paragraph text
+                        formattedLines.push(
+                          <p key={index} style={{ 
+                            margin: '16px 0',
+                            lineHeight: '1.6',
+                            color: tokens.colors.charcoal,
+                            fontSize: tokens.typography.sizes.base
+                          }}>
+                            {trimmedLine}
+                          </p>
+                        );
+                      });
+                      
+                      return formattedLines;
+                    };
+
+                    return (
+                      <div style={{ 
+                        maxWidth: '100%',
+                        fontFamily: tokens.typography.fontFamily
+                      }}>
+                        {formatNewsletterText(bodyText)}
+                      </div>
+                    );
+                  }
+                } else {
+                  // No content available
+                  return (
+                    <p style={{ color: tokens.colors.gray500, fontSize: tokens.typography.sizes.base, fontStyle: 'italic' }}>
+                      No content available
+                    </p>
+                  );
+                }
+              })()}
             
               {/* Attachments */}
               {selectedEmail.data.attachments?.length > 0 && (
@@ -895,31 +1386,37 @@ export default function InboxPage() {
 
           {/* Action Bar */}
           <div style={{
-            padding: tokens.spacing.lg,
-            borderTop: `1px solid ${tokens.colors.gray100}`,
+            padding: `${tokens.spacing.xl} ${tokens.spacing['3xl']}`,
+            borderTop: `1px solid ${tokens.colors.gray200}`,
             backgroundColor: tokens.colors.white,
             display: 'flex',
-            gap: tokens.spacing.sm
+            gap: tokens.spacing.md
           }}>
             <motion.button 
+              onClick={() => setReplyTo(selectedEmail)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: tokens.spacing.sm,
-                padding: `${tokens.spacing.sm} ${tokens.spacing.lg}`,
+                padding: `${tokens.spacing.md} ${tokens.spacing.xl}`,
                 backgroundColor: tokens.colors.evergreen,
                 color: tokens.colors.white,
                 border: 'none',
                 borderRadius: tokens.radii.md,
                 fontSize: tokens.typography.sizes.sm,
-                fontWeight: tokens.typography.weights.medium,
+                fontWeight: tokens.typography.weights.semibold,
                 cursor: 'pointer',
-                transition: tokens.transitions.fast
+                transition: tokens.transitions.fast,
+                boxShadow: tokens.shadows.sm
               }}
-              whileHover={{ opacity: 0.9 }}
+              whileHover={{ 
+                backgroundColor: tokens.colors.evergreen,
+                transform: 'translateY(-1px)',
+                boxShadow: tokens.shadows.md
+              }}
               whileTap={{ scale: 0.98 }}
             >
-              <Reply size={14} strokeWidth={2} />
+              <Reply size={16} strokeWidth={2} />
               Reply
             </motion.button>
             <motion.button 
@@ -927,9 +1424,9 @@ export default function InboxPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: tokens.spacing.sm,
-                padding: `${tokens.spacing.sm} ${tokens.spacing.lg}`,
+                padding: `${tokens.spacing.md} ${tokens.spacing.xl}`,
                 backgroundColor: tokens.colors.white,
-                color: tokens.colors.gray700,
+                color: tokens.colors.gray500,
                 border: `1px solid ${tokens.colors.gray200}`,
                 borderRadius: tokens.radii.md,
                 fontSize: tokens.typography.sizes.sm,
@@ -939,16 +1436,31 @@ export default function InboxPage() {
               }}
               whileHover={{ 
                 backgroundColor: tokens.colors.gray50,
-                borderColor: tokens.colors.gray300
+                borderColor: tokens.colors.evergreen,
+                color: tokens.colors.evergreen
               }}
               whileTap={{ scale: 0.98 }}
             >
-              <Forward size={14} strokeWidth={2} />
+              <Forward size={16} strokeWidth={2} />
               Forward
             </motion.button>
           </div>
         </motion.div>
       )}
+      
+      {/* Compose Modal */}
+      <ComposeModal 
+        isOpen={isComposeOpen || !!replyTo}
+        onClose={() => {
+          setIsComposeOpen(false);
+          setReplyTo(null);
+        }}
+        defaultTo={replyTo ? replyTo.data.from?.email : ''}
+        defaultSubject={replyTo ? `Re: ${replyTo.data.subject}` : ''}
+        defaultBody={replyTo ? `\n\n---\nOn ${new Date(replyTo.createdAt).toLocaleString()}, ${replyTo.data.from?.name || replyTo.data.from?.email} wrote:\n${replyTo.data.body?.substring(0, 500)}` : ''}
+        isReply={!!replyTo}
+        replyToId={replyTo?.id}
+      />
     </div>
   );
 }
