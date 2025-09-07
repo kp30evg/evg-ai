@@ -11,6 +11,7 @@ import EnhancedTableHeader from '@/components/evercore/table/EnhancedTableHeader
 import AddColumnDropdown from '@/components/evercore/table/AddColumnDropdown'
 import FieldConfigModal from '@/components/evercore/table/FieldConfigModal'
 import { TableColumn, ColumnTypeDefinition } from '@/components/evercore/types/column-types'
+import { Badge } from '@/components/ui/badge'
 import { 
   Users, 
   Building2, 
@@ -1602,131 +1603,593 @@ export default function CRMDashboard() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div style={{display: 'flex', flexDirection: 'column', gap: '32px'}}>
-            {/* Stats Cards */}
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px'}}>
-              <div style={{
-                backgroundColor: colors.white,
-                border: `1px solid ${colors.lightGray}`,
-                borderRadius: '12px',
-                padding: '24px'
-              }}>
+            {/* Analytics-Style Metrics Cards */}
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px'}}>
+              {/* Total Revenue Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0 }}
+              >
                 <div style={{
-                  width: '48px',
-                  height: '48px',
-                  backgroundColor: colors.softGray,
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px'
+                  position: 'relative',
+                  overflow: 'hidden',
+                  backgroundColor: colors.white,
+                  border: 'none',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                  transition: 'all 300ms ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 15px 40px rgba(0,0,0,0.12)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.08)'
+                  e.currentTarget.style.transform = 'translateY(0)'
                 }}>
-                  <Users size={24} style={{ color: colors.mediumGray }} />
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '20px'
+                  }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      backgroundColor: colors.evergreen,
+                      borderRadius: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(29, 82, 56, 0.3)'
+                    }}>
+                      <DollarSign size={24} style={{ color: colors.white }} />
+                    </div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      backgroundColor: '#E6F4EC',
+                      color: '#16A34A'
+                    }}>
+                      +12.5%
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: colors.mediumGray,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '8px'
+                  }}>
+                    Total Revenue
+                  </div>
+                  <div style={{
+                    fontSize: '32px',
+                    fontWeight: '700',
+                    color: colors.charcoal,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {formatCurrency(deals.filter(d => d.stage === 'Closed Won').reduce((sum, deal) => sum + deal.value, 0))}
+                  </div>
                 </div>
+              </motion.div>
+
+              {/* Active Deals Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+              >
                 <div style={{
-                  fontSize: '32px',
-                  fontWeight: '700',
-                  color: colors.charcoal,
-                  marginBottom: '4px',
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  position: 'relative',
+                  overflow: 'hidden',
+                  backgroundColor: colors.white,
+                  border: 'none',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                  transition: 'all 300ms ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 15px 40px rgba(0,0,0,0.12)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.08)'
+                  e.currentTarget.style.transform = 'translateY(0)'
                 }}>
-                  {contacts.length}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '20px'
+                  }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      backgroundColor: '#3B82F6',
+                      borderRadius: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                    }}>
+                      <Target size={24} style={{ color: colors.white }} />
+                    </div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      backgroundColor: '#E6F4EC',
+                      color: '#16A34A'
+                    }}>
+                      +8.2%
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: colors.mediumGray,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '8px'
+                  }}>
+                    Active Deals
+                  </div>
+                  <div style={{
+                    fontSize: '32px',
+                    fontWeight: '700',
+                    color: colors.charcoal,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {deals.filter(d => d.stage !== 'Closed Won' && d.stage !== 'Closed Lost').length}
+                  </div>
                 </div>
+              </motion.div>
+
+              {/* Total Contacts Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
                 <div style={{
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: colors.mediumGray,
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                  position: 'relative',
+                  overflow: 'hidden',
+                  backgroundColor: colors.white,
+                  border: 'none',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                  transition: 'all 300ms ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 15px 40px rgba(0,0,0,0.12)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.08)'
+                  e.currentTarget.style.transform = 'translateY(0)'
                 }}>
-                  Active contacts
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '20px'
+                  }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      backgroundColor: '#9333EA',
+                      borderRadius: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(147, 51, 234, 0.3)'
+                    }}>
+                      <Users size={24} style={{ color: colors.white }} />
+                    </div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      backgroundColor: '#E6F4EC',
+                      color: '#16A34A'
+                    }}>
+                      +15.3%
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: colors.mediumGray,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '8px'
+                  }}>
+                    Total Contacts
+                  </div>
+                  <div style={{
+                    fontSize: '32px',
+                    fontWeight: '700',
+                    color: colors.charcoal,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {contacts.length.toLocaleString()}
+                  </div>
                 </div>
-              </div>
-              
-              <div style={{
-                backgroundColor: colors.white,
-                border: `1px solid ${colors.lightGray}`,
-                borderRadius: '12px',
-                padding: '24px'
-              }}>
+              </motion.div>
+
+              {/* Win Rate Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
                 <div style={{
-                  width: '48px',
-                  height: '48px',
-                  backgroundColor: colors.softGreen,
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px'
+                  position: 'relative',
+                  overflow: 'hidden',
+                  backgroundColor: colors.white,
+                  border: 'none',
+                  borderRadius: '24px',
+                  padding: '24px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                  transition: 'all 300ms ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 15px 40px rgba(0,0,0,0.12)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.08)'
+                  e.currentTarget.style.transform = 'translateY(0)'
                 }}>
-                  <Target size={24} style={{ color: colors.evergreen }} />
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '20px'
+                  }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      backgroundColor: '#EA580C',
+                      borderRadius: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 12px rgba(234, 88, 12, 0.3)'
+                    }}>
+                      <TrendingUp size={24} style={{ color: colors.white }} />
+                    </div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      backgroundColor: '#E6F4EC',
+                      color: '#16A34A'
+                    }}>
+                      +2.1%
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: colors.mediumGray,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '8px'
+                  }}>
+                    Win Rate
+                  </div>
+                  <div style={{
+                    fontSize: '32px',
+                    fontWeight: '700',
+                    color: colors.charcoal,
+                    letterSpacing: '-0.5px'
+                  }}>
+                    {deals.length > 0 ? Math.round((deals.filter(d => d.stage === 'Closed Won').length / deals.length) * 100) : 0}%
+                  </div>
                 </div>
-                <div style={{
-                  fontSize: '32px',
-                  fontWeight: '700',
-                  color: colors.charcoal,
-                  marginBottom: '4px',
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  {deals.length}
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: colors.mediumGray,
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  Deals in pipeline
-                </div>
-              </div>
-              
-              <div style={{
-                backgroundColor: colors.white,
-                border: `1px solid ${colors.lightGray}`,
-                borderRadius: '12px',
-                padding: '24px'
-              }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  backgroundColor: colors.softGreen,
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '16px'
-                }}>
-                  <DollarSign size={24} style={{ color: colors.evergreen }} />
-                </div>
-                <div style={{
-                  fontSize: '32px',
-                  fontWeight: '700',
-                  color: colors.charcoal,
-                  marginBottom: '4px',
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  {formatCurrency(deals.reduce((sum, deal) => sum + deal.value, 0))}
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: colors.mediumGray,
-                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-                }}>
-                  Pipeline value
-                </div>
-              </div>
+              </motion.div>
             </div>
 
-            {/* Main Content Grid */}
-            <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px'}}>
-              {/* Hot Leads & Opportunities */}
+            {/* Main Analytics Section */}
+            <div style={{display: 'grid', gridTemplateColumns: '1fr', gap: '32px'}}>
+              
+              {/* Revenue Trends Chart */}
+              <div style={{gridColumn: 'span 1'}}>
+                <div style={{
+                  backgroundColor: colors.white,
+                  border: 'none',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '24px'
+                  }}>
+                    <div>
+                      <h2 style={{
+                        fontSize: '22px',
+                        fontWeight: '700',
+                        color: colors.charcoal,
+                        margin: 0,
+                        marginBottom: '4px'
+                      }}>
+                        Revenue Trends
+                      </h2>
+                      <p style={{
+                        fontSize: '14px',
+                        color: colors.mediumGray,
+                        margin: 0
+                      }}>
+                        Monthly revenue performance over the last 6 months
+                      </p>
+                    </div>
+                    <button style={{
+                      padding: '8px',
+                      backgroundColor: 'transparent',
+                      border: `1px solid ${colors.lightGray}`,
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <MoreHorizontal size={20} style={{color: colors.mediumGray}} />
+                    </button>
+                  </div>
+                  
+                  <div style={{position: 'relative', height: '320px', width: '100%'}}>
+                    <svg viewBox="0 0 600 300" style={{width: '100%', height: '100%'}}>
+                      <defs>
+                        <linearGradient id="crmRevenueGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#1D5238" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#1D5238" stopOpacity="0.05" />
+                        </linearGradient>
+                      </defs>
+                      
+                      {/* Grid lines */}
+                      {[0, 1, 2, 3, 4].map(i => (
+                        <line 
+                          key={i} 
+                          x1="60" 
+                          y1={50 + i * 50} 
+                          x2="580" 
+                          y2={50 + i * 50} 
+                          stroke="#f1f5f9" 
+                          strokeWidth="1" 
+                        />
+                      ))}
+                      
+                      {/* Revenue line */}
+                      <motion.path
+                        d="M 80 180 L 180 160 L 280 170 L 380 120 L 480 140 L 580 100"
+                        fill="none"
+                        stroke="#1D5238"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: 1 }}
+                        transition={{ duration: 2, ease: "easeInOut" }}
+                      />
+                      
+                      {/* Area fill */}
+                      <motion.path
+                        d="M 80 180 L 180 160 L 280 170 L 380 120 L 480 140 L 580 100 L 580 250 L 80 250 Z"
+                        fill="url(#crmRevenueGradient)"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 1, delay: 1 }}
+                      />
+                      
+                      {/* Data points */}
+                      {[180, 160, 170, 120, 140, 100].map((y, index) => (
+                        <motion.circle
+                          key={index}
+                          cx={80 + index * 100}
+                          cy={y}
+                          r="5"
+                          fill="#1D5238"
+                          stroke="white"
+                          strokeWidth="3"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ duration: 0.3, delay: 1.5 + index * 0.1 }}
+                        />
+                      ))}
+                      
+                      {/* Month labels */}
+                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, index) => (
+                        <text
+                          key={month}
+                          x={80 + index * 100}
+                          y="275"
+                          textAnchor="middle"
+                          style={{
+                            fontSize: '13px',
+                            fill: colors.mediumGray,
+                            fontWeight: '500'
+                          }}
+                        >
+                          {month}
+                        </text>
+                      ))}
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lower Grid: Pipeline & Top Customers */}
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px'}}>
+                
+                {/* Deal Pipeline */}
+                <div style={{
+                  backgroundColor: colors.white,
+                  border: 'none',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
+                }}>
+                  <h3 style={{
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    color: colors.charcoal,
+                    marginBottom: '24px'
+                  }}>
+                    Deal Pipeline
+                  </h3>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '20px'}}>
+                    {[
+                      {name: 'Prospecting', value: deals.filter(d => d.stage === 'Prospecting').length, max: deals.length, color: '#3B82F6'},
+                      {name: 'Qualification', value: deals.filter(d => d.stage === 'Qualification').length, max: deals.length, color: '#9333EA'},
+                      {name: 'Proposal', value: deals.filter(d => d.stage === 'Proposal').length, max: deals.length, color: '#F97316'},
+                      {name: 'Negotiation', value: deals.filter(d => d.stage === 'Negotiation').length, max: deals.length, color: '#1D5238'}
+                    ].map((stage, index) => (
+                      <motion.div
+                        key={stage.name}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.1 }}
+                      >
+                        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px'}}>
+                          <span style={{fontSize: '14px', fontWeight: '500', color: colors.charcoal}}>
+                            {stage.name}
+                          </span>
+                          <span style={{fontSize: '14px', fontWeight: '600', color: colors.charcoal}}>
+                            {stage.value} deals
+                          </span>
+                        </div>
+                        <div style={{
+                          width: '100%',
+                          height: '8px',
+                          backgroundColor: colors.lightGray,
+                          borderRadius: '4px',
+                          overflow: 'hidden'
+                        }}>
+                          <motion.div
+                            style={{
+                              height: '100%',
+                              backgroundColor: stage.color,
+                              borderRadius: '4px'
+                            }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${stage.max > 0 ? (stage.value / stage.max) * 100 : 0}%` }}
+                            transition={{ duration: 1, delay: 0.5 + index * 0.2 }}
+                          />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top Customers */}
+                <div style={{
+                  backgroundColor: colors.white,
+                  border: 'none',
+                  borderRadius: '24px',
+                  padding: '28px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.08)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '24px'
+                  }}>
+                    <Building2 size={20} style={{color: colors.evergreen}} />
+                    <h3 style={{
+                      fontSize: '20px',
+                      fontWeight: '700',
+                      color: colors.charcoal
+                    }}>
+                      Top Customers
+                    </h3>
+                  </div>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+                    {companies.slice(0, 5).map((company, index) => (
+                      <motion.div
+                        key={company.id}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.1 }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 16px',
+                          borderRadius: '16px',
+                          backgroundColor: colors.softGray,
+                          cursor: 'pointer',
+                          transition: 'all 200ms ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = colors.softGreen
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = colors.softGray
+                        }}
+                      >
+                        <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                          <span style={{fontSize: '20px'}}>
+                            {['🇺🇸', '🇬🇧', '🇩🇪', '🇫🇷', '🇯🇵'][index] || '🌍'}
+                          </span>
+                          <div>
+                            <p style={{
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              color: colors.charcoal,
+                              marginBottom: '2px'
+                            }}>
+                              {company.name}
+                            </p>
+                            <p style={{
+                              fontSize: '13px',
+                              color: colors.mediumGray
+                            }}>
+                              {formatCurrency(company.value)}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge style={{
+                          backgroundColor: '#E6F4EC',
+                          color: '#16A34A',
+                          border: 'none'
+                        }}>
+                          +{Math.floor(Math.random() * 20 + 5)}%
+                        </Badge>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Hot Leads Section */}
               <div>
                 <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px'}}>
                   <h2 style={{
-                    fontSize: '24px',
+                    fontSize: '22px',
                     fontWeight: '700',
                     color: colors.charcoal,
-                    margin: 0,
-                    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                    margin: 0
                   }}>
                     Hot Leads & Opportunities
                   </h2>
@@ -1738,7 +2201,7 @@ export default function CRMDashboard() {
                       fontWeight: '500',
                       padding: '8px 16px',
                       border: `1px solid ${colors.lightGray}`,
-                      borderRadius: '8px',
+                      borderRadius: '12px',
                       backgroundColor: colors.white,
                       color: colors.mediumGray,
                       cursor: 'pointer',
@@ -1907,94 +2370,6 @@ export default function CRMDashboard() {
                       </div>
                     </motion.div>
                   ))}
-                </div>
-              </div>
-
-              {/* Revenue Insights */}
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">Revenue Insights</h3>
-                  <div className="flex items-center" style={{gap: '8px'}}>
-                    <motion.button 
-                      whileHover={{ scale: 1.1 }}
-                      className="h-8 w-8 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </motion.button>
-                    <span className="text-sm font-medium">This Month</span>
-                    <motion.button 
-                      whileHover={{ scale: 1.1 }}
-                      className="h-8 w-8 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </motion.button>
-                  </div>
-                </div>
-                
-                {/* Revenue Chart */}
-                <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-                  <div className="grid grid-cols-4 gap-2 mb-4">
-                    {['Week 1', 'Week 2', 'Week 3', 'Week 4'].map((week, index) => (
-                      <div key={week} className="text-center">
-                        <div className={`rounded-lg mb-2 ${
-                          index === 0 ? 'bg-[#1D5238]' :
-                          index === 1 ? 'bg-[#E6F4EC]' :
-                          index === 2 ? 'bg-[#E6F4EC]' :
-                          'bg-gray-100'
-                        }`} style={{
-                          height: index === 0 ? '80px' :
-                                 index === 1 ? '60px' :
-                                 index === 2 ? '70px' : '40px'
-                        }}></div>
-                        <div className="text-xs text-gray-600">{week}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">Best week: Week 1</div>
-                  <div className="text-xs text-gray-500">$425K closed, 8 deals won</div>
-                </div>
-                
-                {/* Recent Wins */}
-                <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-gray-900">Recent Wins 🎉</h4>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      className="text-xs px-3 py-1 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      View All
-                    </motion.button>
-                  </div>
-                  
-                  <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                    {[
-                      { company: 'TechStart Inc', value: '$45K', time: '2 hours ago', type: 'New Customer' },
-                      { company: 'Innovation Labs', value: '$120K', time: 'Yesterday', type: 'Expansion' },
-                      { company: 'Digital Solutions', value: '$78K', time: '3 days ago', type: 'Renewal' }
-                    ].map((win) => (
-                      <div key={win.company} className="flex items-center gap-3">
-                        <div className="text-sm font-medium text-gray-600 w-16">{win.time.split(' ')[0]}</div>
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900 flex items-center gap-2">
-                            {win.company} 
-                            <span className="text-[#1D5238] font-semibold">{win.value}</span>
-                          </div>
-                          <div className="text-xs text-gray-500">{win.type} • {win.time}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* AI Insights */}
-                <div className="mt-6 p-4 bg-[#E6F4EC] rounded-xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-[#1D5238]" />
-                    <h4 className="font-semibold text-[#1D5238]">AI Revenue Insights</h4>
-                  </div>
-                  <p className="text-sm text-[#1D5238]">
-                    Your Q4 pipeline looks strong! 3 deals worth $500K+ are likely to close this month based on activity patterns.
-                  </p>
                 </div>
               </div>
             </div>

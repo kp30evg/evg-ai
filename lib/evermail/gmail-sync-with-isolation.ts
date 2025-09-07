@@ -102,7 +102,7 @@ export class GmailSyncService {
       const subject = getHeader('subject');
       const date = getHeader('date');
       
-      // Parse email body
+      // Parse email body (extract both text and HTML if available)
       const body = this.extractBody(message.payload);
       
       // Check if email already exists (to avoid duplicates)
@@ -146,7 +146,11 @@ export class GmailSyncService {
           to: to,
           date: date,
           snippet: message.snippet,
-          body: body,
+          body: {
+            text: body.text,
+            html: body.html,
+            snippet: message.snippet || ''
+          },
           isRead: !message.labelIds?.includes('UNREAD'),
           isStarred: message.labelIds?.includes('STARRED'),
           isDraft: message.labelIds?.includes('DRAFT'),
@@ -169,29 +173,76 @@ export class GmailSyncService {
     }
   }
 
-  private extractBody(payload: any): string {
-    if (!payload) return '';
+  private extractBody(payload: any): { text: string; html: string; snippet?: string } {
+    const result = { text: '', html: '', snippet: '' };
+    
+    if (!payload) return result;
     
     // Single part message
     if (payload.body?.data) {
-      return Buffer.from(payload.body.data, 'base64').toString('utf-8');
+      const decodedBody = Buffer.from(payload.body.data, 'base64').toString('utf-8');
+      if (payload.mimeType === 'text/html') {
+        result.html = decodedBody;
+      } else if (payload.mimeType === 'text/plain') {
+        result.text = decodedBody;
+      } else {
+        // For other mime types, try to detect if it's HTML
+        if (decodedBody.includes('<html') || decodedBody.includes('<body') || decodedBody.includes('<div')) {
+          result.html = decodedBody;
+        } else {
+          result.text = decodedBody;
+        }
+      }
+      return result;
     }
     
-    // Multi-part message
+    // Multi-part message - extract both text and HTML versions
     if (payload.parts) {
-      for (const part of payload.parts) {
-        if (part.mimeType === 'text/plain' && part.body?.data) {
-          return Buffer.from(part.body.data, 'base64').toString('utf-8');
-        }
-        // Recursively check nested parts
-        if (part.parts) {
-          const body = this.extractBody(part);
-          if (body) return body;
-        }
+      this.extractBodyFromParts(payload.parts, result);
+    }
+    
+    // If we only have text but it looks like HTML, move it to HTML field
+    if (!result.html && result.text) {
+      const textContent = result.text;
+      if (textContent.includes('<html') || textContent.includes('<body') || 
+          textContent.includes('<div') || textContent.includes('<p>') ||
+          textContent.includes('<table') || textContent.includes('<img')) {
+        result.html = textContent;
+        result.text = ''; // Clear text since we're treating it as HTML
       }
     }
     
-    return '';
+    return result;
+  }
+
+  private extractBodyFromParts(parts: any[], result: { text: string; html: string }): void {
+    for (const part of parts) {
+      // Get text/plain version
+      if (part.mimeType === 'text/plain' && part.body?.data) {
+        const decodedText = Buffer.from(part.body.data, 'base64').toString('utf-8');
+        if (!result.text || decodedText.length > result.text.length) {
+          result.text = decodedText;
+        }
+      }
+      
+      // Get text/html version
+      if (part.mimeType === 'text/html' && part.body?.data) {
+        const decodedHtml = Buffer.from(part.body.data, 'base64').toString('utf-8');
+        if (!result.html || decodedHtml.length > result.html.length) {
+          result.html = decodedHtml;
+        }
+      }
+      
+      // Handle multipart/alternative, multipart/mixed, and multipart/related
+      if (part.mimeType?.startsWith('multipart/') && part.parts) {
+        this.extractBodyFromParts(part.parts, result);
+      }
+      
+      // Sometimes the body is nested in parts without multipart prefix
+      if (part.parts && !part.body?.data) {
+        this.extractBodyFromParts(part.parts, result);
+      }
+    }
   }
 
   private async createContactFromEmail(email: string, name?: string) {

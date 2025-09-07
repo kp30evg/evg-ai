@@ -620,7 +620,31 @@ export default function InboxPage() {
                     margin: 0,
                     lineHeight: tokens.typography.lineHeights.base
                   }}>
-                    {email.data.body?.snippet || 'No preview available'}
+                    {(() => {
+                      // First try to use the snippet which is always plain text
+                      if (email.data.snippet) {
+                        return email.data.snippet.substring(0, 100);
+                      }
+                      
+                      const body = email.data.body;
+                      if (body && typeof body === 'object') {
+                        // New format: body is an object with text/html/snippet
+                        if (body.snippet) {
+                          return body.snippet.substring(0, 100);
+                        }
+                        // If we have text content, use it (but strip any HTML tags first)
+                        if (body.text) {
+                          const plainText = body.text.replace(/<[^>]*>/g, '').substring(0, 100);
+                          return plainText || 'No preview available';
+                        }
+                      } else if (typeof body === 'string') {
+                        // Old format: strip HTML tags if present
+                        const plainText = body.replace(/<[^>]*>/g, '').substring(0, 100);
+                        return plainText || 'No preview available';
+                      }
+                      
+                      return 'No preview available';
+                    })()}
                   </p>
                 </motion.div>
               ))}
@@ -858,22 +882,28 @@ export default function InboxPage() {
                 let bodyText = '';
                 let bodyHtml = '';
                 
-                if (body.html && body.html.trim().length > 0) {
-                  bodyHtml = body.html;
-                } else if (body.text && body.text.trim().length > 0) {
-                  bodyText = body.text;
+                // First check if body has proper structure with html/text fields
+                if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+                  if (body.html && typeof body.html === 'string' && body.html.trim().length > 0) {
+                    bodyHtml = body.html;
+                  }
+                  if (body.text && typeof body.text === 'string' && body.text.trim().length > 0) {
+                    bodyText = body.text;
+                  }
+                  
+                  // If no html/text fields, check for indexed properties
+                  if (!bodyHtml && !bodyText) {
+                    const keys = Object.keys(body).filter(key => !isNaN(parseInt(key))).sort((a, b) => parseInt(a) - parseInt(b));
+                    if (keys.length > 0) {
+                      bodyText = keys.map(key => body[key]).join('');
+                    } else if (body.snippet) {
+                      bodyText = body.snippet;
+                    }
+                  }
                 } else if (typeof body === 'string') {
                   bodyText = body;
                 } else if (Array.isArray(body)) {
                   bodyText = body.join('');
-                } else if (typeof body === 'object' && Object.keys(body).length > 0) {
-                  // Handle case where body is stored as indexed properties {0: 'a', 1: 'b', 2: 'c', ...}
-                  const keys = Object.keys(body).filter(key => !isNaN(parseInt(key))).sort((a, b) => parseInt(a) - parseInt(b));
-                  if (keys.length > 0) {
-                    bodyText = keys.map(key => body[key]).join('');
-                  } else if (body.snippet) {
-                    bodyText = body.snippet;
-                  }
                 }
 
                 // Check if bodyText contains HTML markup

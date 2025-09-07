@@ -31,20 +31,36 @@ export default function SyncingPage() {
   useEffect(() => {
     if (!syncStarted) {
       setSyncStarted(true);
-      // Trigger the sync via API
+      
+      // Trigger Gmail sync
       fetch('/api/gmail/sync', { method: 'POST' })
         .then(res => res.json())
         .then(result => {
-          console.log('Sync triggered:', result);
+          console.log('Gmail sync triggered:', result);
           if (result.success) {
             setEmailCount(result.totalSynced || 0);
           }
         })
         .catch(error => {
-          console.error('Failed to trigger sync:', error);
+          console.error('Failed to trigger Gmail sync:', error);
         });
+      
+      // If coming from calendar page, also trigger calendar sync
+      if (returnUrl.includes('/calendar')) {
+        fetch('/api/calendar/google/sync', { method: 'POST' })
+          .then(res => res.json())
+          .then(result => {
+            console.log('Calendar sync triggered:', result);
+            if (result.success) {
+              setCalendarCount(result.totalSynced || 0);
+            }
+          })
+          .catch(error => {
+            console.error('Failed to trigger calendar sync:', error);
+          });
+      }
     }
-  }, [syncStarted]);
+  }, [syncStarted, returnUrl]);
   
   useEffect(() => {
     // Check if sync has completed successfully

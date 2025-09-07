@@ -74,9 +74,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   
   // tRPC mutations and queries
   const sendMessageMutation = trpc.everchat.sendMessage.useMutation()
+  const createConversationMutation = trpc.everchat.createConversation.useMutation()
   const getMessagesQuery = trpc.everchat.getMessages.useQuery(
     { 
-      channelId: selectedConversation?.id || '',
+      conversationId: selectedConversation?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedConversation.id) ? selectedConversation.id : undefined,
+      channelId: selectedConversation?.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedConversation.id) ? selectedConversation.id : undefined,
       limit: 50 
     },
     { 
@@ -201,51 +203,82 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // Load initial conversations and messages
   useEffect(() => {
-    if (!organization?.id) return
+    const loadConversations = async () => {
+      if (!organization?.id) return
 
-    // Load initial channels (not DMs - those come from members)
-    const channelConversations: Conversation[] = [
-      {
-        id: 'general',
-        name: '#general',
-        type: 'channel',
-        unreadCount: 0,
-        lastMessage: {
-          id: '1',
-          text: 'Welcome to evergreenOS!',
-          userId: 'system',
-          userName: 'System',
-          timestamp: new Date(),
-          channelId: 'general'
+      // Load initial channels
+      const channelConversations: Conversation[] = [
+        {
+          id: 'general',
+          name: '#general',
+          type: 'channel',
+          unreadCount: 0,
+          lastMessage: {
+            id: '1',
+            text: 'Welcome to evergreenOS!',
+            userId: 'system',
+            userName: 'System',
+            timestamp: new Date(),
+            channelId: 'general'
+          }
+        },
+        {
+          id: 'sales',
+          name: '#sales',
+          type: 'channel',
+          unreadCount: 0,
+          lastMessage: {
+            id: '2',
+            text: 'Discuss sales strategies here',
+            userId: 'system',
+            userName: 'System',
+            timestamp: new Date(Date.now() - 3600000),
+            channelId: 'sales'
+          }
+        },
+        {
+          id: 'engineering',
+          name: '#engineering',
+          type: 'channel',
+          unreadCount: 0
         }
-      },
-      {
-        id: 'sales',
-        name: '#sales',
-        type: 'channel',
-        unreadCount: 0,
-        lastMessage: {
-          id: '2',
-          text: 'Discuss sales strategies here',
-          userId: 'system',
-          userName: 'System',
-          timestamp: new Date(Date.now() - 3600000),
-          channelId: 'sales'
+      ]
+
+      // Try to load existing conversations from database
+      try {
+        const response = await fetch('/api/everchat/conversations')
+        if (response.ok) {
+          const dbConversations = await response.json()
+          
+          // Add database conversations that are DMs
+          const dmConversations = dbConversations
+            .filter((conv: any) => conv.data?.title?.startsWith('DM:'))
+            .map((conv: any) => {
+              const recipientName = conv.data.title.replace('DM: ', '')
+              const participants = conv.data.participants || []
+              const recipientId = participants.find((id: string) => id !== user?.id)
+              
+              return {
+                id: conv.id,
+                name: recipientName,
+                type: 'dm' as const,
+                unreadCount: 0,
+                participants: participants,
+                isOnline: false
+              }
+            })
+          
+          setConversations([...channelConversations, ...dmConversations])
+        } else {
+          setConversations(channelConversations)
         }
-      },
-      {
-        id: 'engineering',
-        name: '#engineering',
-        type: 'channel',
-        unreadCount: 0
+      } catch (error) {
+        console.error('Failed to load conversations:', error)
+        setConversations(channelConversations)
       }
-    ]
+    }
 
-    setConversations(prev => {
-      // Keep DMs, update channels
-      const dms = prev.filter(c => c.type === 'dm')
-      return [...channelConversations, ...dms]
-    })
+    loadConversations()
   }, [organization?.id, user?.id])
 
   // Subscribe to selected conversation channel
@@ -340,12 +373,24 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages(prev => [...prev, newMessage])
 
     try {
-      // Send via tRPC (which will handle Pusher broadcast)
-      await sendMessageMutation.mutateAsync({
-        content: text, // Changed from 'text' to 'content'
-        conversationId: undefined, // Don't pass conversationId for channels
-        channelId: selectedConversation.id // This will be used for non-UUID channel IDs
-      })
+      // Check if this is a DM or channel conversation
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedConversation.id)
+      
+      if (isUUID) {
+        // It's a database conversation (DM or created channel)
+        await sendMessageMutation.mutateAsync({
+          content: text,
+          conversationId: selectedConversation.id,
+          channelId: undefined
+        })
+      } else {
+        // It's a named channel like 'general', 'sales', etc.
+        await sendMessageMutation.mutateAsync({
+          content: text,
+          conversationId: undefined,
+          channelId: selectedConversation.id
+        })
+      }
       
       // Refetch messages to get the persisted message with correct ID
       await getMessagesQuery.refetch()
@@ -374,29 +419,53 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedConversation, user, organization, sendMessageMutation, getMessagesQuery])
 
-  const createDMConversation = (recipientId: string, recipientName: string) => {
-    const dmId = `dm-${[user?.id, recipientId].sort().join('-')}`
+  const createDMConversation = useCallback(async (recipientId: string, recipientName: string) => {
+    if (!user?.id) return
     
-    // Check if conversation already exists
-    const existing = conversations.find(c => c.id === dmId)
+    const dmId = `dm-${[user.id, recipientId].sort().join('-')}`
+    
+    // Check if conversation already exists in local state
+    const existing = conversations.find(c => c.id === dmId || (c.type === 'dm' && c.participants?.includes(recipientId)))
     if (existing) {
       setSelectedConversation(existing)
       return
     }
     
-    // Create new DM conversation
-    const newDM: Conversation = {
-      id: dmId,
-      name: recipientName,
-      type: 'dm',
-      unreadCount: 0,
-      isOnline: onlineUsers.has(recipientId),
-      participants: [user?.id || '', recipientId]
+    try {
+      // Create the DM conversation in the database
+      const dbConversation = await createConversationMutation.mutateAsync({
+        title: `DM: ${recipientName}`,
+        participants: [user.id, recipientId]
+      })
+      
+      // Create new DM conversation object
+      const newDM: Conversation = {
+        id: dbConversation.id,
+        name: recipientName,
+        type: 'dm',
+        unreadCount: 0,
+        isOnline: onlineUsers.has(recipientId),
+        participants: [user.id, recipientId]
+      }
+      
+      setConversations(prev => [...prev, newDM])
+      setSelectedConversation(newDM)
+    } catch (error) {
+      console.error('Failed to create DM conversation:', error)
+      // Fallback to local-only conversation
+      const newDM: Conversation = {
+        id: dmId,
+        name: recipientName,
+        type: 'dm',
+        unreadCount: 0,
+        isOnline: onlineUsers.has(recipientId),
+        participants: [user.id, recipientId]
+      }
+      
+      setConversations(prev => [...prev, newDM])
+      setSelectedConversation(newDM)
     }
-    
-    setConversations(prev => [...prev, newDM])
-    setSelectedConversation(newDM)
-  }
+  }, [user?.id, conversations, onlineUsers, createConversationMutation])
 
   return (
     <ChatContext.Provider

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Mail, Send, Inbox, FileText, Archive, Trash2, Star, Clock, TrendingUp, Users, ChevronLeft, ChevronRight, CheckCircle2, MessageSquare, Paperclip, AlertCircle, Sparkles, MailOpen } from 'lucide-react';
+import { Mail, Send, Inbox, FileText, Archive, Trash2, Star, Clock, TrendingUp, Users, ChevronLeft, ChevronRight, CheckCircle2, MessageSquare, Paperclip, AlertCircle, Sparkles, MailOpen, RefreshCw } from 'lucide-react';
 import OAuthConnectionPrompt from '@/components/oauth/OAuthConnectionPrompt';
 import { trpc } from '@/lib/trpc/client';
 
@@ -43,33 +43,52 @@ export default function MailPage() {
   });
   const [recentThreads, setRecentThreads] = useState<EmailThread[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [hasGmailConnection, setHasGmailConnection] = useState(false);
   const [hasSyncedData, setHasSyncedData] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inbox' | 'sent' | 'drafts' | 'scheduled' | 'analytics'>('dashboard');
   const router = useRouter();
 
   // Check OAuth connection status
-  const { data: oauthStatus, isLoading: checkingAuth } = trpc.oauth.checkConnection.useQuery(
+  const { data: oauthStatus, isLoading: checkingAuth, refetch: refetchOAuth } = trpc.oauth.checkConnection.useQuery(
     { service: 'gmail' },
     { 
       enabled: !!userId && !!orgId,
-      refetchInterval: false 
+      refetchInterval: false,
+      staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
+      cacheTime: 1000 * 60 * 10 // Keep in cache for 10 minutes
     }
   );
   
   // Check Gmail sync status
-  const { data: gmailStatus } = trpc.evermail.getGmailStatus.useQuery(
+  const { data: gmailStatus, refetch: refetchGmailStatus } = trpc.evermail.getGmailStatus.useQuery(
     undefined,
     { 
       enabled: !!userId && !!orgId,
-      refetchInterval: false 
+      refetchInterval: false,
+      staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
+      cacheTime: 1000 * 60 * 10 // Keep in cache for 10 minutes
     }
   );
 
+  // Refetch connection status when page becomes visible
+  useEffect(() => {
+    const handleFocus = () => {
+      // Refetch connection status when user returns to the tab
+      if (userId && orgId) {
+        refetchOAuth();
+        refetchGmailStatus();
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [userId, orgId, refetchOAuth, refetchGmailStatus]);
+
   useEffect(() => {
     if (!checkingAuth && oauthStatus !== undefined && gmailStatus !== undefined) {
-      if (oauthStatus?.connected) {
-        // User is connected
+      if (oauthStatus?.connected || gmailStatus?.connected) {
+        // User is connected (check both for redundancy)
         setHasGmailConnection(true);
         
         // Check if we have synced data
@@ -95,6 +114,42 @@ export default function MailPage() {
 
   const handleConnectGmail = () => {
     window.location.href = '/api/auth/gmail/connect?return=/mail';
+  };
+
+  const handleSyncEmails = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/gmail/sync', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Sync successful:', data);
+        
+        // Reload the page data after sync
+        await loadRecentThreads();
+        await loadEmailStats();
+        
+        // Refetch status
+        await refetchGmailStatus();
+        
+        // Show success message (you could add a toast notification here)
+        alert(`Successfully synced ${data.totalSynced} emails from Gmail`);
+      } else {
+        const error = await response.json();
+        console.error('Sync failed:', error);
+        alert('Failed to sync emails: ' + (error.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error syncing emails:', error);
+      alert('Failed to sync emails. Please try again.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const loadRecentThreads = async () => {
@@ -201,6 +256,17 @@ export default function MailPage() {
               </div>
               <p className="text-gray-600 text-sm">Smart filtering, instant search, and AI assistance for your inbox</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={handleSyncEmails}
+              disabled={isSyncing}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Syncing...' : 'Sync Emails'}
+            </Button>
           </div>
         </div>
       </div>

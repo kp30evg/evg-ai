@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
           eq(entities.workspaceId, workspace.id),
           eq(entities.userId, dbUser.id),
           eq(entities.type, 'email'),
-          sql`data->>'from' like '%${dbUser.email}%'`
+          sql`data->'from'->>'email' = ${dbUser.email}`
         )
       );
     

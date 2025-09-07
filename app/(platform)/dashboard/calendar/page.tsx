@@ -35,17 +35,19 @@ export default function CalendarPage() {
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'calendar' | 'book' | 'availability' | 'stats'>('dashboard');
 
-  // Check OAuth connection status
+  // Check OAuth connection status with caching
   const { data: oauthStatus, isLoading: checkingAuth } = trpc.oauth.checkConnection.useQuery(
     { service: 'calendar' },
     { 
       enabled: !!userId && !!orgId,
-      refetchInterval: false 
+      refetchInterval: false,
+      staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
+      cacheTime: 1000 * 60 * 10 // Keep in cache for 10 minutes
     }
   );
   
-  // Check if we have any calendar data synced
-  const { data: calendarData } = trpc.unified.executeCommand.useMutation().data;
+  // Mutation for executing commands (not used for checking data)
+  const executeCommandMutation = trpc.unified.executeCommand.useMutation();
 
   // Load calendar events when connected
   useEffect(() => {

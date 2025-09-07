@@ -51,7 +51,7 @@ export interface DealData {
  * Create a contact (person)
  * Automatically creates or links to company if companyName is provided
  */
-export async function createContact(
+async function createContactWithData(
   workspaceId: string,
   data: ContactData,
   userId?: string
@@ -153,7 +153,7 @@ export async function createCompany(
 /**
  * Create a deal
  */
-export async function createDeal(
+async function createDealWithData(
   workspaceId: string,
   data: DealData,
   userId?: string
@@ -474,7 +474,7 @@ export async function autoCreateFromEmail(
     }
 
     // Create contact
-    const contact = await createContact(workspaceId, {
+    const contact = await createContactWithData(workspaceId, {
       firstName: firstName || fromEmail.split('@')[0],
       lastName: lastName || '',
       email: fromEmail,
@@ -554,7 +554,7 @@ export async function handleCoreCommand(
       const [firstName, ...lastNameParts] = fullName.split(' ');
       const lastName = lastNameParts.join(' ');
       
-      return await createContact(workspaceId, {
+      return await createContactWithData(workspaceId, {
         firstName,
         lastName,
         email: match[3] || `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
@@ -954,7 +954,7 @@ async function ensureSampleData(workspaceId: string, userId?: string): Promise<v
     }, userId);
 
     // Create sample deals
-    await createDeal(workspaceId, {
+    await createDealWithData(workspaceId, {
       name: 'Enterprise CRM Implementation',
       value: 85000,
       stage: 'negotiation',
@@ -966,7 +966,7 @@ async function ensureSampleData(workspaceId: string, userId?: string): Promise<v
       nextStep: 'Schedule final demo with executives'
     }, userId);
 
-    await createDeal(workspaceId, {
+    await createDealWithData(workspaceId, {
       name: 'AI Platform Integration',
       value: 150000,
       stage: 'proposal',
@@ -978,7 +978,7 @@ async function ensureSampleData(workspaceId: string, userId?: string): Promise<v
       nextStep: 'Finalize technical requirements'
     }, userId);
 
-    await createDeal(workspaceId, {
+    await createDealWithData(workspaceId, {
       name: 'Cloud Migration Services', 
       value: 120000,
       stage: 'closing',
@@ -991,7 +991,7 @@ async function ensureSampleData(workspaceId: string, userId?: string): Promise<v
     }, userId);
 
     // Create a deal at risk
-    await createDeal(workspaceId, {
+    await createDealWithData(workspaceId, {
       name: 'Legacy System Upgrade',
       value: 45000,
       stage: 'qualification',
@@ -1007,4 +1007,35 @@ async function ensureSampleData(workspaceId: string, userId?: string): Promise<v
     console.warn('Error creating sample data:', error);
     // Don't throw - sample data creation failing shouldn't break the command
   }
+}
+
+// Export the simple wrapper functions as the main API
+export async function createContact(
+  workspaceId: string,
+  firstName: string,
+  lastName: string,
+  email: string,
+  companyName?: string,
+  userId?: string
+): Promise<any> {
+  return createContactWithData(workspaceId, {
+    firstName,
+    lastName,
+    email,
+    companyName
+  }, userId);
+}
+
+export async function createDeal(
+  workspaceId: string,
+  name: string,
+  value: number,
+  stage: string,
+  userId?: string
+): Promise<any> {
+  return createDealWithData(workspaceId, {
+    name,
+    value,
+    stage
+  }, userId);
 }

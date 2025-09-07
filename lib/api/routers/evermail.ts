@@ -3,8 +3,8 @@ import { router, protectedProcedure } from '../trpc';
 import { db } from '@/lib/db';
 import { entities, users, workspaces } from '@/lib/db/schema/unified';
 import { eq, and, desc, or, sql, inArray } from 'drizzle-orm';
-import { GmailSyncService } from '@/lib/evermail/gmail-sync-simple';
-import { EmailCommandProcessor } from '@/lib/evermail/command-processor';
+import { GmailSyncService } from '@/lib/evermail/gmail-sync-with-isolation';
+import { processCommand } from '@/lib/modules-simple/command-processor';
 import { GmailClient } from '@/lib/evermail/gmail-client';
 
 // Helper to get workspace ID from Clerk org ID
@@ -238,6 +238,10 @@ export const evermailRouter = router({
       }
 
       const accountData = emailAccount[0].data as any;
+      
+      if (!accountData.tokens) {
+        throw new Error('Gmail tokens not found. Please reconnect your Gmail account.');
+      }
       
       // Decrypt tokens (simple base64 decode for now)
       const tokens = JSON.parse(Buffer.from(accountData.tokens, 'base64').toString());
@@ -577,12 +581,7 @@ export const evermailRouter = router({
       const { orgId, userId } = ctx;
       const workspaceId = stringToUuid(orgId);
       
-      const processor = new EmailCommandProcessor();
-      const result = await processor.processCommand(input.command, {
-        workspaceId,
-        userId,
-        userEmail: ctx.user?.emailAddresses?.[0]?.emailAddress || ''
-      });
+      const result = await processCommand(workspaceId, input.command, userId);
       
       return result;
     }),

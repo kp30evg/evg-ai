@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { GmailSyncService } from '@/lib/evermail/gmail-sync';
+import { GmailSyncService } from '@/lib/evermail/gmail-sync-with-isolation';
 
 export async function GET(req: NextRequest) {
   try {

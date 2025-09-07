@@ -33,8 +33,17 @@ export class GmailClient {
     userId?: string;
   }) {
     try {
+      console.log('[GmailClient.sendEmail] Starting with params:', {
+        to: params.to,
+        subject: params.subject,
+        workspaceId: params.workspaceId,
+        userId: params.userId,
+        hasGmail: !!this.gmail
+      });
+      
       // If no credentials provided in constructor, get from database
       if (!this.gmail && params.workspaceId && params.userId) {
+        console.log('[GmailClient.sendEmail] Fetching email account from database...');
         const emailAccount = await db
           .select()
           .from(entities)
@@ -47,8 +56,11 @@ export class GmailClient {
           )
           .limit(1);
         
+        console.log('[GmailClient.sendEmail] Email account query result:', emailAccount.length > 0 ? 'Found' : 'Not found');
+        
         if (!emailAccount || emailAccount.length === 0) {
-          throw new Error('Gmail account not connected');
+          console.error('[GmailClient.sendEmail] No Gmail account found for user');
+          throw new Error('Gmail account not connected. Please go to Mail > Settings and connect your Gmail account.');
         }
         
         const accountData = emailAccount[0].data as any;
