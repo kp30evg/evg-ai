@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Mail, Send, Inbox, FileText, Archive, Trash2, Star, Clock, TrendingUp, Users, ChevronLeft, ChevronRight, CheckCircle2, MessageSquare, Paperclip, AlertCircle, Sparkles, MailOpen, RefreshCw } from 'lucide-react';
-import OAuthConnectionPrompt from '@/components/oauth/OAuthConnectionPrompt';
+import { Mail, Send, Inbox, FileText, Archive, Trash2, Star, Clock, TrendingUp, Users, ChevronLeft, ChevronRight, CheckCircle2, MessageSquare, Paperclip, AlertCircle, Sparkles, MailOpen, RefreshCw, Plus } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
+import ComposeModal from '@/components/mail/ComposeModal';
+import GmailConnectionStatus from '@/components/mail/GmailConnectionStatus';
 
 interface EmailStats {
   totalInbox: number;
@@ -47,27 +48,32 @@ export default function MailPage() {
   const [hasGmailConnection, setHasGmailConnection] = useState(false);
   const [hasSyncedData, setHasSyncedData] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inbox' | 'sent' | 'drafts' | 'scheduled' | 'analytics'>('dashboard');
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
   const router = useRouter();
 
-  // Check OAuth connection status
+  // Check OAuth connection status - CRITICAL: No caching to prevent cross-user data leaks
   const { data: oauthStatus, isLoading: checkingAuth, refetch: refetchOAuth } = trpc.oauth.checkConnection.useQuery(
     { service: 'gmail' },
     { 
       enabled: !!userId && !!orgId,
       refetchInterval: false,
-      staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
-      cacheTime: 1000 * 60 * 10 // Keep in cache for 10 minutes
+      staleTime: 0, // CRITICAL: Always refetch to ensure user isolation
+      cacheTime: 0, // CRITICAL: Never cache to prevent cross-user data leaks
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true
     }
   );
   
-  // Check Gmail sync status
+  // Check Gmail sync status - CRITICAL: No caching to prevent cross-user data leaks
   const { data: gmailStatus, refetch: refetchGmailStatus } = trpc.evermail.getGmailStatus.useQuery(
     undefined,
     { 
       enabled: !!userId && !!orgId,
       refetchInterval: false,
-      staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
-      cacheTime: 1000 * 60 * 10 // Keep in cache for 10 minutes
+      staleTime: 0, // CRITICAL: Always refetch to ensure user isolation
+      cacheTime: 0, // CRITICAL: Never cache to prevent cross-user data leaks
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true
     }
   );
 
@@ -226,22 +232,16 @@ export default function MailPage() {
     );
   }
 
-  // Show connection prompt if not connected
-  if (!hasGmailConnection) {
-    return (
-      <div className="min-h-screen bg-white">
-        <OAuthConnectionPrompt 
-          type="gmail" 
-          onConnect={handleConnectGmail}
-          userEmail={oauthStatus?.userEmail}
-        />
-      </div>
-    );
-  }
-
-  // Main mail interface (only shown when connected)
+  // Main mail interface (show always, with connection prompt if needed)
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white" style={{ position: 'relative' }}>
+      {/* Gmail Connection Status - only shows if not connected */}
+      {!hasGmailConnection && (
+        <GmailConnectionStatus 
+          onConnect={handleConnectGmail}
+          showOnlyIfDisconnected={true} 
+        />
+      )}
       {/* Header */}
       <div className="border-b border-gray-200" style={{padding: '16px 24px'}}>
         <div className="flex items-center justify-between">
@@ -258,6 +258,13 @@ export default function MailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => setIsComposeOpen(true)}
+              className="bg-[#1D5238] hover:bg-[#2A7A52] text-white flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Compose
+            </Button>
             <Button 
               onClick={handleSyncEmails}
               disabled={isSyncing}
@@ -549,6 +556,12 @@ export default function MailPage() {
           </div>
         )}
       </div>
+
+      {/* Compose Modal */}
+      <ComposeModal
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
+      />
     </div>
   );
 }

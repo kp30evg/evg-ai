@@ -289,13 +289,32 @@ export class GmailSyncService {
 
   private async updateLastSyncTime() {
     try {
+      // Get current account data first
+      const [currentAccount] = await db
+        .select()
+        .from(entities)
+        .where(
+          and(
+            eq(entities.workspaceId, this.workspaceId),
+            eq(entities.userId, this.userId),
+            eq(entities.type, 'email_account')
+          )
+        )
+        .limit(1);
+      
+      if (!currentAccount) return;
+      
+      // Merge the new lastSyncAt with existing data
+      const updatedData = {
+        ...(currentAccount.data as any || {}),
+        lastSyncAt: new Date().toISOString()
+      };
+      
       // Update the email_account entity with last sync time
       await db
         .update(entities)
         .set({
-          data: {
-            lastSyncAt: new Date().toISOString()
-          },
+          data: updatedData,
           updatedAt: new Date()
         })
         .where(

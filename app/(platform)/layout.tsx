@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { redirect } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TRPCCacheBuster } from '@/components/providers/trpc-cache-buster';
 import { 
   Mail,
   Calendar,
@@ -199,14 +200,15 @@ export default function PlatformLayout({
   }
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      backgroundColor: tokens.colors.white,
-      fontFamily: tokens.typography.fontFamily,
-      overflow: 'hidden'
-    }}>
-      {/* Main Icon Navigation Bar */}
+    <TRPCCacheBuster>
+      <div style={{
+        display: 'flex',
+        height: '100vh',
+        backgroundColor: tokens.colors.white,
+        fontFamily: tokens.typography.fontFamily,
+        overflow: 'hidden'
+      }}>
+        {/* Main Icon Navigation Bar */}
       <div style={{
         width: '64px',
         backgroundColor: tokens.colors.white,
@@ -468,5 +470,6 @@ export default function PlatformLayout({
         {children}
       </div>
     </div>
+    </TRPCCacheBuster>
   );
 }

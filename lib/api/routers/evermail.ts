@@ -6,6 +6,8 @@ import { eq, and, desc, or, sql, inArray } from 'drizzle-orm';
 import { GmailSyncService } from '@/lib/evermail/gmail-sync-with-isolation';
 import { processCommand } from '@/lib/modules-simple/command-processor';
 import { GmailClient } from '@/lib/evermail/gmail-client';
+import { autoLabelService, type EmailData } from '@/lib/evermail/services/auto-label-service';
+import { AUTO_LABELS } from '@/lib/evermail/constants/labels';
 
 // Helper to get workspace ID from Clerk org ID
 async function getWorkspaceId(clerkOrgId: string): Promise<string | null> {
@@ -300,70 +302,74 @@ export const evermailRouter = router({
       if (!dbUser) {
         throw new Error('User not found');
       }
+      
+      // CRITICAL: Use secure query wrapper that ALWAYS enforces isolation
+      const { createEmailQuery } = await import('@/lib/db/secure-query');
+      const secureQuery = createEmailQuery(workspaceId, dbUser.id);
 
-      // CRITICAL: Only show emails that belong to this user
-      let query = db
-        .select()
-        .from(entities)
-        .where(
-          and(
-            eq(entities.workspaceId, workspaceId),
-            eq(entities.type, 'email'),
-            eq(entities.userId, dbUser.id) // Use actual user ID for proper isolation
-          )
-        );
+      // Build additional conditions for folder/filter
+      const additionalConditions = [];
 
       // Apply folder filter
       if (input.folder && input.folder !== 'all') {
-        // Filter based on email labels from Gmail
         if (input.folder === 'inbox') {
-          // For inbox, just exclude drafts, trash and spam
-          // Don't filter by 'to' field as that breaks Gmail sync
-          query = query.where(
+          additionalConditions.push(
             sql`(data->>'isDraft')::boolean IS NOT TRUE AND 
                 (data->>'isTrash')::boolean IS NOT TRUE AND
-                (data->>'isSpam')::boolean IS NOT TRUE`
+                (data->>'isSpam')::boolean IS NOT TRUE AND
+                NOT ((data->'labels')::jsonb ? 'SENT') AND
+                (data->'from'->>'email' IS NULL OR data->'from'->>'email' != ${dbUser.email})`
           );
         } else if (input.folder === 'sent') {
-          // Check if email has SENT label or user is in from field
-          query = query.where(
+          additionalConditions.push(
             sql`(data->'labels')::jsonb ? 'SENT' OR 
                 (data->'from'->>'email') = ${dbUser.email}`
           );
         } else if (input.folder === 'drafts') {
-          query = query.where(sql`(data->>'isDraft')::boolean = true`);
+          additionalConditions.push(sql`(data->>'isDraft')::boolean = true`);
         } else if (input.folder === 'trash') {
-          query = query.where(sql`(data->>'isTrash')::boolean = true`);
+          additionalConditions.push(sql`(data->>'isTrash')::boolean = true`);
         } else if (input.folder === 'spam') {
-          query = query.where(sql`(data->>'isSpam')::boolean = true`);
+          additionalConditions.push(sql`(data->>'isSpam')::boolean = true`);
         }
       }
 
       // Apply other filters
       if (input.isRead !== undefined) {
-        query = query.where(sql`(data->>'isRead')::boolean = ${input.isRead}`);
+        additionalConditions.push(sql`(data->>'isRead')::boolean = ${input.isRead}`);
       }
       if (input.isStarred !== undefined) {
-        query = query.where(sql`(data->>'isStarred')::boolean = ${input.isStarred}`);
+        additionalConditions.push(sql`(data->>'isStarred')::boolean = ${input.isStarred}`);
       }
       if (input.hasAttachments) {
-        query = query.where(sql`jsonb_array_length(data->'attachments') > 0`);
+        additionalConditions.push(sql`jsonb_array_length(data->'attachments') > 0`);
       }
       if (input.from) {
-        query = query.where(sql`data->'from'->>'email' ILIKE ${`%${input.from}%`}`);
+        additionalConditions.push(sql`data->'from'->>'email' ILIKE ${`%${input.from}%`}`);
       }
       if (input.query) {
-        query = query.where(
+        additionalConditions.push(
           sql`(data->>'subject' ILIKE ${`%${input.query}%`} OR 
                data->'body'->>'text' ILIKE ${`%${input.query}%`})`
         );
       }
+      
+      // Use secure query with additional conditions
+      let query = secureQuery.where(...additionalConditions);
 
       const emails = await query
         .orderBy(desc(entities.createdAt))
         .limit(input.limit);
 
-      return emails;
+      // Use secure query's filter to ensure safety (double-check)
+      const safeEmails = secureQuery.filterResults(emails);
+      
+      if (safeEmails.length !== emails.length) {
+        console.error('❌❌❌ CRITICAL: Security filter removed', emails.length - safeEmails.length, 'emails');
+        // This should never happen with secure query, but if it does, we're protected
+      }
+
+      return safeEmails;
     }),
 
   // Get single email
@@ -437,10 +443,38 @@ export const evermailRouter = router({
     .input(sendEmailSchema)
     .mutation(async ({ ctx, input }) => {
       const { orgId, userId } = ctx;
-      const workspaceId = stringToUuid(orgId);
-      const userUuid = stringToUuid(userId);
+      
+      // Get the ACTUAL workspace ID from database, not generated
+      const workspaceId = await getWorkspaceId(orgId);
+      
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+
+      console.log('SendEmail Debug:', {
+        clerkUserId: userId,
+        orgId,
+        workspaceId
+      });
 
       try {
+        // Get database user first
+        const [dbUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.clerkUserId, userId))
+          .limit(1);
+        
+        console.log('Database user lookup:', {
+          found: !!dbUser,
+          dbUserId: dbUser?.id,
+          email: dbUser?.email
+        });
+        
+        if (!dbUser) {
+          throw new Error('User not found. Please ensure your account is properly set up.');
+        }
+
         // Get email account with OAuth tokens FOR THIS USER ONLY
         const emailAccount = await db
           .select()
@@ -449,12 +483,32 @@ export const evermailRouter = router({
             and(
               eq(entities.workspaceId, workspaceId),
               eq(entities.type, 'email_account'),
-              sql`metadata->>'createdBy' = ${userUuid}` // CRITICAL: User-specific
+              eq(entities.userId, dbUser.id) // CRITICAL: User-specific - use database user ID
             )
           )
           .limit(1);
 
+        console.log('Email account lookup:', {
+          found: emailAccount.length > 0,
+          accountId: emailAccount[0]?.id,
+          hasTokens: !!(emailAccount[0]?.data as any)?.tokens
+        });
+
         if (!emailAccount || emailAccount.length === 0) {
+          // Debug: Check what accounts exist
+          const allAccounts = await db
+            .select({
+              id: entities.id,
+              userId: entities.userId,
+              workspaceId: entities.workspaceId
+            })
+            .from(entities)
+            .where(eq(entities.type, 'email_account'));
+          
+          console.log('Debug - All email accounts:', allAccounts);
+          console.log('Debug - Looking for userId:', dbUser.id);
+          console.log('Debug - Looking for workspaceId:', workspaceId);
+          
           throw new Error('Gmail not connected. Please connect your Gmail account in settings.');
         }
 
@@ -503,6 +557,7 @@ export const evermailRouter = router({
         // Store in our database
         const [email] = await db.insert(entities).values({
           workspaceId,
+          userId: dbUser.id, // Store with user ID for proper isolation
           type: 'email',
           data: {
             messageId: sentMessage.data.id,
@@ -526,7 +581,7 @@ export const evermailRouter = router({
           },
           metadata: {
             source: 'evermail',
-            createdBy: userUuid
+            createdBy: dbUser.id
           }
         }).returning();
 
@@ -626,8 +681,24 @@ export const evermailRouter = router({
       emailId: z.string().uuid()
     }))
     .mutation(async ({ ctx, input }) => {
-      const { orgId } = ctx;
-      const workspaceId = stringToUuid(orgId);
+      const { orgId, userId } = ctx;
+      
+      // Get the actual workspace from database
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
 
       const [email] = await db
         .select()
@@ -635,7 +706,8 @@ export const evermailRouter = router({
         .where(
           and(
             eq(entities.id, input.emailId),
-            eq(entities.workspaceId, workspaceId)
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id) // Ensure user owns this email
           )
         )
         .limit(1);
@@ -703,8 +775,24 @@ export const evermailRouter = router({
       emailId: z.string().uuid()
     }))
     .mutation(async ({ ctx, input }) => {
-      const { orgId } = ctx;
-      const workspaceId = stringToUuid(orgId);
+      const { orgId, userId } = ctx;
+      
+      // Get the actual workspace from database
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
 
       const [email] = await db
         .select()
@@ -712,7 +800,8 @@ export const evermailRouter = router({
         .where(
           and(
             eq(entities.id, input.emailId),
-            eq(entities.workspaceId, workspaceId)
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id) // Ensure user owns this email
           )
         )
         .limit(1);
@@ -739,41 +828,60 @@ export const evermailRouter = router({
   saveDraft: protectedProcedure
     .input(z.object({
       id: z.string().optional(),
-      to: z.array(z.object({ email: z.string().email() })),
-      cc: z.array(z.object({ email: z.string().email() })).optional(),
-      bcc: z.array(z.object({ email: z.string().email() })).optional(),
+      to: z.array(z.string()).optional(),
+      cc: z.array(z.string()).optional(),
+      bcc: z.array(z.string()).optional(),
       subject: z.string(),
-      body: z.object({
-        text: z.string(),
-        html: z.string().optional(),
-      }),
+      body: z.string(),
       attachments: z.array(z.any()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { orgId } = ctx;
-      const workspaceId = stringToUuid(orgId);
-      const userId = stringToUuid(ctx.user.id);
+      const { orgId, userId } = ctx;
+      
+      // Get the actual workspace from database
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
 
       // Create or update draft
       const draftData = {
         workspaceId,
+        userId: dbUser.id, // Use actual database user ID
         type: 'email' as const,
         data: {
-          ...input,
-          folder: 'drafts',
+          to: input.to?.map(email => ({ email })) || [],
+          cc: input.cc?.map(email => ({ email })) || [],
+          bcc: input.bcc?.map(email => ({ email })) || [],
+          subject: input.subject,
+          body: {
+            text: input.body,
+            html: input.body
+          },
           isDraft: true,
           isRead: true,
           from: {
-            email: ctx.user.email || '',
-            name: ctx.user.name || '',
+            email: dbUser.email || '',
+            name: dbUser.name || '',
           },
           sentAt: null,
-          gmailId: null,
+          attachments: input.attachments || []
         },
         metadata: {
           source: 'evermail',
           isDraft: true,
-          createdBy: userId
+          createdBy: dbUser.id
         },
       };
 
@@ -789,6 +897,7 @@ export const evermailRouter = router({
             and(
               eq(entities.id, input.id),
               eq(entities.workspaceId, workspaceId),
+              eq(entities.userId, dbUser.id),
               eq(entities.type, 'email')
             )
           )
@@ -800,5 +909,302 @@ export const evermailRouter = router({
         const [draft] = await db.insert(entities).values(draftData).returning();
         return draft;
       }
+    }),
+
+  // Auto-label endpoints
+  
+  // Label a single email
+  labelEmail: protectedProcedure
+    .input(z.object({
+      emailId: z.string()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { orgId, userId } = ctx;
+      
+      // Get workspace ID
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
+      
+      // Get email entity
+      const [email] = await db
+        .select()
+        .from(entities)
+        .where(
+          and(
+            eq(entities.id, input.emailId),
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id),
+            eq(entities.type, 'email')
+          )
+        )
+        .limit(1);
+      
+      if (!email) {
+        throw new Error('Email not found');
+      }
+      
+      // Convert entity to EmailData format
+      const emailData: EmailData = {
+        id: email.id,
+        from: (email.data as any).from || { email: 'unknown@example.com' },
+        to: (email.data as any).to || [],
+        subject: (email.data as any).subject || '',
+        body: (email.data as any).body || {},
+        hasAttachments: (email.data as any).attachments?.length > 0,
+        threadId: (email.data as any).threadId,
+        sentAt: new Date((email.data as any).sentAt || email.createdAt)
+      };
+      
+      // Label the email
+      const result = await autoLabelService.labelEmail(emailData, workspaceId, dbUser.id);
+      
+      return result;
+    }),
+  
+  // Label multiple emails in batch
+  labelBatch: protectedProcedure
+    .input(z.object({
+      emailIds: z.array(z.string()).optional(),
+      limit: z.number().default(100)
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { orgId, userId } = ctx;
+      
+      // Get workspace ID
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
+      
+      // Get emails to label
+      let query = db
+        .select()
+        .from(entities)
+        .where(
+          and(
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id),
+            eq(entities.type, 'email'),
+            // Only label emails without labels
+            sql`(metadata->>'autoLabels' IS NULL OR metadata->>'autoLabels' = '[]')`
+          )
+        )
+        .limit(input.limit);
+      
+      if (input.emailIds?.length) {
+        query = query.where(inArray(entities.id, input.emailIds));
+      }
+      
+      const emails = await query;
+      
+      // Convert to EmailData format
+      const emailDataList: EmailData[] = emails.map(email => ({
+        id: email.id,
+        from: (email.data as any).from || { email: 'unknown@example.com' },
+        to: (email.data as any).to || [],
+        subject: (email.data as any).subject || '',
+        body: (email.data as any).body || {},
+        hasAttachments: (email.data as any).attachments?.length > 0,
+        threadId: (email.data as any).threadId,
+        sentAt: new Date((email.data as any).sentAt || email.createdAt)
+      }));
+      
+      // Label emails in batch
+      const results = await autoLabelService.labelBatch(
+        emailDataList,
+        workspaceId,
+        dbUser.id,
+        (current, total) => {
+          console.log(`Labeling progress: ${current}/${total}`);
+        }
+      );
+      
+      return {
+        success: true,
+        labelled: results.size,
+        results: Array.from(results.entries())
+      };
+    }),
+  
+  // Get emails by label
+  getEmailsByLabel: protectedProcedure
+    .input(z.object({
+      label: z.string(),
+      limit: z.number().default(50),
+      cursor: z.string().optional()
+    }))
+    .query(async ({ ctx, input }) => {
+      const { orgId, userId } = ctx;
+      
+      // Get workspace ID
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        return [];
+      }
+      
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        return [];
+      }
+      
+      // Query emails with the specified label
+      const emails = await db
+        .select()
+        .from(entities)
+        .where(
+          and(
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id),
+            eq(entities.type, 'email'),
+            sql`metadata->'autoLabels' @> ${JSON.stringify([input.label])}::jsonb`
+          )
+        )
+        .orderBy(desc(entities.createdAt))
+        .limit(input.limit);
+      
+      return emails;
+    }),
+  
+  // Get label statistics
+  getLabelStats: protectedProcedure
+    .query(async ({ ctx }) => {
+      const { orgId, userId } = ctx;
+      
+      // Get workspace ID
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        return {};
+      }
+      
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        return {};
+      }
+      
+      // Get label stats from service
+      const stats = await autoLabelService.getLabelStats(workspaceId, dbUser.id);
+      
+      // Add label metadata
+      const enrichedStats = Object.entries(stats).map(([labelId, count]) => ({
+        ...AUTO_LABELS[labelId],
+        count
+      }));
+      
+      return enrichedStats;
+    }),
+  
+  // Reprocess labels for an email
+  reprocessLabels: protectedProcedure
+    .input(z.object({
+      emailId: z.string()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { orgId, userId } = ctx;
+      
+      // Get workspace ID
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      // Get database user
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
+      
+      // Clear existing labels first
+      await db
+        .update(entities)
+        .set({
+          metadata: sql`
+            COALESCE(metadata, '{}'::jsonb) - 'autoLabels' - 'labelConfidence' - 'labelledAt' - 'labelVersion'
+          `,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(entities.id, input.emailId),
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id),
+            eq(entities.type, 'email')
+          )
+        );
+      
+      // Get email and re-label
+      const [email] = await db
+        .select()
+        .from(entities)
+        .where(
+          and(
+            eq(entities.id, input.emailId),
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id),
+            eq(entities.type, 'email')
+          )
+        )
+        .limit(1);
+      
+      if (!email) {
+        throw new Error('Email not found');
+      }
+      
+      // Convert to EmailData format
+      const emailData: EmailData = {
+        id: email.id,
+        from: (email.data as any).from || { email: 'unknown@example.com' },
+        to: (email.data as any).to || [],
+        subject: (email.data as any).subject || '',
+        body: (email.data as any).body || {},
+        hasAttachments: (email.data as any).attachments?.length > 0,
+        threadId: (email.data as any).threadId,
+        sentAt: new Date((email.data as any).sentAt || email.createdAt)
+      };
+      
+      // Re-label the email
+      const result = await autoLabelService.labelEmail(emailData, workspaceId, dbUser.id);
+      
+      return result;
     })
 });

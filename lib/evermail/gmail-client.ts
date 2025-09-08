@@ -22,11 +22,12 @@ export class GmailClient {
   }
   
   async sendEmail(params: {
-    to: string[];
+    to: string | string[];
     cc?: string[];
     bcc?: string[];
     subject: string;
     body: string;
+    bodyHtml?: string;
     replyTo?: string;
     attachments?: any[];
     workspaceId?: string;
@@ -97,7 +98,7 @@ export class GmailClient {
             threadId: response.data.threadId,
             subject: params.subject,
             from: { email: 'me' },
-            to: params.to.map(email => ({ email })),
+            to: (Array.isArray(params.to) ? params.to : [params.to]).map(email => ({ email })),
             cc: params.cc?.map(email => ({ email })),
             bcc: params.bcc?.map(email => ({ email })),
             body: {
@@ -322,8 +323,10 @@ ${this.extractOriginalContent(original.data)}
   
   private createMessage(params: any): string {
     const boundary = '===boundary===';
+    // Ensure 'to' is always an array for consistent handling
+    const toAddresses = Array.isArray(params.to) ? params.to : [params.to];
     const headers = [
-      `To: ${params.to.join(', ')}`,
+      `To: ${toAddresses.join(', ')}`,
       `Subject: ${params.subject}`
     ];
     
@@ -358,7 +361,7 @@ ${this.extractOriginalContent(original.data)}
       'Content-Type: text/html; charset=UTF-8',
       'Content-Transfer-Encoding: base64',
       '',
-      Buffer.from(this.convertToHtml(params.body)).toString('base64'),
+      Buffer.from(params.bodyHtml || this.convertToHtml(params.body)).toString('base64'),
       '',
       '--' + boundary + '--'
     ].join('\r\n');

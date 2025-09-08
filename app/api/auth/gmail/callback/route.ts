@@ -172,7 +172,10 @@ export async function GET(req: NextRequest) {
         userId = dbUser.id;
       }
       
-      // Check if email account already exists FOR THIS SPECIFIC USER
+      // CRITICAL FIX: Check if THIS USER already has an email account
+      // This MUST filter by userId to prevent showing other users' accounts
+      console.log('Checking for existing account for user:', userId, 'in workspace:', workspaceId);
+      
       const existingAccount = await db
         .select()
         .from(entities)
@@ -186,6 +189,19 @@ export async function GET(req: NextRequest) {
         .limit(1);
       
       const matchingAccount = existingAccount[0];
+      
+      if (matchingAccount) {
+        const existingData = matchingAccount.data as any;
+        console.log('Found existing account for this user:', existingData.email);
+        console.log('New OAuth is for:', userInfo.data.email);
+        
+        // If this is a different email, we need to replace the old one
+        if (existingData.email !== userInfo.data.email) {
+          console.log('WARNING: User is connecting a different Gmail account. Replacing old connection.');
+        }
+      } else {
+        console.log('No existing email account for this user. Creating new one.');
+      }
       
       const accountData = {
         workspaceId,
@@ -272,10 +288,10 @@ export async function GET(req: NextRequest) {
         // Don't fail the OAuth flow if sync fails - user can manually sync later
       }
       
-      // Redirect to a syncing page that shows progress
-      const returnUrl = stateData.returnUrl || '/mail';
+      // CRITICAL FIX: Redirect directly to mail page, NOT syncing page to avoid infinite loop
+      const returnUrl = stateData.returnUrl || '/mail/inbox';
       return NextResponse.redirect(
-        new URL(`/mail/syncing?return=${encodeURIComponent(returnUrl)}&email=${encodeURIComponent(userInfo.data.email!)}`, req.url)
+        new URL(returnUrl, req.url)
       );
       
     } catch (tokenError: any) {

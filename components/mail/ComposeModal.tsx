@@ -97,6 +97,27 @@ export default function ComposeModal({
   const [isSending, setIsSending] = useState(false);
   const [showCc, setShowCc] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  
+  // Memoize change handlers to prevent re-renders
+  const handleToChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setTo(e.target.value);
+  }, []);
+  
+  const handleCcChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setCc(e.target.value);
+  }, []);
+  
+  const handleBccChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setBcc(e.target.value);
+  }, []);
+  
+  const handleSubjectChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSubject(e.target.value);
+  }, []);
+  
+  const handleBodyChange = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setBody(e.target.value);
+  }, []);
 
   const sendEmail = trpc.evermail.sendEmail.useMutation({
     onSuccess: () => {
@@ -110,6 +131,15 @@ export default function ComposeModal({
     },
     onError: (error) => {
       alert(`Failed to send email: ${error.message}`);
+    }
+  });
+  
+  const saveDraft = trpc.evermail.saveDraft.useMutation({
+    onSuccess: () => {
+      alert('Draft saved successfully!');
+    },
+    onError: (error) => {
+      alert(`Failed to save draft: ${error.message}`);
     }
   });
 
@@ -129,6 +159,16 @@ export default function ComposeModal({
       replyToId
     });
     setIsSending(false);
+  };
+  
+  const handleSaveDraft = () => {
+    saveDraft.mutate({
+      to: to ? to.split(',').map(email => email.trim()) : [],
+      cc: cc ? cc.split(',').map(email => email.trim()) : [],
+      bcc: bcc ? bcc.split(',').map(email => email.trim()) : [],
+      subject: subject || '(No subject)',
+      body: body || ''
+    });
   };
 
   if (!isOpen) return null;
@@ -218,7 +258,7 @@ export default function ComposeModal({
                   type="email"
                   placeholder="To"
                   value={to}
-                  onChange={(e) => setTo(e.target.value)}
+                  onChange={handleToChange}
                   style={{
                     width: '100%',
                     padding: `${tokens.spacing.md} ${tokens.spacing.lg}`,
@@ -248,7 +288,7 @@ export default function ComposeModal({
                       type="email"
                       placeholder="Cc"
                       value={cc}
-                      onChange={(e) => setCc(e.target.value)}
+                      onChange={handleCcChange}
                       style={{
                         width: '100%',
                         padding: `${tokens.spacing.md} ${tokens.spacing.lg}`,
@@ -275,7 +315,7 @@ export default function ComposeModal({
                       type="email"
                       placeholder="Bcc"
                       value={bcc}
-                      onChange={(e) => setBcc(e.target.value)}
+                      onChange={handleBccChange}
                       style={{
                         width: '100%',
                         padding: `${tokens.spacing.md} ${tokens.spacing.lg}`,
@@ -323,7 +363,7 @@ export default function ComposeModal({
                 type="text"
                 placeholder="Subject"
                 value={subject}
-                onChange={(e) => setSubject(e.target.value)}
+                onChange={handleSubjectChange}
                 style={{
                   width: '100%',
                   padding: `${tokens.spacing.md} ${tokens.spacing.lg}`,
@@ -353,7 +393,7 @@ export default function ComposeModal({
               <textarea
                 placeholder="Write your message..."
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
+                onChange={handleBodyChange}
                 style={{
                   width: '100%',
                   minHeight: '240px',
@@ -388,24 +428,50 @@ export default function ComposeModal({
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <motion.button
-                style={{
-                  padding: tokens.spacing.md,
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: tokens.colors.gray500,
-                  borderRadius: tokens.radii.md,
-                  transition: tokens.transitions.fast
-                }}
-                whileHover={{ 
-                  backgroundColor: tokens.colors.gray100,
-                  color: tokens.colors.evergreen 
-                }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Paperclip size={20} strokeWidth={2} />
-              </motion.button>
+              <div style={{ display: 'flex', gap: tokens.spacing.sm }}>
+                <motion.button
+                  style={{
+                    padding: tokens.spacing.md,
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: tokens.colors.gray500,
+                    borderRadius: tokens.radii.md,
+                    transition: tokens.transitions.fast
+                  }}
+                  whileHover={{ 
+                    backgroundColor: tokens.colors.gray100,
+                    color: tokens.colors.evergreen 
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Paperclip size={20} strokeWidth={2} />
+                </motion.button>
+                
+                <motion.button
+                  onClick={handleSaveDraft}
+                  style={{
+                    padding: `${tokens.spacing.md} ${tokens.spacing.xl}`,
+                    background: 'transparent',
+                    border: `1px solid ${tokens.colors.gray200}`,
+                    borderRadius: tokens.radii.md,
+                    cursor: 'pointer',
+                    color: tokens.colors.gray500,
+                    fontSize: tokens.typography.sizes.sm,
+                    fontWeight: tokens.typography.weights.medium,
+                    fontFamily: tokens.typography.fontFamily,
+                    transition: tokens.transitions.fast
+                  }}
+                  whileHover={{ 
+                    backgroundColor: tokens.colors.gray50,
+                    borderColor: tokens.colors.evergreen,
+                    color: tokens.colors.evergreen 
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Save Draft
+                </motion.button>
+              </div>
               
               <motion.button
                 onClick={handleSend}

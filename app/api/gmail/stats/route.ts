@@ -83,7 +83,8 @@ export async function GET(req: NextRequest) {
         )
       );
     
-    return NextResponse.json({
+    // CRITICAL: Set cache headers to prevent cross-user data leaks
+    const response = NextResponse.json({
       totalInbox: stats?.total || 0,
       unread: stats?.unread || 0,
       sent: sentStats?.sent || 0,
@@ -92,6 +93,12 @@ export async function GET(req: NextRequest) {
       responseRate: 0, // Calculate based on replies/received
       avgResponseTime: 0 // Calculate based on reply timestamps
     });
+    
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    
+    return response;
     
   } catch (error) {
     console.error('Error fetching email stats:', error);

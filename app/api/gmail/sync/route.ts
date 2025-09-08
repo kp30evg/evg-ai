@@ -44,7 +44,9 @@ export async function POST(req: Request) {
       );
     }
     
-    // Get email account with tokens FOR THIS USER ONLY
+    // CRITICAL: Get email account with tokens FOR THIS USER ONLY
+    console.log(`[SYNC] Looking for email account for user ${dbUser.email} (ID: ${dbUser.id}) in workspace ${workspace.id}`);
+    
     const emailAccount = await db
       .select()
       .from(entities)
@@ -52,12 +54,13 @@ export async function POST(req: Request) {
         and(
           eq(entities.workspaceId, workspace.id),
           eq(entities.type, 'email_account'),
-          eq(entities.userId, dbUser.id) // Use actual user ID
+          eq(entities.userId, dbUser.id) // CRITICAL: Use actual user ID, not Clerk ID
         )
       )
       .limit(1);
     
     if (!emailAccount || emailAccount.length === 0) {
+      console.log(`[SYNC] No Gmail account found for user ${dbUser.email}`);
       return NextResponse.json(
         { error: 'Gmail account not connected' },
         { status: 400 }
@@ -65,6 +68,17 @@ export async function POST(req: Request) {
     }
     
     const accountData = emailAccount[0].data as any;
+    console.log(`[SYNC] Found Gmail account: ${accountData.email || accountData.userEmail} for user ${dbUser.email}`);
+    
+    // CRITICAL VALIDATION: Ensure we're syncing the right account
+    if (accountData.clerkUserId && accountData.clerkUserId !== userId) {
+      console.error(`[SYNC] SECURITY WARNING: Account belongs to different Clerk user!`);
+      console.error(`[SYNC] Expected: ${userId}, Found: ${accountData.clerkUserId}`);
+      return NextResponse.json(
+        { error: 'Security error: Account mismatch' },
+        { status: 403 }
+      );
+    }
     
     // Decrypt tokens (simple base64 decode for now)
     const tokens = JSON.parse(Buffer.from(accountData.tokens, 'base64').toString());

@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc/client';
 import { formatDistanceToNow } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import ComposeModal from '@/components/mail/ComposeModal';
+import { LabelBadgeGroup } from '@/components/mail/LabelBadge';
+import GmailConnectionStatus from '@/components/mail/GmailConnectionStatus';
 import { 
   Mail, 
   Star, 
@@ -113,6 +116,7 @@ const tokens = {
 };
 
 export default function InboxPage() {
+  const router = useRouter();
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -120,20 +124,27 @@ export default function InboxPage() {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<any>(null);
 
-  // Get Gmail status with caching
+  // CRITICAL: No caching to prevent cross-user data leaks
   const { data: gmailStatus } = trpc.evermail.getGmailStatus.useQuery(
     undefined,
     {
-      staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
-      cacheTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
-      refetchInterval: false
+      staleTime: 0, // CRITICAL: Always refetch to ensure user isolation
+      cacheTime: 0, // CRITICAL: Never cache to prevent cross-user data leaks
+      refetchInterval: false,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true
     }
   );
   
-  // Get emails
+  // CRITICAL: Get emails without caching to prevent cross-user data leaks
   const { data: emails, isLoading, refetch } = trpc.evermail.getEmails.useQuery({
     folder: 'inbox',
     limit: 50
+  }, {
+    staleTime: 0, // CRITICAL: Always refetch to ensure user isolation
+    cacheTime: 0, // CRITICAL: Never cache to prevent cross-user data leaks
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true
   });
 
   // Mark as read mutation
@@ -209,89 +220,17 @@ export default function InboxPage() {
 
   const filteredEmails = emails?.filter(emailMatchesSearch) || [];
 
-  if (!gmailStatus?.connected) {
-    return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100vh',
-        backgroundColor: tokens.colors.gray50,
-        padding: tokens.spacing['2xl'],
-        fontFamily: tokens.typography.fontFamily
-      }}>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          style={{
-            textAlign: 'center',
-            maxWidth: '480px'
-          }}
-        >
-          <div style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: tokens.radii.xl,
-            backgroundColor: tokens.colors.softGreen,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: `0 auto ${tokens.spacing.xl}`
-          }}>
-            <InboxIcon size={32} color={tokens.colors.evergreen} strokeWidth={1.5} />
-          </div>
-          <h2 style={{
-            fontSize: tokens.typography.sizes['2xl'],
-            fontWeight: tokens.typography.weights.semibold,
-            color: tokens.colors.charcoal,
-            marginBottom: tokens.spacing.md,
-            letterSpacing: '-0.01em'
-          }}>
-            Connect Your Gmail
-          </h2>
-          <p style={{
-            fontSize: tokens.typography.sizes.base,
-            color: tokens.colors.gray500,
-            marginBottom: tokens.spacing['2xl'],
-            lineHeight: tokens.typography.lineHeights.relaxed
-          }}>
-            Import your Gmail to start managing emails with AI-powered features.
-          </p>
-          <motion.button
-            onClick={() => window.location.href = '/mail/settings'}
-            style={{
-              padding: `${tokens.spacing.md} ${tokens.spacing.xl}`,
-              backgroundColor: tokens.colors.evergreen,
-              color: tokens.colors.white,
-              border: 'none',
-              borderRadius: tokens.radii.md,
-              fontSize: tokens.typography.sizes.sm,
-              fontWeight: tokens.typography.weights.medium,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: tokens.spacing.sm
-            }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Mail size={16} strokeWidth={2} />
-            Connect Gmail Account
-          </motion.button>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div style={{
       display: 'flex',
       height: '100%',
       backgroundColor: tokens.colors.gray50,
-      fontFamily: tokens.typography.fontFamily
+      fontFamily: tokens.typography.fontFamily,
+      position: 'relative'
     }}>
+      {/* Gmail Connection Prompt - only shows if not connected */}
+      <GmailConnectionStatus showOnlyIfDisconnected={true} />
+      
       {/* Email List */}
       <div style={{
         width: selectedEmail ? '420px' : '100%',
@@ -611,6 +550,20 @@ export default function InboxPage() {
                       <Paperclip size={14} color={tokens.colors.gray500} strokeWidth={2} />
                     )}
                   </div>
+                  {/* Auto-labels */}
+                  {email.metadata?.autoLabels && email.metadata.autoLabels.length > 0 && (
+                    <div style={{ marginBottom: tokens.spacing.xs }}>
+                      <LabelBadgeGroup
+                        labelIds={email.metadata.autoLabels}
+                        onLabelClick={(labelId) => {
+                          // Navigate to filtered view
+                          router.push(`/mail/label/${labelId}`);
+                        }}
+                        maxVisible={3}
+                        size="sm"
+                      />
+                    </div>
+                  )}
                   <p style={{
                     fontSize: tokens.typography.sizes.xs,
                     color: tokens.colors.gray500,

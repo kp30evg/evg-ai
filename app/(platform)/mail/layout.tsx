@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { trpc } from '@/lib/trpc/client';
+import { AUTO_LABELS, getSortedLabels } from '@/lib/evermail/constants/labels';
 import { 
   Inbox,
   Send,
@@ -16,7 +18,16 @@ import {
   Search,
   Menu,
   ChevronDown,
-  Mail
+  Mail,
+  Tag,
+  Newspaper,
+  Briefcase,
+  Users,
+  Reply,
+  Calendar,
+  Edit,
+  Lock,
+  Sparkles
 } from 'lucide-react';
 
 // Design System Tokens
@@ -99,11 +110,19 @@ export default function MailLayout({ children }: MailLayoutProps) {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showMoreFolders, setShowMoreFolders] = useState(false);
+  const [showSmartLabels, setShowSmartLabels] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({
     inbox: 2584,
     drafts: 4,
     spam: 0,
     trash: 0
+  });
+  
+  // Fetch label statistics
+  const { data: labelStats } = trpc.evermail.getLabelStats.useQuery(undefined, {
+    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 10000,
+    cacheTime: 30000
   });
   
   // Hide sidebar on dashboard (main mail page)
@@ -485,10 +504,132 @@ export default function MailLayout({ children }: MailLayoutProps) {
             </div>
           )}
 
-          {/* Labels Section */}
+          {/* Smart Labels Section */}
           {!sidebarCollapsed && (
             <div style={{ 
               marginTop: tokens.spacing.xl,
+              paddingTop: tokens.spacing.lg,
+              borderTop: `1px solid ${tokens.colors.gray100}`
+            }}>
+              <button
+                onClick={() => setShowSmartLabels(!showSmartLabels)}
+                style={{
+                  width: '100%',
+                  padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  fontSize: tokens.typography.sizes.xs,
+                  fontWeight: tokens.typography.weights.semibold,
+                  color: tokens.colors.evergreen,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  transition: tokens.transitions.fast
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacing.sm }}>
+                  <Sparkles size={12} />
+                  Smart Labels
+                </div>
+                <ChevronDown 
+                  size={12} 
+                  strokeWidth={2}
+                  style={{
+                    transform: showSmartLabels ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: tokens.transitions.fast
+                  }}
+                />
+              </button>
+              
+              {showSmartLabels && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  {getSortedLabels().map(label => {
+                    const count = labelStats?.find(s => s.id === label.id)?.count || 0;
+                    const Icon = 
+                      label.id === 'marketing' ? Tag :
+                      label.id === 'news' ? Newspaper :
+                      label.id === 'pitch' ? Briefcase :
+                      label.id === 'social' ? Users :
+                      label.id === 'respond' ? Reply :
+                      label.id === 'meeting' ? Calendar :
+                      label.id === 'signature' ? Edit :
+                      label.id === 'login' ? Lock :
+                      Mail;
+                    
+                    return (
+                      <motion.button
+                        key={label.id}
+                        onClick={() => router.push(`/mail/label/${label.id}`)}
+                        style={{
+                          width: '100%',
+                          padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
+                          backgroundColor: pathname === `/mail/label/${label.id}` ? tokens.colors.softGreen : 'transparent',
+                          border: 'none',
+                          fontSize: tokens.typography.sizes.sm,
+                          color: pathname === `/mail/label/${label.id}` ? tokens.colors.evergreen : tokens.colors.gray700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          transition: tokens.transitions.fast
+                        }}
+                        whileHover={{
+                          backgroundColor: pathname === `/mail/label/${label.id}` ? tokens.colors.softGreen : tokens.colors.gray50
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: tokens.spacing.md
+                        }}>
+                          <div style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '4px',
+                            backgroundColor: label.bgColor,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Icon size={10} color={label.color} strokeWidth={2} />
+                          </div>
+                          <span>{label.name}</span>
+                        </div>
+                        {count > 0 && (
+                          <span style={{
+                            fontSize: tokens.typography.sizes.xs,
+                            fontWeight: tokens.typography.weights.medium,
+                            color: tokens.colors.gray500,
+                            backgroundColor: tokens.colors.gray100,
+                            padding: `2px ${tokens.spacing.sm}`,
+                            borderRadius: tokens.radii.full,
+                            minWidth: '24px',
+                            textAlign: 'center'
+                          }}>
+                            {count > 999 ? '999+' : count}
+                          </span>
+                        )}
+                      </motion.button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </div>
+          )}
+
+          {/* Labels Section */}
+          {!sidebarCollapsed && (
+            <div style={{ 
+              marginTop: tokens.spacing.lg,
               paddingTop: tokens.spacing.lg,
               borderTop: `1px solid ${tokens.colors.gray100}`
             }}>

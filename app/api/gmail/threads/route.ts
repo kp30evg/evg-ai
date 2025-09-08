@@ -39,19 +39,23 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const limit = parseInt(searchParams.get('limit') || '5');
     
-    // Get recent emails from database (emails stored during sync)
+    // CRITICAL: Get recent emails from database FOR THIS USER ONLY
+    console.log(`[THREADS] Fetching emails for user ${dbUser.email} (ID: ${dbUser.id})`);
+    
     const emails = await db
       .select()
       .from(entities)
       .where(
         and(
           eq(entities.workspaceId, workspace.id),
-          eq(entities.userId, dbUser.id),
+          eq(entities.userId, dbUser.id), // CRITICAL: User isolation
           eq(entities.type, 'email')
         )
       )
       .orderBy(desc(entities.createdAt))
       .limit(limit);
+    
+    console.log(`[THREADS] Found ${emails.length} emails for user ${dbUser.email}`);
     
     // Format emails as threads
     const threads = emails.map(email => {
@@ -69,7 +73,12 @@ export async function GET(req: NextRequest) {
       };
     });
     
-    return NextResponse.json({ threads });
+    // CRITICAL: Set cache headers to prevent cross-user data leaks
+    const response = NextResponse.json({ threads });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    return response;
     
   } catch (error) {
     console.error('Error fetching email threads:', error);

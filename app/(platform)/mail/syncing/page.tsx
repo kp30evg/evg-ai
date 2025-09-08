@@ -27,23 +27,13 @@ export default function SyncingPage() {
     }
   );
   
-  // Trigger sync on mount
+  // DON'T trigger sync on mount - sync already happened in OAuth callback
   useEffect(() => {
     if (!syncStarted) {
       setSyncStarted(true);
       
-      // Trigger Gmail sync
-      fetch('/api/gmail/sync', { method: 'POST' })
-        .then(res => res.json())
-        .then(result => {
-          console.log('Gmail sync triggered:', result);
-          if (result.success) {
-            setEmailCount(result.totalSynced || 0);
-          }
-        })
-        .catch(error => {
-          console.error('Failed to trigger Gmail sync:', error);
-        });
+      // DON'T trigger another sync - just check status
+      console.log('Checking sync status, not triggering new sync');
       
       // If coming from calendar page, also trigger calendar sync
       if (returnUrl.includes('/calendar')) {
@@ -90,16 +80,14 @@ export default function SyncingPage() {
       });
     }, 800);
     
-    // Maximum wait time before redirect (in case sync is slow)
+    // CRITICAL FIX: Redirect quickly to avoid infinite loop
     const maxWaitTimeout = setTimeout(() => {
       setSyncStatus('complete');
       setProgress(100);
       
-      // Force redirect after max wait time
-      setTimeout(() => {
-        router.push(returnUrl);
-      }, 1000);
-    }, 20000); // 20 seconds max wait
+      // Force redirect quickly
+      router.push(returnUrl);
+    }, 3000); // 3 seconds max wait
     
     return () => {
       clearInterval(progressInterval);
