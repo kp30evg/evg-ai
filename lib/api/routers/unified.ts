@@ -11,6 +11,10 @@ import * as everchat from '@/lib/modules-simple/everchat';
 import * as evercore from '@/lib/modules-simple/evercore';
 import { TRPCError } from '@trpc/server';
 import { workspaceService } from '@/lib/services/workspace-service';
+import { GmailClient } from '@/lib/evermail/gmail-client';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/unified';
+import { eq } from 'drizzle-orm';
 
 
 export const unifiedRouter = router({
@@ -38,6 +42,55 @@ export const unifiedRouter = router({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }),
+
+  // Send email endpoint for dashboard
+  sendEmail: protectedProcedure
+    .input(z.object({
+      to: z.string(),
+      subject: z.string(),
+      body: z.string(),
+      bodyHtml: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      try {
+        // Get database user first
+        const [dbUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.clerkUserId, ctx.userId))
+          .limit(1);
+        
+        if (!dbUser) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'User not found in database. Please sync users first.',
+          });
+        }
+
+        const gmail = new GmailClient();
+        await gmail.sendEmail({
+          to: input.to,
+          subject: input.subject,
+          body: input.body,
+          bodyHtml: input.bodyHtml,
+          workspaceId,
+          userId: dbUser.id
+        });
+        
+        return {
+          success: true,
+          message: `Email sent successfully to ${input.to}`,
+        };
+      } catch (error) {
+        console.error('Failed to send email:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to send email',
         });
       }
     }),

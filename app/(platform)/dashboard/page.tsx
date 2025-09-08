@@ -35,6 +35,7 @@ export default function DashboardPage() {
   
   // tRPC mutation for command execution using unified API
   const executeCommand = trpc.unified.executeCommand.useMutation()
+  const sendEmail = trpc.unified.sendEmail.useMutation()
   const [currentState, setCurrentState] = useState<State>('welcome')
   const [inputValue, setInputValue] = useState('')
   const [selectedPrompt, setSelectedPrompt] = useState('')
@@ -50,13 +51,14 @@ export default function DashboardPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const colors = {
-    evergreen: '#1D5238',
+    evergreen: '#2F5233',
     white: '#FFFFFF',
-    charcoal: '#222B2E',
+    charcoal: '#1A1A1A',
     mediumGray: '#6B7280',
-    lightGray: '#E5E7EB',
-    softGreen: '#E6F4EC',
-    gold: '#FFD600'
+    lightGray: '#F3F4F6',
+    softGreen: '#E8F5E8',
+    gold: '#FFD600',
+    mint: '#D4E6D4'
   }
 
   const prompts = [
@@ -183,31 +185,42 @@ export default function DashboardPage() {
       startThinkingSequence()
       
       try {
-        const result = await executeCommand.mutateAsync({ input: 'send' })
+        // Use the sendEmail mutation with the email draft data
+        const result = await sendEmail.mutateAsync({
+          to: emailDraft.to,
+          subject: emailDraft.subject,
+          body: emailDraft.body,
+          bodyHtml: emailDraft.bodyHtml || emailDraft.body
+        })
         
         setTimeout(() => {
           setCurrentState('answer')
           setEmailDraft(null)
           setShowEmailActions(false)
-          startStreamingText(result.message || 'Email sent successfully!')
+          startStreamingText(`✅ Email sent successfully to ${emailDraft.to}!\n\nYour email "${emailDraft.subject}" has been delivered.`)
           setFollowupSuggestions(['Compose another email', 'Check inbox', 'View sent emails'])
+          setShowFollowups(true)
         }, 1500)
       } catch (error) {
         console.error('Error sending email:', error)
         setTimeout(() => {
           setCurrentState('answer')
-          startStreamingText('Failed to send email. Please make sure your Gmail account is connected.')
-          setFollowupSuggestions(['Try again', 'Go to settings'])
+          startStreamingText('❌ Failed to send email.\n\nPlease make sure your Gmail account is connected and try again.')
+          setFollowupSuggestions(['Try again', 'Connect Gmail', 'Go to settings'])
+          setShowFollowups(true)
         }, 1000)
       }
     } else if (action === 'cancel') {
       setEmailDraft(null)
       setShowEmailActions(false)
-      startStreamingText('Email draft cancelled.')
-      setFollowupSuggestions(['Compose new email', 'Ask another question'])
+      setCurrentState('welcome')
     } else if (action === 'edit') {
-      // TODO: Implement edit functionality
-      startStreamingText('Edit functionality coming soon. For now, you can cancel and create a new draft.')
+      // Put the command back in the input for editing
+      setInputValue(`Send email to ${emailDraft?.to || ''} about ${emailDraft?.topic || ''}`)
+      setEmailDraft(null)
+      setShowEmailActions(false)
+      setCurrentState('welcome')
+      inputRef.current?.focus()
     }
   }
 
@@ -284,7 +297,7 @@ export default function DashboardPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#FAFBFC',
+      backgroundColor: '#F8F9FA',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     }}>
       {/* Main Content Area */}
@@ -295,8 +308,8 @@ export default function DashboardPage() {
         {/* Header */}
         <div style={{
           backgroundColor: colors.white,
-          borderBottom: `1px solid ${colors.lightGray}40`,
-          padding: '12px 24px',
+          borderBottom: '1px solid #E5E7EB',
+          padding: '16px 32px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -308,11 +321,11 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               fontSize: '18px',
-              fontWeight: '700',
-              color: colors.evergreen,
+              fontWeight: '600',
               letterSpacing: '-0.01em'
             }}>
-              evergreenOS
+              <span style={{ color: colors.charcoal }}>evergreen</span>
+              <span style={{ color: colors.evergreen }}>OS</span>
             </div>
           </div>
           
@@ -329,20 +342,20 @@ export default function DashboardPage() {
                   alignItems: 'center'
                 },
                 organizationSwitcherTrigger: {
-                  padding: '8px 12px',
+                  padding: '10px 16px',
                   backgroundColor: colors.white,
-                  border: `1px solid ${colors.lightGray}`,
-                  borderRadius: '8px',
-                  fontSize: '13px',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '10px',
+                  fontSize: '14px',
                   fontWeight: '500',
                   color: colors.charcoal,
                   '&:hover': {
-                    backgroundColor: colors.softGreen,
+                    backgroundColor: colors.mint,
                     borderColor: colors.evergreen + '30'
                   }
                 },
                 organizationPreview: {
-                  fontSize: '13px',
+                  fontSize: '14px',
                   fontWeight: '500',
                   color: colors.charcoal
                 },
@@ -359,12 +372,17 @@ export default function DashboardPage() {
           <button 
             onClick={() => window.location.href = '/settings/organization'}
             style={{
-            padding: '8px',
+            padding: '10px',
             backgroundColor: 'transparent',
             border: 'none',
-            cursor: 'pointer'
-          }}>
-            <Settings size={18} color={colors.mediumGray} />
+            cursor: 'pointer',
+            borderRadius: '8px',
+            transition: 'background-color 200ms ease'
+          }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.mint}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <Settings size={20} color={colors.mediumGray} />
           </button>
           
           <UserButton afterSignOutUrl="/" />
@@ -404,25 +422,57 @@ export default function DashboardPage() {
                   textAlign: 'center',
                   marginBottom: '64px'
                 }}>
+                  {/* Main Heading */}
                   <h1 style={{
-                    fontSize: '36px',
+                    fontSize: '56px',
                     fontWeight: '600',
-                    color: colors.charcoal,
-                    marginBottom: '16px',
-                    letterSpacing: '-0.02em',
-                    lineHeight: 1.2
+                    marginBottom: '32px',
+                    letterSpacing: '-0.04em',
+                    lineHeight: 1.1
                   }}>
-                    How can I help you today{user?.firstName ? `, ${user.firstName}` : ''}?
+                    <span style={{ color: colors.charcoal }}>How can I help you today</span>
+                    {user?.firstName && (
+                      <>
+                        <span style={{ color: colors.charcoal }}>, </span>
+                        <span style={{ color: colors.evergreen }}>{user.firstName}</span>
+                      </>
+                    )}
+                    <span style={{ color: colors.charcoal }}>?</span>
                   </h1>
-                  <p style={{
-                    fontSize: '16px',
-                    color: colors.mediumGray,
-                    lineHeight: 1.5,
-                    maxWidth: '420px',
-                    margin: '0 auto'
+                  
+                  {/* Tagline with slogan styling */}
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px 20px',
+                    backgroundColor: colors.softGreen,
+                    borderRadius: '24px',
+                    border: `1px solid ${colors.evergreen}15`
                   }}>
-                    One unified system for all your business data - CRM, Email, Tasks, Calendar, and more
-                  </p>
+                    <div style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: colors.evergreen
+                    }} />
+                    <p style={{
+                      fontSize: '16px',
+                      color: colors.evergreen,
+                      lineHeight: 1,
+                      letterSpacing: '0.02em',
+                      fontWeight: '500',
+                      margin: 0
+                    }}>
+                      Business Made Simple
+                    </p>
+                    <div style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: colors.evergreen
+                    }} />
+                  </div>
                 </div>
 
                 {/* Main Input Box */}
@@ -434,11 +484,11 @@ export default function DashboardPage() {
                   <motion.div 
                     style={{
                       backgroundColor: colors.white,
-                      border: `1px solid ${isFocused ? colors.evergreen : colors.lightGray}`,
-                      borderRadius: '24px',
-                      padding: '20px 24px',
+                      border: `1.5px solid ${isFocused ? colors.evergreen : '#E2E8F0'}`,
+                      borderRadius: '16px',
+                      padding: '18px 20px',
                       transition: 'all 200ms ease-out',
-                      boxShadow: isFocused ? '0 8px 32px rgba(29, 82, 56, 0.12)' : '0 4px 12px rgba(0, 0, 0, 0.05)'
+                      boxShadow: isFocused ? '0 0 0 3px rgba(47, 82, 51, 0.08)' : 'none'
                     }}
                   >
                     <div style={{
@@ -458,7 +508,7 @@ export default function DashboardPage() {
                             handleSubmit()
                           }
                         }}
-                        placeholder="Message evergreenOS..."
+                        placeholder="Ask me anything..."
                         style={{
                           flex: 1,
                           resize: 'none',
@@ -483,18 +533,19 @@ export default function DashboardPage() {
                           style={{
                             width: '36px',
                             height: '36px',
-                            borderRadius: '12px',
+                            borderRadius: '10px',
                             border: 'none',
                             backgroundColor: 'transparent',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            transition: 'background-color 200ms ease'
                           }}
-                          whileHover={{ backgroundColor: colors.softGreen }}
+                          whileHover={{ backgroundColor: '#F7F8FA' }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          <Paperclip size={20} color={colors.mediumGray} />
+                          <Paperclip size={18} color='#9CA3AF' />
                         </motion.button>
                         <motion.button
                           onClick={() => handleSubmit()}
@@ -502,18 +553,19 @@ export default function DashboardPage() {
                           style={{
                             width: '36px',
                             height: '36px',
-                            borderRadius: '12px',
+                            borderRadius: '10px',
                             border: 'none',
-                            backgroundColor: inputValue.trim() ? colors.evergreen : colors.lightGray,
+                            backgroundColor: inputValue.trim() ? colors.evergreen : '#E2E8F0',
                             cursor: inputValue.trim() ? 'pointer' : 'not-allowed',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            transition: 'all 200ms ease'
                           }}
-                          whileHover={inputValue.trim() ? { scale: 1.05 } : {}}
+                          whileHover={inputValue.trim() ? { scale: 1.05, backgroundColor: '#245229' } : {}}
                           whileTap={inputValue.trim() ? { scale: 0.95 } : {}}
                         >
-                          <Send size={18} color={colors.white} />
+                          <Send size={16} color={inputValue.trim() ? colors.white : '#9CA3AF'} />
                         </motion.button>
                       </div>
                     </div>
@@ -525,11 +577,12 @@ export default function DashboardPage() {
                   width: '100%'
                 }}>
                   <div style={{
-                    fontSize: '13px',
+                    fontSize: '14px',
                     fontWeight: '500',
-                    color: colors.mediumGray,
-                    marginBottom: '16px',
-                    textAlign: 'center'
+                    color: '#9CA3AF',
+                    marginBottom: '20px',
+                    textAlign: 'center',
+                    letterSpacing: '0.02em'
                   }}>
                     Try asking about:
                   </div>
@@ -546,21 +599,23 @@ export default function DashboardPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                         style={{
-                          padding: '12px 20px',
-                          backgroundColor: 'transparent',
-                          border: `1px solid ${colors.lightGray}`,
-                          borderRadius: '20px',
+                          padding: '14px 24px',
+                          backgroundColor: colors.white,
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '12px',
                           cursor: 'pointer',
-                          fontSize: '14px',
+                          fontSize: '15px',
                           fontWeight: '400',
-                          color: colors.charcoal,
+                          color: '#374151',
                           transition: 'all 200ms ease-out',
-                          maxWidth: '320px'
+                          maxWidth: '440px',
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                         }}
                         whileHover={{ 
-                          backgroundColor: colors.softGreen,
-                          borderColor: colors.evergreen,
-                          scale: 1.02
+                          backgroundColor: '#FAFAFA',
+                          borderColor: colors.evergreen + '40',
+                          scale: 1.005,
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
                         }}
                         onClick={() => handleSubmit(prompt)}
                       >
@@ -594,25 +649,27 @@ export default function DashboardPage() {
                 <div style={{
                   width: '100%',
                   backgroundColor: colors.white,
-                  borderRadius: '16px',
-                  padding: '32px',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
+                  borderRadius: '20px',
+                  padding: '40px',
+                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.06)',
+                  border: '1px solid #E5E7EB'
                 }}>
                   <div style={{
                     textAlign: 'center',
-                    marginBottom: '32px'
+                    marginBottom: '40px'
                   }}>
                     <div style={{
-                      fontSize: '16px',
+                      fontSize: '18px',
                       fontWeight: '600',
                       color: colors.charcoal,
-                      marginBottom: '8px'
+                      marginBottom: '12px'
                     }}>
                       Processing your request
                     </div>
                     <div style={{
-                      fontSize: '14px',
-                      color: colors.mediumGray
+                      fontSize: '15px',
+                      color: '#6B7280',
+                      fontStyle: 'italic'
                     }}>
                       "{selectedPrompt}"
                     </div>
@@ -653,9 +710,9 @@ export default function DashboardPage() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             borderRadius: '8px',
-                            backgroundColor: isCompleted ? colors.evergreen + '15' : 
+                            backgroundColor: isCompleted ? colors.mint : 
                                           isActive ? colors.softGreen : 
-                                          colors.lightGray + '20'
+                                          '#F3F4F6'
                           }}>
                             {isCompleted ? (
                               <Check size={16} color={colors.evergreen} strokeWidth={3} />
@@ -708,9 +765,10 @@ export default function DashboardPage() {
                 {/* Question */}
                 <div style={{
                   marginBottom: '24px',
-                  padding: '16px',
-                  backgroundColor: colors.softGreen + '30',
-                  borderRadius: '12px'
+                  padding: '16px 20px',
+                  backgroundColor: colors.mint,
+                  borderRadius: '12px',
+                  border: `1px solid ${colors.evergreen}20`
                 }}>
                   <div style={{
                     display: 'flex',
@@ -718,15 +776,15 @@ export default function DashboardPage() {
                     gap: '12px'
                   }}>
                     <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '10px',
                       backgroundColor: colors.evergreen,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       color: colors.white,
-                      fontSize: '12px',
+                      fontSize: '13px',
                       fontWeight: '600'
                     }}>
                       {userInitials}
@@ -743,10 +801,11 @@ export default function DashboardPage() {
                 {/* Answer */}
                 <div style={{
                   marginBottom: '24px',
-                  padding: '20px',
+                  padding: '24px',
                   backgroundColor: colors.white,
-                  borderRadius: '12px',
-                  border: `1px solid ${colors.lightGray}40`
+                  borderRadius: '16px',
+                  border: '1px solid #E5E7EB',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
                 }}>
                   <div style={{
                     display: 'flex',
@@ -754,10 +813,10 @@ export default function DashboardPage() {
                     gap: '16px'
                   }}>
                     <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '10px',
-                      backgroundColor: colors.evergreen + '10',
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '12px',
+                      backgroundColor: colors.mint,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -791,11 +850,11 @@ export default function DashboardPage() {
                     <motion.button
                       onClick={() => handleEmailAction('send')}
                       style={{
-                        padding: '12px 24px',
+                        padding: '14px 28px',
                         backgroundColor: colors.evergreen,
                         color: colors.white,
                         border: 'none',
-                        borderRadius: '10px',
+                        borderRadius: '12px',
                         fontSize: '14px',
                         fontWeight: '500',
                         cursor: 'pointer',
@@ -813,17 +872,17 @@ export default function DashboardPage() {
                     <motion.button
                       onClick={() => handleEmailAction('edit')}
                       style={{
-                        padding: '12px 24px',
+                        padding: '14px 28px',
                         backgroundColor: colors.white,
                         color: colors.charcoal,
-                        border: `1px solid ${colors.lightGray}`,
-                        borderRadius: '10px',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
                         fontSize: '14px',
                         fontWeight: '500',
                         cursor: 'pointer'
                       }}
                       whileHover={{ 
-                        backgroundColor: colors.softGreen,
+                        backgroundColor: colors.mint,
                         borderColor: colors.evergreen + '30'
                       }}
                       whileTap={{ scale: 0.95 }}
@@ -834,18 +893,18 @@ export default function DashboardPage() {
                     <motion.button
                       onClick={() => handleEmailAction('cancel')}
                       style={{
-                        padding: '12px 24px',
+                        padding: '14px 28px',
                         backgroundColor: colors.white,
                         color: colors.mediumGray,
-                        border: `1px solid ${colors.lightGray}`,
-                        borderRadius: '10px',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
                         fontSize: '14px',
                         fontWeight: '500',
                         cursor: 'pointer'
                       }}
                       whileHover={{ 
-                        backgroundColor: '#FEE',
-                        borderColor: '#F88'
+                        backgroundColor: '#FEF2F2',
+                        borderColor: '#FCA5A5'
                       }}
                       whileTap={{ scale: 0.95 }}
                     >
@@ -864,12 +923,12 @@ export default function DashboardPage() {
                     }}
                   >
                     <p style={{
-                      fontSize: '12px',
+                      fontSize: '13px',
                       fontWeight: '600',
-                      color: colors.mediumGray,
+                      color: '#9CA3AF',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '12px'
+                      letterSpacing: '0.05em',
+                      marginBottom: '16px'
                     }}>
                       Suggested follow-ups
                     </p>
@@ -885,20 +944,21 @@ export default function DashboardPage() {
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: index * 0.05 }}
                           style={{
-                            padding: '10px 16px',
+                            padding: '12px 20px',
                             backgroundColor: colors.white,
-                            border: `1px solid ${colors.lightGray}60`,
-                            borderRadius: '20px',
-                            fontSize: '13px',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '12px',
+                            fontSize: '14px',
                             fontWeight: '500',
-                            color: colors.charcoal,
+                            color: '#4B5563',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px'
+                            gap: '8px',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
                           }}
                           whileHover={{ 
-                            backgroundColor: colors.softGreen,
+                            backgroundColor: colors.mint,
                             borderColor: colors.evergreen + '30'
                           }}
                           onClick={() => handleSubmit(followup)}
@@ -926,12 +986,12 @@ export default function DashboardPage() {
                       resetToWelcome()
                     }}
                     style={{
-                      padding: '12px 24px',
+                      padding: '14px 28px',
                       backgroundColor: colors.evergreen,
                       color: colors.white,
                       border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '14px',
+                      borderRadius: '12px',
+                      fontSize: '15px',
                       fontWeight: '500',
                       cursor: 'pointer'
                     }}

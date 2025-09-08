@@ -426,6 +426,7 @@ CLERK_SECRET_KEY=...
    - processCommand → OpenAI client initialization
 4. Test with: "What is 2+2?" (should use OpenAI)
 5. Test with: "Summarize my contacts" (should use EverCore)
+6. Test with: "Send test@example.com an email about testing" (should show email draft)
 
 ## Common Issues & Fixes:
 - **"Command not recognized"**: Check command processor regex patterns
@@ -435,6 +436,27 @@ CLERK_SECRET_KEY=...
 - **Users seeing same data**: Check user_id filtering and users table sync
 - **Empty users table**: Run `npx tsx scripts/sync-users-simple.ts`
 - **OAuth shared between users**: Ensure userId is stored with OAuth accounts
+- **Email draft not showing**: Check command processor handleEmail function
+- **Send button not working**: Verify unified.sendEmail endpoint exists
+- **"Gmail not connected" error**: User needs to connect Gmail at /mail/settings
+
+## 📧 CRITICAL: Email Sending Feature
+The dashboard supports sending emails via natural language commands. This feature is CRITICAL and must always work.
+
+**Architecture:**
+1. Command: "send [email] an email about [topic]"
+2. AI generates professional email draft
+3. Dashboard shows draft with Send/Edit/Cancel buttons
+4. Send button calls unified.sendEmail → GmailClient
+5. Email sent via user's connected Gmail account
+
+**Files involved:**
+- `/lib/modules-simple/command-processor.ts` - Handles email draft commands
+- `/app/(platform)/dashboard/page.tsx` - Renders email drafts and buttons
+- `/lib/api/routers/unified.ts` - sendEmail endpoint
+- `/lib/evermail/gmail-client.ts` - Gmail API integration
+
+**Testing:** Run `npx tsx scripts/test-email-feature.ts` to verify everything works
 
 ---
 

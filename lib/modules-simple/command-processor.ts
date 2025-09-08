@@ -87,7 +87,14 @@ Rules:
 Email commands:
 - "summarize my emails" -> {"action":"email","parameters":{"command":"summarize"},"response":"Checking your emails..."}
 - "show my emails" -> {"action":"email","parameters":{"command":"list"},"response":"Loading your emails..."}
-- "send email to X" -> {"action":"email","parameters":{"command":"send","to":"X"},"response":"Preparing email..."}
+- "send email to X about Y" -> {"action":"email","parameters":{"command":"draft","to":"X","topic":"Y"},"response":"Drafting email..."}
+- "email X about Y" -> {"action":"email","parameters":{"command":"draft","to":"X","topic":"Y"},"response":"Drafting email..."}
+- "draft email to X regarding Y" -> {"action":"email","parameters":{"command":"draft","to":"X","topic":"Y"},"response":"Drafting email..."}
+
+For email draft commands, extract:
+- to: email address of recipient
+- topic: what the email should be about
+- command: should be "draft" for composition requests
 
 CRITICAL: Return ONLY the JSON object, no other text.`
         },
@@ -186,6 +193,85 @@ CRITICAL: Return ONLY the JSON object, no other text.`
 
 // Simplified email handler
 async function handleEmail(workspaceId: string, params: any, userId?: string, aiResponse: string): Promise<CommandResult> {
+  // Handle email draft generation
+  if (params.command === 'draft' && params.to && params.topic) {
+    try {
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(params.to)) {
+        return {
+          success: false,
+          message: `❌ Invalid email address: "${params.to}"\n\nPlease provide a valid email address.`,
+          data: { type: 'error' }
+        };
+      }
+      
+      // Check if topic is too vague
+      if (!params.topic || params.topic.trim().length < 3) {
+        return {
+          success: false,
+          message: `❌ Please provide more details about what the email should be about.\n\nTry something like:\n- "Send email to ${params.to} about project update"\n- "Email ${params.to} regarding meeting schedule"`,
+          data: { type: 'error' }
+        };
+      }
+      
+      // Generate email content using OpenAI
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a professional email assistant. Generate a well-structured email about the given topic.
+            
+Format the response as JSON with these fields:
+- subject: Professional subject line
+- body: Email body with proper formatting (use \\n for line breaks)
+- bodyHtml: HTML formatted version of the email
+
+Keep the tone professional but friendly. Include:
+1. Appropriate greeting
+2. Clear main message about the topic
+3. Professional closing
+4. Signature placeholder
+
+The email should be concise and to the point.`
+          },
+          {
+            role: "user",
+            content: `Write an email to ${params.to} about: ${params.topic}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 800
+      });
+
+      const emailContent = JSON.parse(completion.choices[0].message.content || '{}');
+      
+      // Return draft email response for dashboard to render
+      return {
+        success: true,
+        message: `## Email Draft\n\n**To:** ${params.to}\n**Subject:** ${emailContent.subject}\n\n${emailContent.body}`,
+        data: {
+          type: 'draft_email',
+          draft: {
+            to: params.to,
+            subject: emailContent.subject || `Regarding: ${params.topic}`,
+            body: emailContent.body || `Dear recipient,\n\nI wanted to reach out about ${params.topic}.\n\nBest regards`,
+            bodyHtml: emailContent.bodyHtml || emailContent.body,
+            topic: params.topic
+          }
+        }
+      };
+    } catch (error) {
+      console.error('Email draft generation error:', error);
+      return {
+        success: false,
+        error: 'Failed to generate email draft',
+        message: 'I couldn\'t generate an email draft. Please try again.'
+      };
+    }
+  }
+  
   if (params.command === 'summarize') {
     try {
       // Get emails from database (don't filter by user for now)
@@ -226,7 +312,8 @@ async function handleEmail(workspaceId: string, params: any, userId?: string, ai
     }
   }
   
-  if (params.command === 'send' && params.to) {
+  // Handle actual sending of email (called when user clicks Send button)
+  if (params.command === 'send' && params.to && params.subject && params.body) {
     try {
       const { GmailClient } = await import('@/lib/evermail/gmail-client');
       const gmail = new GmailClient();
@@ -239,9 +326,18 @@ async function handleEmail(workspaceId: string, params: any, userId?: string, ai
         userId
       });
       
-      return { success: true, message: aiResponse };
+      return { 
+        success: true, 
+        message: `✅ Email sent successfully to ${params.to}!`,
+        data: { type: 'email_sent' }
+      };
     } catch (error) {
-      return { success: false, error: 'Failed to send email', message: aiResponse };
+      console.error('Failed to send email:', error);
+      return { 
+        success: false, 
+        error: 'Failed to send email', 
+        message: 'Unable to send email. Please make sure your Gmail account is connected in Mail Settings.' 
+      };
     }
   }
   
