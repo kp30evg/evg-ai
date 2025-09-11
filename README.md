@@ -14,6 +14,6 @@ Make sure you have the following installed:
    git clone <repository-url>
    cd <project-folder>
 
-2. npm install + npm run dev
+2. npm install + npm run dev + try hitting localhost:3000 in your browser
 
 3. Happy coding!
