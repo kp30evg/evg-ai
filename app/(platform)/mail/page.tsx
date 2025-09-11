@@ -47,7 +47,7 @@ export default function MailPage() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasGmailConnection, setHasGmailConnection] = useState(false);
   const [hasSyncedData, setHasSyncedData] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'inbox' | 'sent' | 'drafts' | 'scheduled' | 'analytics'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard'>('dashboard');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const router = useRouter();
 
@@ -283,11 +283,7 @@ export default function MailPage() {
         <div className="flex items-center" style={{gap: '4px', paddingTop: '24px'}}>
           {[
             { key: 'dashboard', label: 'Dashboard' },
-            { key: 'inbox', label: 'Inbox' },
-            { key: 'sent', label: 'Sent' },
-            { key: 'drafts', label: 'Drafts' },
-            { key: 'scheduled', label: 'Scheduled' },
-            { key: 'analytics', label: 'Analytics' }
+            { key: 'inbox', label: 'Inbox' }
           ].map((tab) => (
             <button
               key={tab.key}
@@ -296,12 +292,6 @@ export default function MailPage() {
                   setActiveTab('dashboard');
                 } else if (tab.key === 'inbox') {
                   router.push('/mail/inbox');
-                } else if (tab.key === 'sent') {
-                  router.push('/mail/sent');
-                } else if (tab.key === 'drafts') {
-                  router.push('/mail/drafts');
-                } else {
-                  setActiveTab(tab.key as any);
                 }
               }}
               className={`transition-colors ${
@@ -498,63 +488,6 @@ export default function MailPage() {
           </div>
         )}
 
-        {activeTab === 'inbox' && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-[#E6F4EC] rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Inbox className="h-8 w-8 text-[#1D5238]" />
-            </div>
-            <h3 className="text-[#222B2E] mb-2" style={{fontSize: '20px', fontWeight: 600}}>Inbox</h3>
-            <p className="text-[#6B7280] mb-6" style={{fontSize: '16px'}}>Your intelligent inbox is being prepared...</p>
-            <button 
-              onClick={() => router.push('/mail/inbox')}
-              className="bg-[#1D5238] hover:bg-[#2A7A52] text-white transition-colors duration-200 inline-flex items-center" 
-              style={{padding: '12px 24px', fontSize: '14px', fontWeight: 600, borderRadius: '8px'}}
-            >
-              <MailOpen className="h-4 w-4 mr-2" />
-              Open Classic View
-            </button>
-          </div>
-        )}
-
-        {activeTab === 'sent' && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-[#E6F4EC] rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Send className="h-8 w-8 text-[#1D5238]" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Sent Mail</h3>
-            <p className="text-gray-600">View all your sent messages and track responses...</p>
-          </div>
-        )}
-
-        {activeTab === 'drafts' && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-[#E6F4EC] rounded-xl flex items-center justify-center mx-auto mb-4">
-              <FileText className="h-8 w-8 text-[#1D5238]" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Drafts</h3>
-            <p className="text-gray-600">Continue working on your saved drafts...</p>
-          </div>
-        )}
-
-        {activeTab === 'scheduled' && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-[#E6F4EC] rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Clock className="h-8 w-8 text-[#1D5238]" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Scheduled</h3>
-            <p className="text-gray-600">Manage your scheduled emails...</p>
-          </div>
-        )}
-
-        {activeTab === 'analytics' && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-[#E6F4EC] rounded-xl flex items-center justify-center mx-auto mb-4">
-              <TrendingUp className="h-8 w-8 text-[#1D5238]" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Email Analytics</h3>
-            <p className="text-gray-600">Detailed insights into your email patterns...</p>
-          </div>
-        )}
       </div>
 
       {/* Compose Modal */}

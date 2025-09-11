@@ -46,7 +46,7 @@ const sendEmailSchema = z.object({
 
 const searchEmailsSchema = z.object({
   query: z.string().optional(),
-  folder: z.enum(['inbox', 'sent', 'drafts', 'trash', 'spam', 'all']).optional(),
+  folder: z.enum(['inbox', 'sent', 'drafts', 'trash', 'spam', 'starred', 'all']).optional(),
   isRead: z.boolean().optional(),
   isStarred: z.boolean().optional(),
   hasAttachments: z.boolean().optional(),
@@ -331,6 +331,8 @@ export const evermailRouter = router({
           additionalConditions.push(sql`(data->>'isTrash')::boolean = true`);
         } else if (input.folder === 'spam') {
           additionalConditions.push(sql`(data->>'isSpam')::boolean = true`);
+        } else if (input.folder === 'starred') {
+          additionalConditions.push(sql`(data->>'isStarred')::boolean = true`);
         }
       }
 
@@ -526,6 +528,44 @@ export const evermailRouter = router({
         );
         oauth2Client.setCredentials(tokens);
         
+        // Set up token refresh handler
+        oauth2Client.on('tokens', async (newTokens: any) => {
+          console.log('Refreshing Gmail tokens...');
+          const updatedTokens = { ...tokens, ...newTokens };
+          
+          // Update stored tokens in database
+          await db
+            .update(entities)
+            .set({
+              data: {
+                ...accountData,
+                tokens: Buffer.from(JSON.stringify(updatedTokens)).toString('base64')
+              },
+              updatedAt: new Date()
+            })
+            .where(eq(entities.id, emailAccount[0].id));
+        });
+        
+        // Try to refresh the token if it's expired
+        try {
+          const { credentials } = await oauth2Client.refreshAccessToken();
+          oauth2Client.setCredentials(credentials);
+          
+          // Update stored tokens
+          await db
+            .update(entities)
+            .set({
+              data: {
+                ...accountData,
+                tokens: Buffer.from(JSON.stringify(credentials)).toString('base64')
+              },
+              updatedAt: new Date()
+            })
+            .where(eq(entities.id, emailAccount[0].id));
+        } catch (refreshError) {
+          console.log('Token refresh attempted, continuing with existing tokens');
+        }
+        
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
         
         // Create email message in RFC 2822 format
@@ -547,12 +587,27 @@ export const evermailRouter = router({
           .replace(/=+$/, '');
         
         // Send email via Gmail API
-        const sentMessage = await gmail.users.messages.send({
-          userId: 'me',
-          requestBody: {
-            raw: encodedMessage
+        let sentMessage;
+        try {
+          sentMessage = await gmail.users.messages.send({
+            userId: 'me',
+            requestBody: {
+              raw: encodedMessage
+            }
+          });
+        } catch (sendError: any) {
+          console.error('Gmail API send error:', sendError);
+          
+          // Check if it's an authentication error
+          if (sendError.message?.includes('invalid_grant') || 
+              sendError.code === 401 || 
+              sendError.message?.includes('Token has been expired')) {
+            throw new Error('Your Gmail session has expired. Please reconnect your Gmail account in Mail Settings.');
           }
-        });
+          
+          // Other errors
+          throw new Error(`Failed to send email: ${sendError.message || 'Unknown error'}`);
+        }
 
         // Store in our database
         const [email] = await db.insert(entities).values({
@@ -1206,5 +1261,143 @@ export const evermailRouter = router({
       const result = await autoLabelService.labelEmail(emailData, workspaceId, dbUser.id);
       
       return result;
+    }),
+
+  // Restore email from trash
+  restoreFromTrash: protectedProcedure
+    .input(z.object({
+      emailId: z.string().uuid()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { orgId, userId } = ctx;
+      
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
+
+      const [email] = await db
+        .select()
+        .from(entities)
+        .where(
+          and(
+            eq(entities.id, input.emailId),
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id)
+          )
+        )
+        .limit(1);
+
+      if (!email) {
+        throw new Error('Email not found');
+      }
+
+      const data = email.data as any;
+      await db
+        .update(entities)
+        .set({
+          data: {
+            ...data,
+            isTrash: false
+          },
+          updatedAt: new Date()
+        })
+        .where(eq(entities.id, input.emailId));
+
+      return { success: true };
+    }),
+
+  // Permanently delete email
+  permanentlyDelete: protectedProcedure
+    .input(z.object({
+      emailId: z.string().uuid()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { orgId, userId } = ctx;
+      
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
+
+      // Verify email belongs to user and is in trash
+      const [email] = await db
+        .select()
+        .from(entities)
+        .where(
+          and(
+            eq(entities.id, input.emailId),
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id),
+            sql`(data->>'isTrash')::boolean = true`
+          )
+        )
+        .limit(1);
+
+      if (!email) {
+        throw new Error('Email not found in trash');
+      }
+
+      // Permanently delete
+      await db
+        .delete(entities)
+        .where(eq(entities.id, input.emailId));
+
+      return { success: true };
+    }),
+
+  // Empty trash
+  emptyTrash: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const { orgId, userId } = ctx;
+      
+      const workspaceId = await getWorkspaceId(orgId);
+      if (!workspaceId) {
+        throw new Error('Workspace not found');
+      }
+      
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        throw new Error('User not found');
+      }
+
+      // Delete all emails in trash for this user
+      await db
+        .delete(entities)
+        .where(
+          and(
+            eq(entities.workspaceId, workspaceId),
+            eq(entities.userId, dbUser.id),
+            eq(entities.type, 'email'),
+            sql`(data->>'isTrash')::boolean = true`
+          )
+        );
+
+      return { success: true };
     })
 });

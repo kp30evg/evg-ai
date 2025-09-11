@@ -4,16 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { trpc } from '@/lib/trpc/client';
 import { motion, AnimatePresence } from 'framer-motion';
+import RichTextEditor from '@/components/mail/RichTextEditor';
 import { 
   Send,
   X,
-  Paperclip,
-  Bold,
-  Italic,
-  Link2,
-  List,
   Save,
-  ChevronDown,
   Loader2,
   ArrowLeft
 } from 'lucide-react';
@@ -104,6 +99,44 @@ const tokens = {
   }
 };
 
+// Input field component - moved outside to prevent re-creation on every render
+const InputField = ({ label, value, onChange, placeholder }: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    padding: `${tokens.spacing.sm} 0`
+  }}>
+    <label style={{
+      fontSize: tokens.typography.sizes.sm,
+      color: tokens.colors.gray500,
+      minWidth: '50px'
+    }}>
+      {label}
+    </label>
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{
+        flex: 1,
+        border: 'none',
+        outline: 'none',
+        fontSize: tokens.typography.sizes.sm,
+        color: tokens.colors.charcoal,
+        fontFamily: tokens.typography.fontFamily,
+        backgroundColor: 'transparent',
+        padding: `${tokens.spacing.xs} ${tokens.spacing.xs}`
+      }}
+    />
+  </div>
+);
+
 export default function ComposePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -118,7 +151,8 @@ export default function ComposePage() {
   const [bcc, setBcc] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [attachments, setAttachments] = useState<any[]>([]);
+  const [bodyHtml, setBodyHtml] = useState('');
+  const [attachments, setAttachments] = useState<Array<{ name: string; size: number; id: string; file?: File }>>([]);
   const [isSending, setIsSending] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [showCc, setShowCc] = useState(false);
@@ -135,8 +169,17 @@ export default function ComposePage() {
     },
     onError: (error) => {
       console.error('Failed to send email:', error);
-      alert('Failed to send email. Please try again.');
       setIsSending(false);
+      
+      // Check if it's a Gmail authentication error
+      if (error.message?.includes('session has expired') || 
+          error.message?.includes('reconnect')) {
+        if (confirm(error.message + '\n\nWould you like to reconnect your Gmail account now?')) {
+          router.push('/mail/settings');
+        }
+      } else {
+        alert(error.message || 'Failed to send email. Please try again.');
+      }
     }
   });
 
@@ -163,6 +206,25 @@ export default function ComposePage() {
     return () => clearInterval(interval);
   }, [to, cc, bcc, subject, body]);
 
+  const handleEditorChange = (html: string, text: string) => {
+    setBodyHtml(html);
+    setBody(text);
+  };
+
+  const handleAttachmentAdd = (files: File[]) => {
+    const newAttachments = files.map(file => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      size: file.size,
+      file: file
+    }));
+    setAttachments(prev => [...prev, ...newAttachments]);
+  };
+
+  const handleAttachmentRemove = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  };
+
   const handleSend = async () => {
     if (!to || !subject) {
       alert('Please enter a recipient and subject');
@@ -175,8 +237,8 @@ export default function ComposePage() {
       cc: cc ? cc.split(',').map(email => email.trim()) : undefined,
       bcc: bcc ? bcc.split(',').map(email => email.trim()) : undefined,
       subject,
-      body,
-      attachments
+      body: bodyHtml || body,
+      attachments: attachments.map(a => ({ name: a.name, size: a.size }))
     });
   };
 
@@ -187,7 +249,7 @@ export default function ComposePage() {
       cc: cc ? cc.split(',').map(email => email.trim()) : [],
       bcc: bcc ? bcc.split(',').map(email => email.trim()) : [],
       subject: subject || '(No subject)',
-      body
+      body: bodyHtml || body
     });
   };
 
@@ -200,41 +262,6 @@ export default function ComposePage() {
       router.push('/mail/inbox');
     }
   };
-
-  // Input field component for consistency
-  const InputField = ({ label, value, onChange, placeholder }: any) => (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      borderBottom: `1px solid ${tokens.colors.gray100}`,
-      padding: `${tokens.spacing.md} 0`
-    }}>
-      <label style={{
-        fontSize: tokens.typography.sizes.sm,
-        fontWeight: tokens.typography.weights.medium,
-        color: tokens.colors.gray600,
-        minWidth: '60px'
-      }}>
-        {label}
-      </label>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          flex: 1,
-          border: 'none',
-          outline: 'none',
-          fontSize: tokens.typography.sizes.sm,
-          color: tokens.colors.charcoal,
-          fontFamily: tokens.typography.fontFamily,
-          backgroundColor: 'transparent',
-          padding: `${tokens.spacing.xs} ${tokens.spacing.sm}`
-        }}
-      />
-    </div>
-  );
 
   if (!gmailStatus?.connected) {
     return (
@@ -279,136 +306,105 @@ export default function ComposePage() {
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
-      backgroundColor: tokens.colors.gray50,
+      backgroundColor: tokens.colors.white,
       fontFamily: tokens.typography.fontFamily
     }}>
-      {/* Header */}
-      <div style={{
-        padding: tokens.spacing.lg,
-        backgroundColor: tokens.colors.white,
-        borderBottom: `1px solid ${tokens.colors.gray100}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: tokens.spacing.lg
-        }}>
-          <motion.button
-            onClick={() => router.push('/mail/inbox')}
-            style={{
-              padding: tokens.spacing.sm,
-              backgroundColor: 'transparent',
-              border: `1px solid ${tokens.colors.gray200}`,
-              borderRadius: tokens.radii.md,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: tokens.transitions.fast
-            }}
-            whileHover={{ backgroundColor: tokens.colors.gray50 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <ArrowLeft size={16} color={tokens.colors.gray600} strokeWidth={2} />
-          </motion.button>
-          <h1 style={{
-            fontSize: tokens.typography.sizes.lg,
-            fontWeight: tokens.typography.weights.semibold,
-            color: tokens.colors.charcoal,
-            margin: 0,
-            letterSpacing: '-0.01em'
-          }}>
-            Compose
-          </h1>
-        </div>
-        
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: tokens.spacing.sm
-        }}>
-          {lastSaved && (
-            <span style={{
-              fontSize: tokens.typography.sizes.xs,
-              color: tokens.colors.gray500
-            }}>
-              Saved {lastSaved.toLocaleTimeString()}
-            </span>
-          )}
-          <motion.button
-            onClick={handleSaveDraft}
-            disabled={isSavingDraft}
-            style={{
-              padding: `${tokens.spacing.sm} ${tokens.spacing.lg}`,
-              backgroundColor: tokens.colors.white,
-              color: tokens.colors.gray700,
-              border: `1px solid ${tokens.colors.gray200}`,
-              borderRadius: tokens.radii.md,
-              fontSize: tokens.typography.sizes.sm,
-              fontWeight: tokens.typography.weights.medium,
-              cursor: isSavingDraft ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: tokens.spacing.sm,
-              transition: tokens.transitions.fast
-            }}
-            whileHover={{ backgroundColor: isSavingDraft ? tokens.colors.white : tokens.colors.gray50 }}
-            whileTap={{ scale: isSavingDraft ? 1 : 0.98 }}
-          >
-            {isSavingDraft ? (
-              <Loader2 size={14} className="animate-spin" strokeWidth={2} />
-            ) : (
-              <Save size={14} strokeWidth={2} />
-            )}
-            Save Draft
-          </motion.button>
-          <motion.button
-            onClick={handleSend}
-            disabled={isSending || !to || !subject}
-            style={{
-              padding: `${tokens.spacing.sm} ${tokens.spacing.lg}`,
-              backgroundColor: isSending || !to || !subject ? tokens.colors.gray300 : tokens.colors.evergreen,
-              color: tokens.colors.white,
-              border: 'none',
-              borderRadius: tokens.radii.md,
-              fontSize: tokens.typography.sizes.sm,
-              fontWeight: tokens.typography.weights.medium,
-              cursor: isSending || !to || !subject ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: tokens.spacing.sm,
-              transition: tokens.transitions.fast
-            }}
-            whileHover={{ opacity: isSending || !to || !subject ? 1 : 0.9 }}
-            whileTap={{ scale: isSending || !to || !subject ? 1 : 0.98 }}
-          >
-            {isSending ? (
-              <Loader2 size={14} className="animate-spin" strokeWidth={2} />
-            ) : (
-              <Send size={14} strokeWidth={2} />
-            )}
-            Send
-          </motion.button>
-        </div>
-      </div>
 
       {/* Compose Form */}
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        maxWidth: '800px',
         width: '100%',
-        margin: '0 auto',
         backgroundColor: tokens.colors.white,
-        marginTop: tokens.spacing.xl,
-        borderRadius: tokens.radii.lg,
-        boxShadow: tokens.shadows.md,
         overflow: 'hidden'
       }}>
+        {/* Header with Send and Save */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: `${tokens.spacing.md} ${tokens.spacing.xl}`,
+          borderBottom: `1px solid ${tokens.colors.gray200}`,
+        }}>
+          <h2 style={{
+            fontSize: tokens.typography.sizes.base,
+            fontWeight: tokens.typography.weights.medium,
+            color: tokens.colors.charcoal,
+            margin: 0,
+          }}>
+            Compose
+          </h2>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: tokens.spacing.sm,
+          }}>
+            {lastSaved && (
+              <span style={{
+                fontSize: tokens.typography.sizes.xs,
+                color: tokens.colors.gray500,
+              }}>
+                Saved {lastSaved.toLocaleTimeString()}
+              </span>
+            )}
+            <motion.button
+              onClick={handleSaveDraft}
+              disabled={isSavingDraft}
+              style={{
+                padding: `6px ${tokens.spacing.md}`,
+                backgroundColor: tokens.colors.white,
+                color: tokens.colors.gray700,
+                border: `1px solid ${tokens.colors.gray300}`,
+                borderRadius: tokens.radii.sm,
+                fontSize: tokens.typography.sizes.sm,
+                fontWeight: tokens.typography.weights.medium,
+                cursor: isSavingDraft ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: tokens.spacing.xs,
+                transition: tokens.transitions.fast,
+              }}
+              whileHover={{ backgroundColor: isSavingDraft ? tokens.colors.white : tokens.colors.gray50 }}
+              whileTap={{ scale: isSavingDraft ? 1 : 0.98 }}
+            >
+              {isSavingDraft ? (
+                <Loader2 size={14} className="animate-spin" strokeWidth={2} />
+              ) : (
+                <Save size={14} strokeWidth={2} />
+              )}
+              Save Draft
+            </motion.button>
+            <motion.button
+              onClick={handleSend}
+              disabled={isSending || !to || !subject}
+              style={{
+                padding: `6px ${tokens.spacing.lg}`,
+                backgroundColor: isSending || !to || !subject ? tokens.colors.gray300 : '#1a73e8',
+                color: tokens.colors.white,
+                border: 'none',
+                borderRadius: tokens.radii.sm,
+                fontSize: tokens.typography.sizes.sm,
+                fontWeight: tokens.typography.weights.medium,
+                cursor: isSending || !to || !subject ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: tokens.spacing.xs,
+                transition: tokens.transitions.fast,
+              }}
+              whileHover={{ opacity: isSending || !to || !subject ? 1 : 0.9 }}
+              whileTap={{ scale: isSending || !to || !subject ? 1 : 0.98 }}
+            >
+              {isSending ? (
+                <Loader2 size={14} className="animate-spin" strokeWidth={2} />
+              ) : (
+                <Send size={14} strokeWidth={2} />
+              )}
+              Send
+            </motion.button>
+          </div>
+        </div>
+
         {/* Recipients */}
         <div style={{
           padding: `0 ${tokens.spacing.xl}`,
@@ -418,7 +414,7 @@ export default function ComposePage() {
             label="To"
             value={to}
             onChange={setTo}
-            placeholder="Recipients (comma separated)"
+            placeholder="Recipients"
           />
           
           {!showCc && !showBcc && (
@@ -504,149 +500,21 @@ export default function ComposePage() {
           />
         </div>
 
-        {/* Body */}
+        {/* Rich Text Editor */}
         <div style={{
           flex: 1,
-          padding: tokens.spacing.xl,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
+          <RichTextEditor
+            value={bodyHtml || body}
+            onChange={handleEditorChange}
             placeholder="Write your message..."
-            style={{
-              flex: 1,
-              border: 'none',
-              outline: 'none',
-              fontSize: tokens.typography.sizes.sm,
-              color: tokens.colors.charcoal,
-              fontFamily: tokens.typography.fontFamily,
-              lineHeight: tokens.typography.lineHeights.relaxed,
-              resize: 'none',
-              backgroundColor: 'transparent'
-            }}
+            onAttachmentAdd={handleAttachmentAdd}
+            attachments={attachments}
+            onAttachmentRemove={handleAttachmentRemove}
           />
-        </div>
-
-        {/* Bottom Toolbar */}
-        <div style={{
-          padding: tokens.spacing.lg,
-          borderTop: `1px solid ${tokens.colors.gray100}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: tokens.colors.gray50
-        }}>
-          <div style={{
-            display: 'flex',
-            gap: tokens.spacing.xs
-          }}>
-            <motion.button
-              style={{
-                padding: tokens.spacing.sm,
-                backgroundColor: 'transparent',
-                border: `1px solid ${tokens.colors.gray200}`,
-                borderRadius: tokens.radii.md,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: tokens.transitions.fast
-              }}
-              whileHover={{ backgroundColor: tokens.colors.white }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Bold size={14} color={tokens.colors.gray600} strokeWidth={2} />
-            </motion.button>
-            <motion.button
-              style={{
-                padding: tokens.spacing.sm,
-                backgroundColor: 'transparent',
-                border: `1px solid ${tokens.colors.gray200}`,
-                borderRadius: tokens.radii.md,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: tokens.transitions.fast
-              }}
-              whileHover={{ backgroundColor: tokens.colors.white }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Italic size={14} color={tokens.colors.gray600} strokeWidth={2} />
-            </motion.button>
-            <motion.button
-              style={{
-                padding: tokens.spacing.sm,
-                backgroundColor: 'transparent',
-                border: `1px solid ${tokens.colors.gray200}`,
-                borderRadius: tokens.radii.md,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: tokens.transitions.fast
-              }}
-              whileHover={{ backgroundColor: tokens.colors.white }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link2 size={14} color={tokens.colors.gray600} strokeWidth={2} />
-            </motion.button>
-            <motion.button
-              style={{
-                padding: tokens.spacing.sm,
-                backgroundColor: 'transparent',
-                border: `1px solid ${tokens.colors.gray200}`,
-                borderRadius: tokens.radii.md,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: tokens.transitions.fast
-              }}
-              whileHover={{ backgroundColor: tokens.colors.white }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <List size={14} color={tokens.colors.gray600} strokeWidth={2} />
-            </motion.button>
-            <motion.button
-              style={{
-                padding: tokens.spacing.sm,
-                backgroundColor: 'transparent',
-                border: `1px solid ${tokens.colors.gray200}`,
-                borderRadius: tokens.radii.md,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: tokens.transitions.fast,
-                marginLeft: tokens.spacing.sm
-              }}
-              whileHover={{ backgroundColor: tokens.colors.white }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Paperclip size={14} color={tokens.colors.gray600} strokeWidth={2} />
-            </motion.button>
-          </div>
-
-          <motion.button
-            onClick={handleDiscard}
-            style={{
-              padding: tokens.spacing.sm,
-              backgroundColor: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: tokens.transitions.fast
-            }}
-            whileHover={{ opacity: 0.7 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <X size={16} color={tokens.colors.gray500} strokeWidth={2} />
-          </motion.button>
         </div>
       </div>
     </div>

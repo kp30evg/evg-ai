@@ -244,7 +244,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
           style={{
             width: sidebarCollapsed ? '60px' : '260px',
             backgroundColor: tokens.colors.white,
-            borderRight: `1px solid ${tokens.colors.gray200}`,
+            borderRight: `1px solid ${tokens.colors.gray100}`,
             display: 'flex',
             flexDirection: 'column',
             position: 'relative',
@@ -306,8 +306,8 @@ export default function MailLayout({ children }: MailLayoutProps) {
               width: '100%',
               padding: sidebarCollapsed ? tokens.spacing.md : `${tokens.spacing.md} ${tokens.spacing.lg}`,
               backgroundColor: tokens.colors.white,
-              color: tokens.colors.evergreen,
-              border: `1px solid ${tokens.colors.evergreen}`,
+              color: tokens.colors.gray700,
+              border: `1px solid ${tokens.colors.gray300}`,
               borderRadius: tokens.radii.lg,
               fontSize: tokens.typography.sizes.sm,
               fontWeight: tokens.typography.weights.medium,
@@ -320,7 +320,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
               transition: tokens.transitions.fast
             }}
             whileHover={{ 
-              backgroundColor: tokens.colors.softGreen,
+              backgroundColor: tokens.colors.gray50,
               scale: 1.02
             }}
             whileTap={{ scale: 0.98 }}
@@ -349,12 +349,12 @@ export default function MailLayout({ children }: MailLayoutProps) {
                   style={{
                     width: '100%',
                     padding: sidebarCollapsed ? tokens.spacing.md : `${tokens.spacing.sm} ${tokens.spacing.md}`,
-                    backgroundColor: active ? tokens.colors.softGreen : 'transparent',
+                    backgroundColor: active ? tokens.colors.gray100 : 'transparent',
                     border: 'none',
                     borderRadius: tokens.radii.md,
                     fontSize: tokens.typography.sizes.sm,
                     fontWeight: active ? tokens.typography.weights.medium : tokens.typography.weights.regular,
-                    color: active ? tokens.colors.evergreen : tokens.colors.gray700,
+                    color: active ? tokens.colors.charcoal : tokens.colors.gray700,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -375,7 +375,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
                   }}>
                     <Icon 
                       size={18} 
-                      color={active ? tokens.colors.evergreen : item.color}
+                      color={active ? tokens.colors.charcoal : item.color}
                       strokeWidth={active ? 2.5 : 2}
                     />
                     {!sidebarCollapsed && <span>{item.label}</span>}
@@ -401,7 +401,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
                       right: '8px',
                       width: '8px',
                       height: '8px',
-                      backgroundColor: tokens.colors.evergreen,
+                      backgroundColor: tokens.colors.error,
                       borderRadius: '50%'
                     }} />
                   )}
@@ -457,12 +457,12 @@ export default function MailLayout({ children }: MailLayoutProps) {
                         style={{
                           width: '100%',
                           padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
-                          backgroundColor: active ? tokens.colors.softGreen : 'transparent',
+                          backgroundColor: active ? tokens.colors.gray100 : 'transparent',
                           border: 'none',
                           borderRadius: tokens.radii.md,
                           fontSize: tokens.typography.sizes.sm,
                           fontWeight: active ? tokens.typography.weights.medium : tokens.typography.weights.regular,
-                          color: active ? tokens.colors.evergreen : tokens.colors.gray700,
+                          color: active ? tokens.colors.charcoal : tokens.colors.gray700,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -471,7 +471,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
                           transition: tokens.transitions.fast
                         }}
                         whileHover={{
-                          backgroundColor: active ? tokens.colors.softGreen : tokens.colors.gray50
+                          backgroundColor: active ? tokens.colors.gray100 : tokens.colors.gray50
                         }}
                         whileTap={{ scale: 0.98 }}
                       >
@@ -482,7 +482,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
                         }}>
                           <Icon 
                             size={18} 
-                            color={active ? tokens.colors.evergreen : item.color}
+                            color={active ? tokens.colors.charcoal : item.color}
                             strokeWidth={active ? 2.5 : 2}
                           />
                           <span>{item.label}</span>
@@ -571,10 +571,10 @@ export default function MailLayout({ children }: MailLayoutProps) {
                         style={{
                           width: '100%',
                           padding: `${tokens.spacing.sm} ${tokens.spacing.md}`,
-                          backgroundColor: pathname === `/mail/label/${label.id}` ? tokens.colors.softGreen : 'transparent',
+                          backgroundColor: pathname === `/mail/label/${label.id}` ? tokens.colors.gray100 : 'transparent',
                           border: 'none',
                           fontSize: tokens.typography.sizes.sm,
-                          color: pathname === `/mail/label/${label.id}` ? tokens.colors.evergreen : tokens.colors.gray700,
+                          color: pathname === `/mail/label/${label.id}` ? tokens.colors.charcoal : tokens.colors.gray700,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -582,7 +582,7 @@ export default function MailLayout({ children }: MailLayoutProps) {
                           transition: tokens.transitions.fast
                         }}
                         whileHover={{
-                          backgroundColor: pathname === `/mail/label/${label.id}` ? tokens.colors.softGreen : tokens.colors.gray50
+                          backgroundColor: pathname === `/mail/label/${label.id}` ? tokens.colors.gray100 : tokens.colors.gray50
                         }}
                         whileTap={{ scale: 0.98 }}
                       >

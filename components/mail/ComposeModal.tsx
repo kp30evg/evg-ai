@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Paperclip, Minimize2, Maximize2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
+import RichTextEditor from '@/components/mail/RichTextEditor';
 
 // evergreenOS Design System Tokens (from style guide)
 const tokens = {
@@ -94,6 +95,8 @@ export default function ComposeModal({
   const [bcc, setBcc] = useState('');
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
+  const [bodyHtml, setBodyHtml] = useState('');
+  const [attachments, setAttachments] = useState<Array<{ name: string; size: number; id: string }>>([]);
   const [isSending, setIsSending] = useState(false);
   const [showCc, setShowCc] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -115,8 +118,22 @@ export default function ComposeModal({
     setSubject(e.target.value);
   }, []);
   
-  const handleBodyChange = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setBody(e.target.value);
+  const handleEditorChange = React.useCallback((html: string, text: string) => {
+    setBodyHtml(html);
+    setBody(text);
+  }, []);
+
+  const handleAttachmentAdd = React.useCallback((files: File[]) => {
+    const newAttachments = files.map(file => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      size: file.size
+    }));
+    setAttachments(prev => [...prev, ...newAttachments]);
+  }, []);
+
+  const handleAttachmentRemove = React.useCallback((id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
   }, []);
 
   const sendEmail = trpc.evermail.sendEmail.useMutation({
@@ -130,7 +147,17 @@ export default function ComposeModal({
       setBody('');
     },
     onError: (error) => {
-      alert(`Failed to send email: ${error.message}`);
+      setIsSending(false);
+      
+      // Check if it's a Gmail authentication error
+      if (error.message?.includes('session has expired') || 
+          error.message?.includes('reconnect')) {
+        if (confirm(error.message + '\n\nWould you like to reconnect your Gmail account now?')) {
+          window.location.href = '/mail/settings';
+        }
+      } else {
+        alert(error.message || 'Failed to send email. Please try again.');
+      }
     }
   });
   
@@ -155,7 +182,7 @@ export default function ComposeModal({
       cc: cc ? cc.split(',').map(email => email.trim()) : undefined,
       bcc: bcc ? bcc.split(',').map(email => email.trim()) : undefined,
       subject,
-      body,
+      body: bodyHtml || body,
       replyToId
     });
     setIsSending(false);
@@ -185,6 +212,8 @@ export default function ComposeModal({
           right: tokens.spacing.xl,
           width: isMinimized ? '320px' : '680px',
           maxWidth: '90vw',
+          height: isMinimized ? 'auto' : '650px',
+          maxHeight: '85vh',
           backgroundColor: tokens.colors.white,
           borderRadius: tokens.radii.xl,
           boxShadow: tokens.shadows.xl,
@@ -192,7 +221,9 @@ export default function ComposeModal({
           zIndex: 1000,
           overflow: 'hidden',
           transition: tokens.transitions.base,
-          fontFamily: tokens.typography.fontFamily
+          fontFamily: tokens.typography.fontFamily,
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
         {/* Header */}
@@ -389,33 +420,21 @@ export default function ComposeModal({
             </div>
 
             {/* Body */}
-            <div style={{ padding: `${tokens.spacing.xl} ${tokens.spacing.xl}` }}>
-              <textarea
+            <div style={{ 
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: '250px',
+              maxHeight: 'calc(100% - 240px)',
+              overflow: 'auto'
+            }}>
+              <RichTextEditor
+                value={bodyHtml || body}
+                onChange={handleEditorChange}
                 placeholder="Write your message..."
-                value={body}
-                onChange={handleBodyChange}
-                style={{
-                  width: '100%',
-                  minHeight: '240px',
-                  padding: `${tokens.spacing.lg} ${tokens.spacing.lg}`,
-                  border: `2px solid ${tokens.colors.gray200}`,
-                  borderRadius: tokens.radii.lg,
-                  fontSize: tokens.typography.sizes.base,
-                  fontFamily: tokens.typography.fontFamily,
-                  lineHeight: tokens.typography.lineHeights.relaxed,
-                  resize: 'vertical',
-                  outline: 'none',
-                  transition: tokens.transitions.fast,
-                  backgroundColor: tokens.colors.white
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = tokens.colors.evergreen;
-                  e.target.style.boxShadow = `0 0 0 3px ${tokens.colors.softGreen}`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = tokens.colors.gray200;
-                  e.target.style.boxShadow = 'none';
-                }}
+                onAttachmentAdd={handleAttachmentAdd}
+                attachments={attachments}
+                onAttachmentRemove={handleAttachmentRemove}
               />
             </div>
 
@@ -429,25 +448,6 @@ export default function ComposeModal({
               alignItems: 'center'
             }}>
               <div style={{ display: 'flex', gap: tokens.spacing.sm }}>
-                <motion.button
-                  style={{
-                    padding: tokens.spacing.md,
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: tokens.colors.gray500,
-                    borderRadius: tokens.radii.md,
-                    transition: tokens.transitions.fast
-                  }}
-                  whileHover={{ 
-                    backgroundColor: tokens.colors.gray100,
-                    color: tokens.colors.evergreen 
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Paperclip size={20} strokeWidth={2} />
-                </motion.button>
-                
                 <motion.button
                   onClick={handleSaveDraft}
                   style={{
