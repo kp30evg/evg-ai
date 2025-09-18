@@ -103,7 +103,7 @@ export class GmailClient {
             bcc: params.bcc?.map(email => ({ email })),
             body: {
               text: params.body,
-              html: this.convertToHtml(params.body)
+              html: params.bodyHtml || this.convertToHtml(params.body)
             },
             isDraft: false,
             isRead: true,

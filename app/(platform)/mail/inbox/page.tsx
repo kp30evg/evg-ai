@@ -26,7 +26,10 @@ import {
   Send,
   MoreVertical,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Columns,
+  Square,
+  X
 } from 'lucide-react';
 
 // Design System Tokens
@@ -118,11 +121,24 @@ const tokens = {
 export default function InboxPage() {
   const router = useRouter();
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'full' | 'split'>('full');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<any>(null);
+
+  // ESC key handler to return to full view
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedEmail && viewMode === 'split') {
+        setViewMode('full');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [selectedEmail, viewMode]);
 
   // CRITICAL: No caching to prevent cross-user data leaks
   const { data: gmailStatus } = trpc.evermail.getGmailStatus.useQuery(
@@ -188,6 +204,7 @@ export default function InboxPage() {
 
   const handleEmailClick = (email: any) => {
     setSelectedEmail(email);
+    setViewMode('split'); // Auto-switch to split view when email is clicked
     if (!email.data.isRead) {
       markAsRead.mutate({ emailIds: [email.id], isRead: true });
     }
@@ -233,9 +250,9 @@ export default function InboxPage() {
       
       {/* Email List */}
       <div style={{
-        width: selectedEmail ? '420px' : '100%',
-        minWidth: selectedEmail ? '420px' : 'auto',
-        borderRight: selectedEmail ? `1px solid ${tokens.colors.gray200}` : 'none',
+        width: (selectedEmail && viewMode === 'split') ? '420px' : '100%',
+        minWidth: (selectedEmail && viewMode === 'split') ? '420px' : 'auto',
+        borderRight: (selectedEmail && viewMode === 'split') ? `1px solid ${tokens.colors.gray200}` : 'none',
         backgroundColor: tokens.colors.white,
         display: 'flex',
         flexDirection: 'column',
@@ -283,6 +300,33 @@ export default function InboxPage() {
                 {filteredEmails.filter((e: any) => !e.data.isRead).length} unread
               </span>
             )}
+            {/* View Toggle Button */}
+            <motion.button
+              onClick={() => setViewMode(viewMode === 'full' ? 'split' : 'full')}
+              title={viewMode === 'full' ? 'Switch to split view' : 'Switch to full view'}
+              style={{
+                padding: tokens.spacing.md,
+                backgroundColor: selectedEmail ? tokens.colors.softGreen : 'transparent',
+                border: `1px solid ${selectedEmail ? tokens.colors.evergreen : tokens.colors.gray200}`,
+                borderRadius: tokens.radii.md,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: tokens.transitions.fast
+              }}
+              whileHover={{ 
+                backgroundColor: selectedEmail ? tokens.colors.softGreen : tokens.colors.gray50,
+                borderColor: tokens.colors.evergreen
+              }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {viewMode === 'full' ? (
+                <Columns size={16} color={selectedEmail ? tokens.colors.evergreen : tokens.colors.gray500} strokeWidth={2} />
+              ) : (
+                <Square size={16} color={tokens.colors.evergreen} strokeWidth={2} />
+              )}
+            </motion.button>
             <motion.button
               onClick={() => setIsComposeOpen(true)}
               style={{
@@ -607,7 +651,7 @@ export default function InboxPage() {
       </div>
 
       {/* Email Viewer Panel */}
-      {selectedEmail && (
+      {selectedEmail && viewMode === 'split' && (
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -644,6 +688,26 @@ export default function InboxPage() {
                 alignItems: 'center',
                 gap: tokens.spacing.xs
               }}>
+                {/* Close button to return to full view */}
+                <motion.button
+                  onClick={() => setViewMode('full')}
+                  title="Return to full view"
+                  style={{
+                    padding: tokens.spacing.sm,
+                    backgroundColor: 'transparent',
+                    border: `1px solid ${tokens.colors.gray200}`,
+                    borderRadius: tokens.radii.md,
+                    cursor: 'pointer',
+                    transition: tokens.transitions.fast
+                  }}
+                  whileHover={{ 
+                    backgroundColor: tokens.colors.gray50,
+                    borderColor: tokens.colors.gray400
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <X size={16} color={tokens.colors.gray500} strokeWidth={2} />
+                </motion.button>
                 <motion.button
                   onClick={() => handleStarClick(new MouseEvent('click') as any, selectedEmail.id)}
                   style={{
@@ -1440,7 +1504,7 @@ export default function InboxPage() {
         }}
         defaultTo={replyTo ? replyTo.data.from?.email : ''}
         defaultSubject={replyTo ? `Re: ${replyTo.data.subject}` : ''}
-        defaultBody={replyTo ? `\n\n---\nOn ${new Date(replyTo.createdAt).toLocaleString()}, ${replyTo.data.from?.name || replyTo.data.from?.email} wrote:\n${replyTo.data.body?.substring(0, 500)}` : ''}
+        defaultBody={replyTo ? `\n\n---\nOn ${new Date(replyTo.createdAt).toLocaleString()}, ${replyTo.data.from?.name || replyTo.data.from?.email} wrote:\n${(typeof replyTo.data.body === 'string' ? replyTo.data.body : replyTo.data.body?.text || replyTo.data.body?.snippet || '')?.substring(0, 500)}` : ''}
         isReply={!!replyTo}
         replyToId={replyTo?.id}
       />

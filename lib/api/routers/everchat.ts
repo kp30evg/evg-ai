@@ -49,30 +49,24 @@ export const everchatRouter = router({
       channelId: z.string().optional(), // Add support for non-UUID channel IDs
     }))
     .mutation(async ({ ctx, input }) => {
-      // Get or create workspace for this org
-      let workspaceId: string;
-      if (ctx.workspace) {
-        workspaceId = ctx.workspace.id;
-      } else {
-        // Create workspace if it doesn't exist
-        const { db } = ctx;
-        const [newWorkspace] = await db.insert(workspaces).values({
-          clerkOrgId: ctx.orgId,
-          name: 'Default Workspace',
-        }).returning();
-        workspaceId = newWorkspace.id;
+      // Ensure workspace exists
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Workspace not found',
+        });
       }
-      const userId = ctx.userId;
+      const workspaceId = ctx.workspace.id;
+      const clerkUserId = ctx.userId; // This is the Clerk user ID
+      const dbUserId = ctx.user?.id; // This is the database user ID (UUID)
       
       // Get user info from context
       let userName = 'User';
       let userImage: string | undefined;
+      
       if (ctx.user) {
-        userName = ctx.user.name || ctx.user.email || userId || 'User';
+        userName = ctx.user.name || ctx.user.email || 'User';
         userImage = ctx.user.imageUrl || undefined;
-      } else {
-        // Fallback to userId if no user in context
-        userName = userId || 'User';
       }
       
       try {
@@ -94,33 +88,62 @@ export const everchatRouter = router({
               workspaceId,
               `#${input.channelId}`,
               [],
-              userId
+              clerkUserId  // Use Clerk user ID for metadata
             );
             conversationId = newConversation.id;
           }
         }
         
+        if (!conversationId) {
+          throw new Error('No conversation ID provided and could not create one');
+        }
+        
+        console.log('Sending message:', {
+          workspaceId,
+          conversationId,
+          clerkUserId: clerkUserId,
+          dbUserId: dbUserId,
+          content: input.content.substring(0, 50)
+        });
+        
         const message = await everchat.sendMessage(
           workspaceId,
           input.content,
           conversationId,
-          userId,
+          dbUserId || undefined,  // Use database user ID for user_id field
+          clerkUserId,  // Pass Clerk ID for metadata
           userName,
           userImage
         );
         
-        // Broadcast to Pusher for real-time updates
-        const channelName = conversationId 
-          ? channels.getConversationChannel(workspaceId, conversationId)
-          : channels.getCompanyChannel(workspaceId);
-        
-        await pusher.trigger(channelName, events.MESSAGE_SENT, {
-          message,
-          timestamp: new Date().toISOString(),
-        });
+        // Broadcast to Pusher for real-time updates if configured
+        if (pusher) {
+          try {
+            // Use Clerk org ID for Pusher channels, not workspace ID
+            const clerkOrgId = ctx.orgId;
+            const channelName = input.channelId 
+              ? channels.channel(clerkOrgId, input.channelId)
+              : `private-org-${clerkOrgId}-conversation-${conversationId}`;
+            
+            await pusher.trigger(channelName, events.MESSAGE_NEW, {
+              id: message.id,
+              text: message.data.content,
+              userId: message.data.from || message.data.userId,
+              userName: message.data.userName,
+              userImage: message.data.userImage,
+              timestamp: new Date().toISOString(),
+              channelId: conversationId,
+            });
+            console.log('Message broadcast to channel:', channelName);
+          } catch (error) {
+            console.log('Pusher not configured or failed:', error);
+            // Continue without real-time updates
+          }
+        }
         
         return message;
       } catch (error) {
+        console.error('Failed to send message:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: error instanceof Error ? error.message : 'Failed to send message',
@@ -215,14 +238,16 @@ export const everchatRouter = router({
         });
       }
       const workspaceId = ctx.workspace.id;
-      const userId = ctx.userId;
+      const clerkUserId = ctx.userId;
+      const dbUserId = ctx.user?.id;
       
       try {
         const conversation = await everchat.createConversation(
           workspaceId,
           input.title,
           input.participants,
-          userId
+          clerkUserId,  // Use Clerk ID for metadata
+          dbUserId  // Database user ID for user_id field
         );
         
         return conversation;
@@ -275,10 +300,11 @@ export const everchatRouter = router({
         });
       }
       const workspaceId = ctx.workspace.id;
-      const userId = ctx.userId;
+      const clerkUserId = ctx.userId;
+      const dbUserId = ctx.user?.id;
       
       try {
-        const result = await everchat.handleChatCommand(workspaceId, input.command, userId);
+        const result = await everchat.handleChatCommand(workspaceId, input.command, clerkUserId, dbUserId);
         
         if (result.error) {
           throw new TRPCError({

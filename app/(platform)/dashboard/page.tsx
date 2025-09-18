@@ -48,6 +48,8 @@ export default function DashboardPage() {
   const [isFocused, setIsFocused] = useState(false)
   const [emailDraft, setEmailDraft] = useState<any>(null)
   const [showEmailActions, setShowEmailActions] = useState(false)
+  const [emailSummaryData, setEmailSummaryData] = useState<any>(null)
+  const [showEmailSummaryActions, setShowEmailSummaryActions] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const colors = {
@@ -98,13 +100,24 @@ export default function DashboardPage() {
         if (result.data?.type === 'draft_email') {
           setEmailDraft(result.data.draft)
           setShowEmailActions(true)
+          setEmailSummaryData(null)
+          setShowEmailSummaryActions(false)
+        } 
+        // Check if this is an email summary response
+        else if (result.data?.type === 'email_summary' && result.data.actions) {
+          setEmailSummaryData(result.data)
+          setShowEmailSummaryActions(true)
+          setEmailDraft(null)
+          setShowEmailActions(false)
         } else {
           setEmailDraft(null)
           setShowEmailActions(false)
+          setEmailSummaryData(null)
+          setShowEmailSummaryActions(false)
         }
         
         startStreamingText(result.message || 'I couldn\'t generate a response.')
-        setFollowupSuggestions(result.suggestions || ['Try again', 'Ask a different question'])
+        setFollowupSuggestions(result.data?.suggestions || result.suggestions || ['Try again', 'Ask a different question'])
       }, 2500)
     } catch (error) {
       console.error('Error executing command:', error)
@@ -125,6 +138,8 @@ export default function DashboardPage() {
     setFollowupSuggestions([])
     setEmailDraft(null)
     setShowEmailActions(false)
+    setEmailSummaryData(null)
+    setShowEmailSummaryActions(false)
   }
 
   const startThinkingSequence = () => {
@@ -910,6 +925,52 @@ export default function DashboardPage() {
                     >
                       Cancel
                     </motion.button>
+                  </motion.div>
+                )}
+
+                {/* Email Summary Action Buttons */}
+                {showEmailSummaryActions && emailSummaryData?.actions && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      gap: '12px',
+                      marginBottom: '24px'
+                    }}
+                  >
+                    {emailSummaryData.actions.map((action: any, index: number) => (
+                      <motion.button
+                        key={index}
+                        onClick={() => {
+                          if (action.action === 'navigate' && action.url) {
+                            window.location.href = action.url;
+                          }
+                        }}
+                        style={{
+                          padding: '14px 28px',
+                          backgroundColor: index === 0 ? colors.evergreen : colors.white,
+                          color: index === 0 ? colors.white : colors.charcoal,
+                          border: index === 0 ? 'none' : '1px solid #E5E7EB',
+                          borderRadius: '12px',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        whileHover={{ 
+                          scale: index === 0 ? 1.05 : 1,
+                          backgroundColor: index === 0 ? colors.evergreen : colors.mint,
+                          borderColor: index === 0 ? undefined : colors.evergreen + '30'
+                        }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        {action.label}
+                      </motion.button>
+                    ))}
                   </motion.div>
                 )}
 

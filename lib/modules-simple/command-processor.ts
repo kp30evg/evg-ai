@@ -5,6 +5,16 @@
 
 import OpenAI from 'openai';
 import { entityService } from '@/lib/entities/entity-service';
+import {
+  fetchEmails,
+  calculateEmailStats,
+  formatEmailsForDisplay,
+  identifyImportantEmails,
+  getSenderAnalytics,
+  generateFollowUpSuggestions,
+  getDatabaseUserId,
+  parseTimeframe
+} from './email-helpers';
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -85,16 +95,21 @@ Rules:
 - Otherwise -> action: "answer"
 
 Email commands:
-- "summarize my emails" -> {"action":"email","parameters":{"command":"summarize"},"response":"Checking your emails..."}
-- "show my emails" -> {"action":"email","parameters":{"command":"list"},"response":"Loading your emails..."}
-- "send email to X about Y" -> {"action":"email","parameters":{"command":"draft","to":"X","topic":"Y"},"response":"Drafting email..."}
-- "email X about Y" -> {"action":"email","parameters":{"command":"draft","to":"X","topic":"Y"},"response":"Drafting email..."}
-- "draft email to X regarding Y" -> {"action":"email","parameters":{"command":"draft","to":"X","topic":"Y"},"response":"Drafting email..."}
+- "summarize my emails" -> {"action":"email","parameters":{"command":"summarize"},"response":"Analyzing your emails..."}
+- "summarize my emails this week" -> {"action":"email","parameters":{"command":"summarize","timeframe":"this week"},"response":"Analyzing this week's emails..."}
+- "show my emails today" -> {"action":"email","parameters":{"command":"list","timeframe":"today"},"response":"Loading today's emails..."}
+- "any urgent emails?" -> {"action":"email","parameters":{"command":"list","query":"urgent"},"response":"Checking for urgent emails..."}
+- "who emails me the most?" -> {"action":"email","parameters":{"command":"analytics","query":"who emails"},"response":"Analyzing email senders..."}
 
-For email draft commands, extract:
-- to: email address of recipient
-- topic: what the email should be about
-- command: should be "draft" for composition requests
+For email draft/send commands like "send email to john@example.com about puma":
+- Extract the ACTUAL email address (not "X"), e.g., "john@example.com"
+- Extract the ACTUAL topic (not "Y"), e.g., "puma"
+- Return: {"action":"email","parameters":{"command":"draft","to":"john@example.com","topic":"puma"},"response":"Drafting email..."}
+
+Examples:
+- "send email to kian.pezeshki1@gmail about puma" -> {"action":"email","parameters":{"command":"draft","to":"kian.pezeshki1@gmail.com","topic":"puma"},"response":"Drafting email..."}
+- "email sarah@company.com about the project update" -> {"action":"email","parameters":{"command":"draft","to":"sarah@company.com","topic":"the project update"},"response":"Drafting email..."}
+- "send an email to bob@test.org regarding meeting tomorrow" -> {"action":"email","parameters":{"command":"draft","to":"bob@test.org","topic":"meeting tomorrow"},"response":"Drafting email..."}
 
 CRITICAL: Return ONLY the JSON object, no other text.`
         },
@@ -122,6 +137,12 @@ CRITICAL: Return ONLY the JSON object, no other text.`
     }
     
     const aiResponse = JSON.parse(responseText);
+    
+    // Debug logging for email commands
+    if (command.toLowerCase().includes('email') || command.toLowerCase().includes('send')) {
+      console.log('Email command detected:', command);
+      console.log('Parsed response:', aiResponse);
+    }
     
     // Ensure response has required fields
     if (!aiResponse.response) {
@@ -196,12 +217,19 @@ async function handleEmail(workspaceId: string, params: any, userId?: string, ai
   // Handle email draft generation
   if (params.command === 'draft' && params.to && params.topic) {
     try {
+      // Fix common email typos - add .com if missing
+      let emailAddress = params.to;
+      if (emailAddress.includes('@') && !emailAddress.includes('.')) {
+        // If there's an @ but no dot, assume .com was forgotten
+        emailAddress = emailAddress + '.com';
+      }
+      
       // Basic email validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(params.to)) {
+      if (!emailRegex.test(emailAddress)) {
         return {
           success: false,
-          message: `❌ Invalid email address: "${params.to}"\n\nPlease provide a valid email address.`,
+          message: `❌ Invalid email address: "${params.to}"\n\nPlease provide a valid email address with format: name@domain.com`,
           data: { type: 'error' }
         };
       }
@@ -238,7 +266,7 @@ The email should be concise and to the point.`
           },
           {
             role: "user",
-            content: `Write an email to ${params.to} about: ${params.topic}`
+            content: `Write an email to ${emailAddress} about: ${params.topic}`
           }
         ],
         temperature: 0.7,
@@ -250,11 +278,11 @@ The email should be concise and to the point.`
       // Return draft email response for dashboard to render
       return {
         success: true,
-        message: `## Email Draft\n\n**To:** ${params.to}\n**Subject:** ${emailContent.subject}\n\n${emailContent.body}`,
+        message: `## Email Draft\n\n**To:** ${emailAddress}\n**Subject:** ${emailContent.subject}\n\n${emailContent.body}`,
         data: {
           type: 'draft_email',
           draft: {
-            to: params.to,
+            to: emailAddress,
             subject: emailContent.subject || `Regarding: ${params.topic}`,
             body: emailContent.body || `Dear recipient,\n\nI wanted to reach out about ${params.topic}.\n\nBest regards`,
             bodyHtml: emailContent.bodyHtml || emailContent.body,
@@ -272,43 +300,190 @@ The email should be concise and to the point.`
     }
   }
   
-  if (params.command === 'summarize') {
+  if (params.command === 'summarize' || params.command === 'list') {
     try {
-      // Get emails from database (don't filter by user for now)
-      const emails = await entityService.find({
-        workspaceId,
-        type: 'email',
-        limit: 10 // Get recent emails
-      });
+      // Get database user ID if Clerk user ID provided
+      let dbUserId = null;
+      if (userId) {
+        dbUserId = await getDatabaseUserId(userId);
+      }
+      
+      // Extract timeframe from parameters or default to "this week"
+      const timeframe = params.timeframe || params.query || 'this week';
+      
+      // Fetch real emails with user isolation
+      const emails = await fetchEmails(workspaceId, dbUserId, timeframe, 100);
       
       if (emails.length === 0) {
         return { 
           success: true, 
-          message: "You don't have any emails to summarize. Try connecting your Gmail account first.",
+          message: "📧 You don't have any emails to show. Try connecting your Gmail account in Mail Settings.",
           data: { type: 'email_summary', count: 0 }
         };
       }
       
-      // Format email data for summary
-      const emailSummary = emails.map((e: any) => ({
-        subject: e.data?.subject || 'No subject',
-        from: e.data?.from?.email || 'Unknown',
-        date: e.createdAt
-      }));
+      // Calculate statistics
+      const stats = calculateEmailStats(emails);
       
-      // Create a proper summary message
-      const summaryMessage = `## Email Summary\n\nYou have **${emails.length} recent emails**.\n\n**Latest emails:**\n${emailSummary.slice(0, 5).map(e => 
-        `- **${e.subject}** from ${e.from}`
-      ).join('\n')}`;
+      // Format emails for display
+      const formattedEmails = formatEmailsForDisplay(emails, 5);
+      
+      // Identify important emails
+      const importantEmails = identifyImportantEmails(emails);
+      const importantFormatted = formatEmailsForDisplay(importantEmails, 3);
+      
+      // Generate follow-up suggestions
+      const suggestions = generateFollowUpSuggestions(emails, stats);
+      
+      // Create rich summary message
+      let summaryMessage = `## 📧 Email Summary: ${timeframe.charAt(0).toUpperCase() + timeframe.slice(1)}\n\n`;
+      summaryMessage += `You have **${stats.total} emails**`;
+      
+      if (stats.unread > 0) {
+        summaryMessage += ` (${stats.unread} unread)`;
+      }
+      
+      const uniqueSenders = new Set(emails.map(e => e.data?.from?.email)).size;
+      summaryMessage += ` from ${uniqueSenders} ${uniqueSenders === 1 ? 'person' : 'people'}.\n\n`;
+      
+      // Add priority emails section if there are important ones
+      if (importantFormatted.length > 0) {
+        summaryMessage += `**Priority Emails:**\n`;
+        importantFormatted.forEach(email => {
+          const icon = email.priority === 'high' ? '🔴' : email.priority === 'low' ? '⚪' : '🟡';
+          summaryMessage += `${icon} **${email.from.name}** - ${email.subject} (${email.timestamp})\n`;
+        });
+        summaryMessage += '\n';
+      }
+      
+      // Add key stats
+      summaryMessage += `**Key Stats:**\n`;
+      if (stats.needingResponse > 0) {
+        summaryMessage += `• ${stats.needingResponse} emails need responses\n`;
+      }
+      if (stats.fromVIPs > 0) {
+        summaryMessage += `• ${stats.fromVIPs} from VIP contacts\n`;
+      }
+      if (stats.unread > 0) {
+        summaryMessage += `• ${stats.unread} unread messages\n`;
+      }
+      summaryMessage += '\n';
+      
+      // Add suggestions
+      if (suggestions.length > 0) {
+        summaryMessage += `💡 Try: "${suggestions[0]}"`;
+      }
       
       return { 
         success: true, 
         message: summaryMessage,
-        data: { type: 'email_summary', emails: emailSummary }
+        data: { 
+          type: 'email_summary',
+          stats,
+          emails: formattedEmails,
+          suggestions,
+          actions: [
+            { type: 'button', label: 'Open EverMail', action: 'navigate', url: '/mail/inbox' },
+            { type: 'button', label: 'Compose New', action: 'navigate', url: '/mail/compose' }
+          ]
+        }
       };
     } catch (error) {
       console.error('Email summarization error:', error);
-      return { success: false, error: 'Failed to summarize emails', message: aiResponse };
+      return { 
+        success: true, 
+        message: "I couldn't fetch your emails right now. Please try again or check your Gmail connection.",
+        data: { type: 'error' }
+      };
+    }
+  }
+  
+  // Handle "who emails me the most" analytics
+  if (params.command === 'analytics' || params.query?.includes('who emails')) {
+    try {
+      let dbUserId = null;
+      if (userId) {
+        dbUserId = await getDatabaseUserId(userId);
+      }
+      
+      const senderAnalytics = await getSenderAnalytics(workspaceId, dbUserId, 5);
+      
+      if (senderAnalytics.length === 0) {
+        return {
+          success: true,
+          message: "📊 No email data available yet. Connect your Gmail account to see analytics.",
+          data: { type: 'email_analytics' }
+        };
+      }
+      
+      let message = `## 📊 Email Analytics\n\n**Top Senders:**\n`;
+      senderAnalytics.forEach((sender, index) => {
+        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+        message += `${medal} **${sender.sender}** - ${sender.count} emails\n`;
+      });
+      
+      return {
+        success: true,
+        message,
+        data: { 
+          type: 'email_analytics',
+          senders: senderAnalytics 
+        }
+      };
+    } catch (error) {
+      console.error('Email analytics error:', error);
+      return {
+        success: true,
+        message: "I couldn't analyze your email data right now. Please try again.",
+        data: { type: 'error' }
+      };
+    }
+  }
+  
+  // Handle urgent/important email queries
+  if (params.query?.includes('urgent') || params.query?.includes('important')) {
+    try {
+      let dbUserId = null;
+      if (userId) {
+        dbUserId = await getDatabaseUserId(userId);
+      }
+      
+      const emails = await fetchEmails(workspaceId, dbUserId, 'this week', 50);
+      const importantEmails = identifyImportantEmails(emails);
+      
+      if (importantEmails.length === 0) {
+        return {
+          success: true,
+          message: "✅ No urgent emails right now. You're all caught up!",
+          data: { type: 'email_urgent' }
+        };
+      }
+      
+      const formatted = formatEmailsForDisplay(importantEmails, 5);
+      let message = `## 🚨 Urgent/Important Emails\n\n`;
+      message += `You have **${importantEmails.length} important emails** to review:\n\n`;
+      
+      formatted.forEach(email => {
+        message += `🔴 **${email.from.name}** - ${email.subject}\n`;
+        message += `   ${email.preview.substring(0, 80)}...\n`;
+        message += `   _${email.timestamp}_\n\n`;
+      });
+      
+      return {
+        success: true,
+        message,
+        data: { 
+          type: 'email_urgent',
+          emails: formatted 
+        }
+      };
+    } catch (error) {
+      console.error('Urgent email check error:', error);
+      return {
+        success: true,
+        message: "I couldn't check for urgent emails right now. Please try again.",
+        data: { type: 'error' }
+      };
     }
   }
   

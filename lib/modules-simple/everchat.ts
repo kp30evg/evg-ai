@@ -14,26 +14,27 @@ export async function sendMessage(
   workspaceId: string,
   content: string,
   conversationId?: string,
-  userId?: string,
+  dbUserId?: string,  // Database user ID (UUID)
+  clerkUserId?: string,  // Clerk user ID (for metadata)
   userName?: string,
   userImage?: string
 ): Promise<any> {
   // Create or get conversation
   if (!conversationId) {
-    const conversation = await createConversation(workspaceId, 'New Conversation');
+    const conversation = await createConversation(workspaceId, 'New Conversation', [], clerkUserId, dbUserId);
     conversationId = conversation.id;
   }
 
-  // Create message entity
+  // Create message entity with proper user isolation
   const message = await entityService.create(
     workspaceId,
     'message',
     {
       content,
       channel: 'chat',
-      from: userId || 'user',
-      userId: userId || 'user',
-      userName: userName || userId || 'User',
+      from: clerkUserId || 'user',  // Store Clerk ID for display
+      userId: clerkUserId || 'user',  // Store Clerk ID for display
+      userName: userName || 'User',
       userImage: userImage,
       timestamp: new Date(),
     } as MessageData,
@@ -41,7 +42,8 @@ export async function sendMessage(
       conversation: conversationId, // Link to conversation
     },
     {
-      userId,
+      userId: dbUserId,  // This will be used for the database user_id field (UUID)
+      createdBy: clerkUserId, // Store Clerk ID in metadata
     }
   );
 
@@ -81,17 +83,46 @@ export async function sendMessage(
 }
 
 /**
- * Create a conversation
+ * Create a conversation (or find existing DM)
  */
 export async function createConversation(
   workspaceId: string,
   title: string,
   participants: string[] = [],
-  userId?: string
+  clerkUserId?: string,
+  dbUserId?: string
 ): Promise<any> {
   // Extract channel name if it starts with #
   const channel = title.startsWith('#') ? title.substring(1) : undefined;
   
+  // For DM conversations, check if one already exists between these participants
+  if (title.startsWith('DM:') && participants.length === 2) {
+    // Sort participants to ensure consistent ordering
+    const sortedParticipants = [...participants].sort();
+    
+    // Find existing DM conversation between these two users
+    const existingConversations = await entityService.find({
+      workspaceId,
+      type: 'conversation'
+    });
+    
+    const existingDM = existingConversations.find((conv: any) => {
+      if (!conv.data?.title?.startsWith('DM:')) return false;
+      if (!conv.data?.participants || conv.data.participants.length !== 2) return false;
+      
+      // Check if participants match (order doesn't matter)
+      const convParticipants = [...conv.data.participants].sort();
+      return convParticipants[0] === sortedParticipants[0] && 
+             convParticipants[1] === sortedParticipants[1];
+    });
+    
+    if (existingDM) {
+      console.log('Found existing DM conversation:', existingDM.id);
+      return existingDM;
+    }
+  }
+  
+  // Create new conversation
   return await entityService.create(
     workspaceId,
     'conversation',
@@ -104,7 +135,10 @@ export async function createConversation(
       lastMessageAt: null,
     } as ConversationData,
     {},
-    { userId }
+    { 
+      userId: dbUserId,  // Database user ID for user_id field
+      createdBy: clerkUserId  // Clerk ID in metadata
+    }
   );
 }
 
@@ -227,7 +261,8 @@ async function countMessages(
 export async function handleChatCommand(
   workspaceId: string,
   command: string,
-  userId?: string
+  clerkUserId?: string,
+  dbUserId?: string
 ): Promise<any> {
   const lowerCommand = command.toLowerCase();
 
@@ -236,7 +271,7 @@ export async function handleChatCommand(
     const match = command.match(/(?:send message|say)\s+(.+)/i);
     if (match) {
       const content = match[1];
-      return await sendMessage(workspaceId, content, undefined, userId);
+      return await sendMessage(workspaceId, content, undefined, dbUserId, clerkUserId);
     }
   }
 
@@ -257,7 +292,7 @@ export async function handleChatCommand(
   if (lowerCommand.includes('create conversation') || lowerCommand.includes('new conversation')) {
     const match = command.match(/(?:create|new)\s+conversation\s+(?:about\s+)?(.+)/i);
     const title = match ? match[1] : 'New Conversation';
-    return await createConversation(workspaceId, title);
+    return await createConversation(workspaceId, title, [], clerkUserId, dbUserId);
   }
 
   // Search pattern

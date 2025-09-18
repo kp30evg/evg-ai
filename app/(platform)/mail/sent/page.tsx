@@ -348,7 +348,15 @@ export default function SentPage() {
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap'
                     }}>
-                      To: {email.data.to?.map((r: any) => r.email).join(', ') || 'Unknown'}
+                      To: {(() => {
+                        const to = email.data.to;
+                        if (!to) return 'Unknown';
+                        if (typeof to === 'string') return to;
+                        if (Array.isArray(to)) {
+                          return to.map((r: any) => typeof r === 'string' ? r : r.email || r).join(', ');
+                        }
+                        return 'Unknown';
+                      })()}
                     </span>
                   </div>
                   <span style={{
@@ -501,15 +509,31 @@ export default function SentPage() {
               color: colors.mediumGray,
               marginTop: '4px'
             }}>
-              To: {selectedEmail.data.to?.map((r: any) => r.email).join(', ')}
+              To: {(() => {
+                const to = selectedEmail.data.to;
+                if (!to) return 'Unknown';
+                if (typeof to === 'string') return to;
+                if (Array.isArray(to)) {
+                  return to.map((r: any) => typeof r === 'string' ? r : r.email || r).join(', ');
+                }
+                return 'Unknown';
+              })()}
             </div>
-            {selectedEmail.data.cc?.length > 0 && (
+            {(selectedEmail.data.cc && (Array.isArray(selectedEmail.data.cc) ? selectedEmail.data.cc.length > 0 : selectedEmail.data.cc.length > 0)) && (
               <div style={{
                 fontSize: '13px',
                 color: colors.mediumGray,
                 marginTop: '2px'
               }}>
-                Cc: {selectedEmail.data.cc.map((r: any) => r.email).join(', ')}
+                Cc: {(() => {
+                  const cc = selectedEmail.data.cc;
+                  if (!cc) return '';
+                  if (typeof cc === 'string') return cc;
+                  if (Array.isArray(cc)) {
+                    return cc.map((r: any) => typeof r === 'string' ? r : r.email || r).join(', ');
+                  }
+                  return '';
+                })()}
               </div>
             )}
           </div>

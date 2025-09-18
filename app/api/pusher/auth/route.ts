@@ -6,18 +6,22 @@ export async function POST(req: NextRequest) {
   try {
     // Check if Pusher is configured
     if (!pusher) {
+      console.log('Pusher not configured');
       return NextResponse.json({ error: 'Pusher not configured' }, { status: 503 })
     }
     
-    const { userId, organizationId } = await auth()
+    const { userId, orgId } = await auth()
     
-    if (!userId || !organizationId) {
+    if (!userId || !orgId) {
+      console.log('Pusher auth failed - no user or org:', { userId, orgId });
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const formData = await req.formData()
     const socketId = formData.get('socket_id') as string
     const channelName = formData.get('channel_name') as string
+
+    console.log('Pusher auth request:', { userId, orgId, channelName, socketId: socketId?.substring(0, 10) + '...' });
 
     if (!socketId || !channelName) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
@@ -47,7 +51,7 @@ export async function POST(req: NextRequest) {
     const channelOrgId = channelParts[2]
     
     // Verify user can only subscribe to their org's channels
-    if (channelOrgId !== organizationId) {
+    if (channelOrgId !== orgId) {
       return NextResponse.json({ error: 'Forbidden - cannot access other organization channels' }, { status: 403 })
     }
     
@@ -61,13 +65,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate auth response for Pusher
-    const authResponse = pusher.authorizeChannel(socketId, channelName, {
-      user_id: userId,
-      user_info: {
-        organizationId,
-        // You can add more user info here if needed
-      }
-    })
+    let authResponse;
+    
+    if (channelPrefix === 'presence') {
+      // For presence channels, include user data
+      authResponse = pusher.authorizeChannel(socketId, channelName, {
+        user_id: userId,
+        user_info: {
+          organizationId: orgId,
+          // You can add more user info here if needed
+        }
+      });
+    } else {
+      // For private channels, just authorize
+      authResponse = pusher.authorizeChannel(socketId, channelName);
+    }
 
     return NextResponse.json(authResponse)
   } catch (error) {

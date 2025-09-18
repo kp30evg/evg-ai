@@ -1,115 +1,129 @@
-# Master Prompt to Fix EverMail UI Bugs
+The dashboard's natural language processor needs to properly handle email-related commands and provide rich, actionable responses that integrate with EverMail's features.
+Current Problem
+When users ask "summarize my emails this week", the response is generic and doesn't provide useful functionality. It should leverage EverMail's actual data and capabilities.
+Fix Requirements
+1. Enhanced Email Command Recognition
+Update /lib/modules-simple/command-processor.ts to recognize these email patterns:
+Summary Commands:
 
-Fix these specific EverMail functionality issues:
+"summarize my emails [timeframe]"
+"what emails did I get [timeframe]"
+"show me important emails"
+"any urgent emails?"
 
-## 1. Inbox Showing Sent Emails
-**Problem**: Inbox displays both received AND sent emails. Should only show received.
+Action Commands:
 
-**Fix**: Update the inbox query to exclude sent emails
-- Check `/lib/api/routers/evermail.ts` - the `getEmails` query
-- Add filter: `WHERE from != currentUserEmail` or similar
-- Ensure only emails TO the user appear in inbox
-- Sent emails should ONLY appear in Sent folder
+"draft a response to [person]"
+"reply to [latest email from X]"
+"send email to [person] about [topic]"
+"follow up on [topic]"
 
-## 2. Star/Unstar Not Working
-**Problem**: Clicking star icon doesn't work or persist
+Analytics Commands:
 
-**Fix**: 
-- Add click handler to star icon
-- Update email entity with `isStarred: true/false`
-- Create tRPC mutation for toggling star status
-- Starred emails should appear in Starred section
-- Visual feedback when starring (filled vs outline icon)
+"who emails me the most?"
+"email response time"
+"unread email count"
+"emails needing response"
 
-## 3. Trash/Delete Not Working
-**Problem**: Clicking trash icon doesn't delete or move to trash
+2. Rich Response Format
+Instead of plain text, return structured responses with:
+typescriptinterface EmailCommandResponse {
+  summary: {
+    text: string;
+    stats: {
+      total: number;
+      unread: number;
+      needingResponse: number;
+      fromVIPs: number;
+    };
+  };
+  emails: {
+    id: string;
+    from: string;
+    subject: string;
+    preview: string;
+    timestamp: string;
+    labels?: string[];
+    priority?: 'high' | 'normal' | 'low';
+  }[];
+  actions: {
+    type: 'button' | 'link';
+    label: string;
+    action: string; // e.g., 'open_email', 'compose', 'mark_read'
+    data?: any;
+  }[];
+  suggestions: string[];
+}
+3. Actual Data Integration
+Pull REAL email data from the database:
 
-**Fix**:
-- Add click handler to trash icon
-- Don't actually delete - mark as `status: 'trashed'`
-- Move email to Trash folder view
-- Add "Empty Trash" option that permanently deletes
-- Exclude trashed emails from inbox/other views
+Query actual emails from entities table
+Filter by user and timeframe
+Identify important emails (VIPs, keywords, urgency)
+Calculate real statistics
+Generate actionable summaries
 
-## 4. Drafts Section Empty
-**Problem**: Draft emails not showing in Drafts section
+4. Interactive Response Components
+The dashboard should render email responses with:
+Email List Component:
 
-**Fix**:
-- When email is partially composed, auto-save as draft
-- Query drafts: `WHERE type = 'draft' OR isDraft = true`
-- Show unsent/incomplete emails in Drafts section
-- Make drafts clickable to resume editing
+Clickable email previews
+Quick actions (reply, archive, star)
+Visual priority indicators
+Label badges
 
-## 5. Save Draft Button Not Working
-**Problem**: "Save Draft" button in compose doesn't save
+Action Buttons:
 
-**Fix**:
-- Add click handler to Save Draft button
-- Save current compose state to entities table
-- Mark as `isDraft: true`
-- Show confirmation toast "Draft saved"
-- Allow retrieval from Drafts section
+"Open in EverMail" → Navigate to /mail/inbox
+"Compose New" → Navigate to /mail/compose
+"Mark All Read" → Execute bulk action
+"Quick Reply" → Inline compose modal
 
-## 6. Rich Text Editor Buttons Broken
-**Problem**: Bold, italic, attach, and other formatting buttons don't work
+5. Improved Response Examples
+For "summarize my emails this week":
+## 📧 Email Summary: This Week
 
-**Fix**:
-- Check rich text editor initialization
-- Ensure each button has proper command binding
-- Common commands:
-  - Bold: `editor.chain().focus().toggleBold().run()`
-  - Italic: `editor.chain().focus().toggleItalic().run()`
-  - Link: `editor.chain().focus().setLink({ href: url }).run()`
-- For attachments: implement file upload handler
-- Test ALL toolbar buttons
+You have **47 emails** (12 unread) from 23 people.
 
-## 7. Input Field Losing Focus
-**Problem**: Typing in To/Subject fields loses focus after each character
+**Priority Emails:**
+- **MagicPath** - Creating your custom design system (needs response)
+- **Claude Code Workshop** - Enterprise B2B Sales workflows
+- **Substack** - Productivity philosophy article
 
-**Critical Fix**:
-- This is likely a React re-render issue
-- Check for state updates triggering full re-renders
-- Solutions:
-  - Use `useCallback` for handlers
-  - Memoize components with `React.memo`
-  - Check for key prop issues
-  - Ensure form state is managed properly (controlled vs uncontrolled)
-  - Move state closer to where it's needed
+**Key Stats:**
+- 3 emails need responses
+- 2 from VIP contacts
+- 5 newsletters (auto-labeled)
 
-**Example fix pattern**:
-```typescript
-// BAD - causes re-render
-const [to, setTo] = useState('');
-<input value={to} onChange={(e) => setTo(e.target.value)} />
+[Open EverMail] [Compose New] [Mark All Read]
 
-// GOOD - prevent unnecessary re-renders
-const [to, setTo] = useState('');
-const handleToChange = useCallback((e) => {
-  setTo(e.target.value);
-}, []);
-<input value={to} onChange={handleToChange} />
-```
+💡 Try asking: "Draft a response to MagicPath about the design system"
+6. Command Examples to Implement
+typescript// Email summary with real data
+if (command.includes('email') && command.includes('summar')) {
+  const emails = await getRecentEmails(workspaceId, userId, timeframe);
+  return {
+    type: 'email_summary',
+    emails: emails.slice(0, 5),
+    stats: calculateEmailStats(emails),
+    actions: [
+      { label: 'Open EverMail', action: 'navigate', url: '/mail/inbox' },
+      { label: 'Compose', action: 'navigate', url: '/mail/compose' }
+    ]
+  };
+}
 
-## Files Likely Needing Changes
-
-1. `/lib/api/routers/evermail.ts` - Query filters for inbox/starred/trash
-2. `/components/evermail/EmailList.tsx` - Star/trash click handlers
-3. `/components/evermail/Compose.tsx` - Input focus issue, save draft
-4. `/app/(platform)/mail/inbox/page.tsx` - Inbox filtering
-5. `/app/(platform)/mail/drafts/page.tsx` - Draft query
-6. Rich text editor component - Toolbar button handlers
-
-## Testing After Fixes
-
-- [ ] Inbox shows ONLY received emails
-- [ ] Sent folder shows ONLY sent emails  
-- [ ] Star icon toggles and persists
-- [ ] Starred emails appear in Starred section
-- [ ] Trash icon moves email to Trash
-- [ ] Drafts section shows saved drafts
-- [ ] Save Draft button works with confirmation
-- [ ] All rich text buttons function properly
-- [ ] Can type continuously in To/Subject fields without losing focus
-- [ ] No re-render issues while typing
-
-The focus issue (#7) is the most critical UX problem - fix that first as it makes the app unusable.
+// Draft email command
+if (command.includes('draft') || command.includes('send email')) {
+  const recipient = extractRecipient(command);
+  const topic = extractTopic(command);
+  const draft = await generateEmailDraft(recipient, topic);
+  return {
+    type: 'email_draft',
+    draft: draft,
+    actions: [
+      { label: 'Send Now', action: 'send_email' },
+      { label: 'Edit in EverMail', action: 'navigate', url: '/mail/compose' }
+    ]
+  };
+}

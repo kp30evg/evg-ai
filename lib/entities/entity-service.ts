@@ -40,16 +40,22 @@ export class EntityService {
   ): Promise<Entity> {
     const searchText = this.extractSearchableText(data);
     
+    // Only set userId if it's a valid UUID (database user ID)
+    // Clerk IDs start with "user_" so we can detect them
+    const dbUserId = metadata.userId && !metadata.userId.startsWith('user_') 
+      ? metadata.userId 
+      : null;
+    
     const [entity] = await db.insert(entities).values({
       workspaceId,
-      userId: metadata.userId || null, // Use the userId field directly
+      userId: dbUserId, // Only use valid database user IDs
       type,
       data,
       relationships,
       metadata: {
         ...metadata,
         version: 1,
-        createdBy: metadata.userId || 'system',
+        createdBy: metadata.createdBy || metadata.userId || 'system', // Store Clerk ID in metadata
       },
       searchVector: searchText,
     }).returning();

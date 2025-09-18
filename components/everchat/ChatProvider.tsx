@@ -101,10 +101,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     
     setPusherClient(client)
 
-    // Subscribe to organization general channel
+    // Subscribe to organization general channel using Clerk org ID
     const generalChannel = client.subscribe(channels.orgGeneral(organization.id))
     
-    // Subscribe to organization-wide presence channel for online status
+    // Subscribe to organization-wide presence channel for online status using Clerk org ID
     const presenceChannel = client.subscribe(channels.orgPresence(organization.id)) as PresenceChannel
     
     // Handle new messages in general channel
@@ -175,23 +175,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           const members = await response.json()
           setOrganizationMembers(members)
           
-          // Create DM conversations for each member
-          const dmConversations = members
-            .filter((member: any) => member.userId !== user?.id)
-            .map((member: any) => ({
-              id: `dm-${[user?.id, member.userId].sort().join('-')}`,
-              name: `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email,
-              type: 'dm' as const,
-              unreadCount: 0,
-              isOnline: false,
-              participants: [user?.id, member.userId]
-            }))
-          
-          setConversations(prev => {
-            // Keep channels, update DMs
-            const channels = prev.filter(c => c.type === 'channel')
-            return [...channels, ...dmConversations]
-          })
+          // Don't pre-create DM conversations - they'll be created on demand
+          // when the user clicks on a team member
         }
       } catch (error) {
         console.error('Failed to fetch organization members:', error)
@@ -204,7 +189,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // Load initial conversations and messages
   useEffect(() => {
     const loadConversations = async () => {
-      if (!organization?.id) return
+      if (!organization?.id || !user?.id) return
 
       // Load initial channels
       const channelConversations: Conversation[] = [
@@ -244,19 +229,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       ]
 
-      // Try to load existing conversations from database
+      // Load existing conversations from database
       try {
-        const response = await fetch('/api/everchat/conversations')
+        // Use TRPC to get conversations
+        const response = await fetch('/api/trpc/everchat.getConversations?batch=1&input=%7B%220%22%3A%7B%22json%22%3A%7B%22limit%22%3A100%7D%7D%7D')
         if (response.ok) {
-          const dbConversations = await response.json()
+          const data = await response.json()
+          const dbConversations = data?.[0]?.result?.data?.json || []
           
-          // Add database conversations that are DMs
+          // Process database conversations that are DMs where current user is a participant
           const dmConversations = dbConversations
-            .filter((conv: any) => conv.data?.title?.startsWith('DM:'))
+            .filter((conv: any) => {
+              // Only show DMs where current user is a participant
+              return conv.data?.title?.startsWith('DM:') && 
+                     conv.data?.participants?.includes(user.id);
+            })
             .map((conv: any) => {
-              const recipientName = conv.data.title.replace('DM: ', '')
               const participants = conv.data.participants || []
-              const recipientId = participants.find((id: string) => id !== user?.id)
+              const recipientId = participants.find((id: string) => id !== user.id)
+              
+              // Find the recipient's name from organization members
+              const recipient = organizationMembers.find(m => m.userId === recipientId)
+              const recipientName = recipient 
+                ? `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || recipient.email
+                : 'Unknown User'
               
               return {
                 id: conv.id,
@@ -264,11 +260,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 type: 'dm' as const,
                 unreadCount: 0,
                 participants: participants,
-                isOnline: false
+                isOnline: onlineUsers.has(recipientId || '')
               }
             })
           
-          setConversations([...channelConversations, ...dmConversations])
+          // Remove duplicates based on conversation ID
+          const uniqueDMs = dmConversations.reduce((acc: any[], dm: any) => {
+            if (!acc.find((existing: any) => existing.id === dm.id)) {
+              acc.push(dm)
+            }
+            return acc
+          }, [])
+          
+          setConversations([...channelConversations, ...uniqueDMs])
         } else {
           setConversations(channelConversations)
         }
@@ -279,22 +283,51 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
 
     loadConversations()
-  }, [organization?.id, user?.id])
+  }, [organization?.id, user?.id, organizationMembers, onlineUsers])
 
   // Subscribe to selected conversation channel
   useEffect(() => {
     if (!selectedConversation || !pusherClient || !organization?.id || !user?.id) return
 
-    // Subscribe to the specific channel
+    // Subscribe to the specific channel using Clerk org ID
+    // For conversations, use the conversation ID directly
     const channelName = selectedConversation.type === 'channel' 
       ? channels.channel(organization.id, selectedConversation.id)
-      : channels.dm(organization.id, user.id, selectedConversation.id.replace('dm-', '').split('-').find(id => id !== user.id) || '')
+      : `private-org-${organization.id}-conversation-${selectedConversation.id}`
     
+    console.log('Subscribing to channel:', channelName);
     const conversationChannel = pusherClient.subscribe(channelName)
     
+    // Handle subscription success
+    conversationChannel.bind('pusher:subscription_succeeded', () => {
+      console.log('Successfully subscribed to channel:', channelName);
+    });
+    
+    // Handle subscription error
+    conversationChannel.bind('pusher:subscription_error', (error: any) => {
+      console.error('Failed to subscribe to channel:', channelName, error);
+    });
+    
     // Handle messages in this channel
-    conversationChannel.bind(events.MESSAGE_NEW, (data: Message) => {
-      setMessages(prev => [...prev, data])
+    conversationChannel.bind(events.MESSAGE_NEW, (data: any) => {
+      console.log('Received message via Pusher:', data);
+      // Format the message to match our Message interface
+      const formattedMessage: Message = {
+        id: data.id || Date.now().toString(),
+        text: data.text || data.content,
+        userId: data.userId,
+        userName: data.userName,
+        userImage: data.userImage,
+        timestamp: new Date(data.timestamp || Date.now()),
+        channelId: selectedConversation.id,
+      };
+      setMessages(prev => {
+        // Check if message already exists (to avoid duplicates)
+        if (prev.some(m => m.id === formattedMessage.id)) {
+          return prev;
+        }
+        return [...prev, formattedMessage];
+      });
     })
     
     // Handle typing indicators
@@ -332,7 +365,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         })
       }
     }
-  }, [selectedConversation, user, pusherClient, organization?.id, activeChannels])
+  }, [selectedConversation, user, pusherClient, organization?.id])
 
   // Load messages from database when query succeeds
   useEffect(() => {
@@ -358,6 +391,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const sendMessage = useCallback(async (text: string) => {
     if (!selectedConversation || !user || !organization) return
 
+    console.log('Sending message to conversation:', selectedConversation.id, 'Type:', selectedConversation.type)
+
     const newMessage: Message = {
       id: Date.now().toString(),
       text,
@@ -373,18 +408,25 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages(prev => [...prev, newMessage])
 
     try {
-      // Check if this is a DM or channel conversation
+      // Check if this is a UUID (database conversation) or a local/channel ID
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedConversation.id)
       
       if (isUUID) {
         // It's a database conversation (DM or created channel)
+        console.log('Sending to database conversation:', selectedConversation.id)
         await sendMessageMutation.mutateAsync({
           content: text,
           conversationId: selectedConversation.id,
           channelId: undefined
         })
+      } else if (selectedConversation.id.startsWith('dm-')) {
+        // It's a local DM that hasn't been created in the database yet
+        // This shouldn't happen anymore, but handle it just in case
+        console.log('Local DM detected, skipping send')
+        throw new Error('Please click on the user again to create the conversation')
       } else {
         // It's a named channel like 'general', 'sales', etc.
+        console.log('Sending to channel:', selectedConversation.id)
         await sendMessageMutation.mutateAsync({
           content: text,
           conversationId: undefined,
@@ -398,6 +440,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       console.error('Failed to send message:', error)
       // Remove optimistic message on error
       setMessages(prev => prev.filter(m => m.id !== newMessage.id))
+      
+      // Show user-friendly error
+      if (error instanceof Error && error.message.includes('click on the user again')) {
+        alert('Please click on the user again to start the conversation')
+      }
     }
 
     // If it's an AI command, process it
@@ -422,11 +469,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const createDMConversation = useCallback(async (recipientId: string, recipientName: string) => {
     if (!user?.id) return
     
-    const dmId = `dm-${[user.id, recipientId].sort().join('-')}`
+    console.log('Creating DM conversation with:', recipientName, recipientId)
     
     // Check if conversation already exists in local state
-    const existing = conversations.find(c => c.id === dmId || (c.type === 'dm' && c.participants?.includes(recipientId)))
+    const existing = conversations.find(c => 
+      c.type === 'dm' && 
+      c.participants && 
+      c.participants.includes(recipientId) && 
+      c.participants.includes(user.id)
+    )
+    
     if (existing) {
+      console.log('Found existing DM conversation:', existing.id)
       setSelectedConversation(existing)
       return
     }
@@ -438,6 +492,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         participants: [user.id, recipientId]
       })
       
+      console.log('Created new DM conversation in database:', dbConversation.id)
+      
       // Create new DM conversation object
       const newDM: Conversation = {
         id: dbConversation.id,
@@ -448,11 +504,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         participants: [user.id, recipientId]
       }
       
-      setConversations(prev => [...prev, newDM])
+      // Add to conversations list and select it
+      setConversations(prev => {
+        // Remove any duplicate DMs with same participants
+        const filtered = prev.filter(c => 
+          !(c.type === 'dm' && c.participants?.includes(recipientId))
+        )
+        return [...filtered, newDM]
+      })
       setSelectedConversation(newDM)
+      
+      // Clear messages for new conversation
+      setMessages([])
     } catch (error) {
       console.error('Failed to create DM conversation:', error)
-      // Fallback to local-only conversation
+      // Fallback to local-only conversation with a unique ID
+      const dmId = `dm-${Date.now()}-${[user.id, recipientId].sort().join('-')}`
       const newDM: Conversation = {
         id: dmId,
         name: recipientName,
@@ -462,8 +529,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         participants: [user.id, recipientId]
       }
       
-      setConversations(prev => [...prev, newDM])
+      setConversations(prev => {
+        const filtered = prev.filter(c => 
+          !(c.type === 'dm' && c.participants?.includes(recipientId))
+        )
+        return [...filtered, newDM]
+      })
       setSelectedConversation(newDM)
+      setMessages([])
     }
   }, [user?.id, conversations, onlineUsers, createConversationMutation])
 

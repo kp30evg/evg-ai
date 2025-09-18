@@ -456,7 +456,9 @@ The dashboard supports sending emails via natural language commands. This featur
 - `/lib/api/routers/unified.ts` - sendEmail endpoint
 - `/lib/evermail/gmail-client.ts` - Gmail API integration
 
-**Testing:** Run `npx tsx scripts/test-email-feature.ts` to verify everything works
+**Testing:** 
+- Run `npm run test:email:send` to verify email send commands work
+- Run `npm run test:email` to verify general email features work
 
 ---
 

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pusher Test</title>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+</head>
+<body>
+    <h1>Pusher Connection Test</h1>
+    <div id="status">Initializing...</div>
+    <div id="messages"></div>
+    
+    <script>
+        // Enable Pusher logging
+        Pusher.logToConsole = true;
+        
+        const pusher = new Pusher('95000d7be8d1444a4d00', {
+            cluster: 'us2',
+            authEndpoint: '/api/pusher/auth',
+            auth: {
+                params: {
+                    userId: 'test-user',
+                    organizationId: 'org_321PMbgXawub3NIZaTRy0OQaBhP'
+                }
+            }
+        });
+        
+        const status = document.getElementById('status');
+        const messages = document.getElementById('messages');
+        
+        pusher.connection.bind('connecting', function() {
+            status.innerHTML = 'Connecting...';
+        });
+        
+        pusher.connection.bind('connected', function() {
+            status.innerHTML = 'Connected! Socket ID: ' + pusher.connection.socket_id;
+        });
+        
+        pusher.connection.bind('failed', function() {
+            status.innerHTML = 'Connection failed!';
+        });
+        
+        pusher.connection.bind('error', function(err) {
+            status.innerHTML = 'Connection error: ' + JSON.stringify(err);
+        });
+        
+        // Try to subscribe to a test channel
+        const channel = pusher.subscribe('private-org-org_321PMbgXawub3NIZaTRy0OQaBhP-general');
+        
+        channel.bind('pusher:subscription_succeeded', function() {
+            messages.innerHTML += '<p>Successfully subscribed to channel!</p>';
+        });
+        
+        channel.bind('pusher:subscription_error', function(error) {
+            messages.innerHTML += '<p>Subscription error: ' + JSON.stringify(error) + '</p>';
+        });
+        
+        channel.bind('message.new', function(data) {
+            messages.innerHTML += '<p>New message: ' + JSON.stringify(data) + '</p>';
+        });
+    </script>
+</body>
+</html>
