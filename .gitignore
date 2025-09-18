@@ -48,3 +48,10 @@ capture-*.js
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# Playwright E2E testing
+storageState.json
+auth-setup-error.png
+playwright-report/
+test-results/
+.env.e2e

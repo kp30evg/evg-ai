@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useUser, UserButton, OrganizationSwitcher, useOrganization } from '@clerk/nextjs'
+import { UserButton, OrganizationSwitcher } from '@clerk/nextjs'
+import { useUser, useOrganization } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { 
   Send,

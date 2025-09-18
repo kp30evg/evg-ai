@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack --port 3000",
+    "dev:test": "next dev --turbopack --port 3001",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
@@ -14,7 +15,12 @@
     "test:email:send": "tsx scripts/test-email-send-command.ts",
     "test:email:watch": "vitest __tests__/email-feature.test.ts --watch",
     "debug:email": "tsx scripts/debug-email-isolation.ts",
-    "env": "node -r dotenv/config"
+    "env": "node -r dotenv/config",
+    "e2e:setup": "cp -n .env.e2e .env || true && playwright test --list && node -e \"console.log('✅ E2E environment ready')\"",
+    "e2e:auth": "tsx scripts/capture-auth-state.ts",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.879.0",
@@ -50,6 +56,7 @@
     "@trpc/next": "^11.5.0",
     "@trpc/react-query": "^11.5.0",
     "@trpc/server": "^11.5.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/uuid": "^10.0.0",
     "@upstash/redis": "^1.35.3",
     "bullmq": "^5.58.4",
@@ -62,6 +69,7 @@
     "google-auth-library": "^10.3.0",
     "googleapis": "^159.0.0",
     "jsforce": "^3.10.4",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.542.0",
     "next": "15.5.2",
     "openai": "^5.16.0",

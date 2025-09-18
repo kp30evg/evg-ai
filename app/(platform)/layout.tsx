@@ -91,8 +91,14 @@ export default function PlatformLayout({
   const router = useRouter();
   const { userId, orgId, isLoaded } = useAuth();
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
+  
+  // Check if we're in Playwright test mode
+  const isTestMode = process.env.NEXT_PUBLIC_PLAYWRIGHT_TEST === 'true';
 
   useEffect(() => {
+    // Skip auth checks in test mode
+    if (isTestMode) return;
+    
     // Wait for auth to load before redirecting
     if (!isLoaded) return;
     
@@ -102,7 +108,7 @@ export default function PlatformLayout({
     if (!orgId) {
       redirect('/select-org');
     }
-  }, [userId, orgId, isLoaded]);
+  }, [userId, orgId, isLoaded, isTestMode]);
 
   const modules = [
     { 
@@ -181,8 +187,8 @@ export default function PlatformLayout({
     return pathname.startsWith(path);
   };
 
-  // Show loading state while auth is being checked
-  if (!isLoaded) {
+  // Show loading state while auth is being checked (skip in test mode)
+  if (!isTestMode && !isLoaded) {
     return (
       <div style={{
         display: 'flex',
