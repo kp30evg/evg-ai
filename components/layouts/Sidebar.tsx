@@ -20,6 +20,7 @@ import {
   HelpCircle,
   Package,
   ShoppingCart,
+  CheckSquare,
 } from 'lucide-react'
 import { theme } from '@/lib/evercore/theme'
 import { useUser, useOrganization } from '@clerk/nextjs'
@@ -61,6 +62,12 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    id: 'evertask',
+    label: 'EverTask',
+    icon: CheckSquare,
+    href: '/dashboard/tasks',
+  },
+  {
     id: 'evermail',
     label: 'EverMail',
     icon: Mail,
@@ -78,6 +85,12 @@ const navItems: NavItem[] = [
     label: 'EverCal',
     icon: Calendar,
     href: '/calendar',
+  },
+  {
+    id: 'everdocs',
+    label: 'EverDocs',
+    icon: FileText,
+    href: '/dashboard/docs',
   },
 ]
 

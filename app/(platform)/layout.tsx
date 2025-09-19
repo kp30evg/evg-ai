@@ -15,7 +15,8 @@ import {
   MessageSquare,
   BarChart3,
   Package,
-  Home
+  Home,
+  CheckSquare
 } from 'lucide-react';
 
 // Design System Tokens
@@ -119,6 +120,20 @@ export default function PlatformLayout({
       color: tokens.colors.evergreen
     },
     { 
+      id: 'evercore',
+      name: 'EverCore',
+      icon: Users,
+      path: '/dashboard/crm',
+      color: tokens.colors.evergreen
+    },
+    { 
+      id: 'evertask',
+      name: 'EverTask',
+      icon: CheckSquare,
+      path: '/dashboard/tasks',
+      color: tokens.colors.evergreen
+    },
+    { 
       id: 'evermail',
       name: 'EverMail',
       icon: Mail,
@@ -137,13 +152,6 @@ export default function PlatformLayout({
       name: 'EverChat',
       icon: MessageSquare,
       path: '/chat',
-      color: tokens.colors.evergreen
-    },
-    { 
-      id: 'evercore',
-      name: 'EverCore',
-      icon: Users,
-      path: '/dashboard/crm',
       color: tokens.colors.evergreen
     },
     { 
