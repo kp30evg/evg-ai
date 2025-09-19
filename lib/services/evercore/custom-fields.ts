@@ -165,10 +165,13 @@ export async function getCustomFields(
   entityType: string
 ): Promise<FieldDefinition[]> {
   // Get workspace metadata that stores field definitions
-  const workspace = await entityService.findOne({
+  const workspaces = await entityService.find({
     workspaceId,
-    type: 'workspace_metadata'
+    type: 'workspace_metadata',
+    limit: 1
   });
+  
+  const workspace = workspaces[0];
   
   if (!workspace?.data?.customFields) {
     return [];
@@ -280,10 +283,13 @@ export async function deleteCustomField(
   removeData: boolean = false
 ): Promise<void> {
   // Get workspace metadata
-  const workspace = await entityService.findOne({
+  const workspaces = await entityService.find({
     workspaceId,
-    type: 'workspace_metadata'
+    type: 'workspace_metadata',
+    limit: 1
   });
+  
+  const workspace = workspaces[0];
   
   if (!workspace?.data?.customFields) {
     return;
@@ -561,10 +567,13 @@ function validateFieldValue(value: any, fieldDef: FieldDefinition): void {
 
 async function saveFieldDefinition(workspaceId: string, field: FieldDefinition): Promise<void> {
   // Get or create workspace metadata
-  let workspace = await entityService.findOne({
+  const workspaces = await entityService.find({
     workspaceId,
-    type: 'workspace_metadata'
+    type: 'workspace_metadata',
+    limit: 1
   });
+  
+  let workspace = workspaces[0];
   
   if (!workspace) {
     workspace = await entityService.create(
@@ -673,10 +682,13 @@ export async function exportFieldDefinitions(
   exportedAt: Date;
   fields: FieldDefinition[];
 }> {
-  const workspace = await entityService.findOne({
+  const workspaces = await entityService.find({
     workspaceId,
-    type: 'workspace_metadata'
+    type: 'workspace_metadata',
+    limit: 1
   });
+  
+  const workspace = workspaces[0];
   
   return {
     version: '1.0.0',

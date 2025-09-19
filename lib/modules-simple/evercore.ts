@@ -209,6 +209,22 @@ async function createContactWithData(
 
   // Establish bidirectional relationship with company
   if (companyId) {
+    // Create relationship in the relationships table
+    await entityService.createRelationship(
+      workspaceId,
+      contact.id,
+      companyId,
+      'works_at',
+      {
+        strengthScore: 100,
+        metadata: {
+          title: data.title,
+          primary: true
+        }
+      }
+    );
+    
+    // Also update the legacy link for backward compatibility
     await entityService.link(workspaceId, companyId, contact.id, 'contacts', true);
     console.log(`🔄 Established bidirectional link: Contact ${contact.id} ↔ Company ${companyId}`);
   }
@@ -272,11 +288,36 @@ async function createDealWithData(
     { userId }
   );
 
-  // Link back to company and contact
+  // Link back to company and contact with proper relationships
   if (data.companyId) {
+    await entityService.createRelationship(
+      workspaceId,
+      deal.id,
+      data.companyId,
+      'belongs_to_company',
+      {
+        strengthScore: 100,
+        metadata: {
+          stage: data.stage,
+          value: data.value
+        }
+      }
+    );
     await entityService.link(workspaceId, data.companyId, deal.id, 'deals');
   }
   if (data.primaryContactId) {
+    await entityService.createRelationship(
+      workspaceId,
+      deal.id,
+      data.primaryContactId,
+      'primary_contact',
+      {
+        strengthScore: 100,
+        metadata: {
+          role: 'primary'
+        }
+      }
+    );
     await entityService.link(workspaceId, data.primaryContactId, deal.id, 'deals');
   }
 

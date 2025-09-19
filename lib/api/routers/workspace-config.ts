@@ -8,6 +8,14 @@ import { router, protectedProcedure } from '../trpc';
 import { entityService } from '@/lib/entities/entity-service';
 import { workspaceService } from '@/lib/services/workspace-service';
 import { TRPCError } from '@trpc/server';
+import { 
+  createCustomField, 
+  getCustomFields, 
+  deleteCustomField,
+  setFieldValue,
+  getFieldValues,
+  suggestFields
+} from '@/lib/services/evercore/custom-fields';
 
 // Import types from workspace-config (these don't cause database initialization)
 import type { 
@@ -355,6 +363,170 @@ export const workspaceConfigRouter = router({
   getTemplates: protectedProcedure
     .query(async () => {
       return getBuiltInTemplates();
+    }),
+
+  // Custom Fields Management
+  createCustomField: protectedProcedure
+    .input(z.object({
+      entityType: z.enum(['contact', 'company', 'deal', 'lead', 'product', 'order']),
+      name: z.string(),
+      label: z.string(),
+      type: z.enum(['text', 'number', 'date', 'boolean', 'select', 'multiselect', 'url', 'email', 'phone', 'currency', 'percentage']),
+      required: z.boolean().optional(),
+      defaultValue: z.any().optional(),
+      options: z.array(z.string()).optional(),
+      validation: z.object({
+        min: z.number().optional(),
+        max: z.number().optional(),
+        pattern: z.string().optional(),
+      }).optional(),
+      description: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const workspaceId = await workspaceService.createWorkspaceIfNotExists(
+          ctx.orgId,
+          `Workspace ${ctx.orgId}`
+        );
+        const userId = ctx.userId;
+        
+        const field = await createCustomField(
+          workspaceId,
+          {
+            ...input,
+            createdBy: userId
+          },
+          userId
+        );
+        
+        return field;
+      } catch (error) {
+        console.error('Failed to create custom field:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to create custom field'
+        });
+      }
+    }),
+    
+  getCustomFields: protectedProcedure
+    .input(z.object({
+      entityType: z.string()
+    }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const workspaceId = await workspaceService.createWorkspaceIfNotExists(
+          ctx.orgId,
+          `Workspace ${ctx.orgId}`
+        );
+        
+        const fields = await getCustomFields(workspaceId, input.entityType);
+        return fields;
+      } catch (error) {
+        console.error('Failed to fetch custom fields:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch custom fields'
+        });
+      }
+    }),
+    
+  deleteCustomField: protectedProcedure
+    .input(z.object({
+      fieldId: z.string(),
+      removeData: z.boolean().optional()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const workspaceId = await workspaceService.createWorkspaceIfNotExists(
+          ctx.orgId,
+          `Workspace ${ctx.orgId}`
+        );
+        
+        await deleteCustomField(workspaceId, input.fieldId, input.removeData);
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to delete custom field:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to delete custom field'
+        });
+      }
+    }),
+    
+  setFieldValue: protectedProcedure
+    .input(z.object({
+      entityId: z.string(),
+      fieldId: z.string(),
+      value: z.any()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const workspaceId = await workspaceService.createWorkspaceIfNotExists(
+          ctx.orgId,
+          `Workspace ${ctx.orgId}`
+        );
+        const userId = ctx.userId;
+        
+        await setFieldValue(
+          workspaceId,
+          input.entityId,
+          input.fieldId,
+          input.value,
+          userId
+        );
+        
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to set field value:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to set field value'
+        });
+      }
+    }),
+    
+  getFieldValues: protectedProcedure
+    .input(z.object({
+      entityId: z.string()
+    }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const workspaceId = await workspaceService.createWorkspaceIfNotExists(
+          ctx.orgId,
+          `Workspace ${ctx.orgId}`
+        );
+        
+        const values = await getFieldValues(workspaceId, input.entityId);
+        return values;
+      } catch (error) {
+        console.error('Failed to fetch field values:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch field values'
+        });
+      }
+    }),
+    
+  suggestFields: protectedProcedure
+    .input(z.object({
+      entityType: z.string(),
+      existingFields: z.array(z.string())
+    }))
+    .query(async ({ ctx, input }) => {
+      try {
+        const suggestions = await suggestFields(
+          input.entityType,
+          input.existingFields
+        );
+        return suggestions;
+      } catch (error) {
+        console.error('Failed to get field suggestions:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to get field suggestions'
+        });
+      }
     }),
 });
 

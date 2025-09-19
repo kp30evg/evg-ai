@@ -4,7 +4,17 @@
  */
 
 import { db } from '@/lib/db';
-import { entities, Entity, NewEntity } from '@/lib/db/schema/unified';
+import { 
+  entities, 
+  Entity, 
+  NewEntity, 
+  activities, 
+  Activity, 
+  NewActivity,
+  relationships,
+  Relationship,
+  NewRelationship 
+} from '@/lib/db/schema/unified';
 import { eq, and, or, sql, desc, asc, like, ilike } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -447,6 +457,195 @@ export class EntityService {
   async count(query: Omit<EntityQuery, 'limit' | 'offset' | 'orderBy' | 'orderDirection'>): Promise<number> {
     const results = await this.find({ ...query, limit: undefined, offset: undefined });
     return results.length;
+  }
+
+  /**
+   * Log an activity for an entity
+   */
+  async logActivity(
+    workspaceId: string,
+    entityId: string,
+    activityType: string,
+    content: any = {},
+    options: {
+      userId?: string;
+      sourceModule?: string;
+      participants?: string[];
+      metadata?: Record<string, any>;
+    } = {}
+  ): Promise<Activity> {
+    try {
+      const [activity] = await db.insert(activities).values({
+        workspaceId,
+        entityId,
+        activityType,
+        userId: options.userId,
+        sourceModule: options.sourceModule,
+        content,
+        participants: options.participants,
+        metadata: options.metadata || {},
+        timestamp: new Date(),
+      }).returning();
+
+      return activity;
+    } catch (error) {
+      console.error('Failed to log activity:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get activities for an entity
+   */
+  async getActivities(
+    workspaceId: string,
+    entityId: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      types?: string[];
+      startDate?: Date;
+      endDate?: Date;
+    } = {}
+  ): Promise<Activity[]> {
+    let query = db
+      .select()
+      .from(activities)
+      .where(
+        and(
+          eq(activities.workspaceId, workspaceId),
+          eq(activities.entityId, entityId)
+        )
+      )
+      .orderBy(desc(activities.timestamp));
+
+    // Add type filter if specified
+    if (options.types && options.types.length > 0) {
+      const typeConditions = options.types.map(type => eq(activities.activityType, type));
+      query = query.where(
+        and(
+          eq(activities.workspaceId, workspaceId),
+          eq(activities.entityId, entityId),
+          or(...typeConditions)
+        )
+      );
+    }
+
+    // Add date range filter
+    if (options.startDate || options.endDate) {
+      const dateConditions = [];
+      if (options.startDate) {
+        dateConditions.push(sql`${activities.timestamp} >= ${options.startDate}`);
+      }
+      if (options.endDate) {
+        dateConditions.push(sql`${activities.timestamp} <= ${options.endDate}`);
+      }
+      query = query.where(
+        and(
+          eq(activities.workspaceId, workspaceId),
+          eq(activities.entityId, entityId),
+          ...dateConditions
+        )
+      );
+    }
+
+    // Add pagination
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    if (options.offset) {
+      query = query.offset(options.offset);
+    }
+
+    return await query;
+  }
+
+  /**
+   * Create a relationship between entities
+   */
+  async createRelationship(
+    workspaceId: string,
+    sourceEntityId: string,
+    targetEntityId: string,
+    relationshipType: string,
+    options: {
+      strengthScore?: number;
+      metadata?: Record<string, any>;
+    } = {}
+  ): Promise<Relationship> {
+    try {
+      const [relationship] = await db.insert(relationships).values({
+        workspaceId,
+        sourceEntityId,
+        targetEntityId,
+        relationshipType,
+        strengthScore: options.strengthScore || 50,
+        metadata: options.metadata || {},
+      }).returning();
+
+      return relationship;
+    } catch (error) {
+      // Check if it's a unique constraint violation
+      if (error.message?.includes('duplicate key')) {
+        // Update existing relationship
+        const [existing] = await db
+          .select()
+          .from(relationships)
+          .where(
+            and(
+              eq(relationships.workspaceId, workspaceId),
+              eq(relationships.sourceEntityId, sourceEntityId),
+              eq(relationships.targetEntityId, targetEntityId),
+              eq(relationships.relationshipType, relationshipType)
+            )
+          )
+          .limit(1);
+        
+        if (existing) {
+          return existing;
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get relationships for an entity
+   */
+  async getRelationships(
+    workspaceId: string,
+    entityId: string,
+    options: {
+      type?: string;
+      direction?: 'source' | 'target' | 'both';
+    } = { direction: 'both' }
+  ): Promise<Relationship[]> {
+    const conditions = [eq(relationships.workspaceId, workspaceId)];
+    
+    // Add direction filter
+    if (options.direction === 'source') {
+      conditions.push(eq(relationships.sourceEntityId, entityId));
+    } else if (options.direction === 'target') {
+      conditions.push(eq(relationships.targetEntityId, entityId));
+    } else {
+      conditions.push(
+        or(
+          eq(relationships.sourceEntityId, entityId),
+          eq(relationships.targetEntityId, entityId)
+        )
+      );
+    }
+
+    // Add type filter
+    if (options.type) {
+      conditions.push(eq(relationships.relationshipType, options.type));
+    }
+
+    return await db
+      .select()
+      .from(relationships)
+      .where(and(...conditions))
+      .orderBy(desc(relationships.createdAt));
   }
 }
 

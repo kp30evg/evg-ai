@@ -572,8 +572,61 @@ npm run dev
 - **Fix**: Added maximum 20-second timeout with automatic redirect
 - **Files**: `/app/(platform)/mail/syncing/page.tsx`
 
+### 🔥 **TODAY'S SESSION ACHIEVEMENTS** (January 19, 2025)
+
+#### **MAJOR FEATURE: Automatic Company Extraction from Email Domains**
+**Problem**: CRM contacts showed empty Company column despite having email addresses
+**Solution**: Built comprehensive company extraction system that:
+- Automatically extracts company names from email domains (e.g., john@acme.com → "Acme")
+- Handles complex subdomains correctly (e.g., hi@learn.therundown.ai → "Therundown", not "Learn")
+- Filters out personal email providers (Gmail, Yahoo, etc.)
+- Works on both new contact creation AND existing imports
+
+**Implementation Details:**
+1. **Created `extractCompanyFromEmail()` function** in `/lib/modules-simple/evercore.ts`
+   - Intelligent domain parsing with TLD awareness
+   - Handles country codes (.co.uk, .com.au)
+   - Skips personal domains and common prefixes
+
+2. **Updated Contact Creation Flow**:
+   - Modified `createContactWithData()` to auto-extract companies
+   - Stores both `companyId` (for relationships) AND `companyName` (for display)
+   - Creates company entities automatically if they don't exist
+
+3. **Fixed Gmail Import Path**:
+   - Updated `/lib/evermail/gmail-sync-with-isolation.ts`
+   - Now extracts companies when importing contacts from emails
+
+4. **Migration Script for Existing Data**:
+   - Created `/scripts/fix-contact-companies.ts`
+   - Successfully migrated 367 existing contacts
+   - Populated company names for all historical data
+
+**Results**:
+- ✅ All 367 existing contacts now have company names
+- ✅ Future email imports automatically extract companies
+- ✅ Manual contact creation auto-fills company from email
+- ✅ Company column properly displays in CRM table
+
+#### **Database Connection Error Fixes**
+**Problem**: "No database connection string was provided to 'neon()'" errors in browser
+**Root Cause**: Client-side components trying to access database directly
+
+**Solution**:
+1. Created tRPC routers for server-side operations:
+   - `/lib/api/routers/workspace-config.ts` - Workspace configuration
+   - `/lib/api/routers/entity-types.ts` - Dynamic entity management
+
+2. Updated React contexts to use tRPC instead of direct DB access:
+   - `/lib/contexts/workspace-config-context.tsx`
+   - `/lib/contexts/dynamic-entities-context.tsx`
+
+#### **React Warning Fix**
+**Problem**: "Received false for a non-boolean attribute indeterminate"
+**Solution**: Fixed EntityTable checkbox to use ref + useEffect for indeterminate state
+
 ### 🎯 **IMMEDIATE NEXT STEPS** (Pick up from here)
-1. **Test Complete Flow**: Verify Omid and Kian can both see their own emails properly
+1. **Test Complete Flow**: Verify all users can see their properly extracted company names
 2. **Polish EverCore**: Add deal pipeline visualization, activity timeline
 3. **Email-CRM Integration**: Link emails to contacts/deals automatically  
 4. **Module 4 - EverTask**: Task management integrated with CRM
@@ -582,7 +635,15 @@ npm run dev
 
 ### 💻 **KEY TECHNICAL DETAILS FOR NEXT DEVELOPER**
 
-**Critical Files to Know:**
+**Critical Files Modified in Latest Session (Company Extraction Feature):**
+- `/lib/modules-simple/evercore.ts` - Contains `extractCompanyFromEmail()` function (EXPORTED)
+- `/lib/evermail/gmail-sync-with-isolation.ts` - Updated to extract companies on import
+- `/components/evercore/entities/EntityTable.tsx` - Fixed React indeterminate checkbox issue
+- `/lib/api/routers/workspace-config.ts` - NEW: tRPC router for workspace operations
+- `/lib/api/routers/entity-types.ts` - NEW: tRPC router for dynamic entities
+- `/scripts/fix-contact-companies.ts` - Migration script (can be run again if needed)
+
+**Critical Files to Know (Email System):**
 - `/lib/api/routers/evermail.ts` - Main email API (getEmails query is critical)
 - `/lib/evermail/gmail-sync-with-isolation.ts` - Gmail sync logic with user isolation
 - `/app/api/auth/gmail/callback/route.ts` - OAuth callback that triggers sync
@@ -595,6 +656,8 @@ npm run dev
 2. **Always filter by userId**: Every query must include `eq(entities.userId, dbUser.id)`
 3. **Use actual database IDs**: Don't use `stringToUuid()` - get real workspace/user IDs from DB
 4. **OAuth tokens are encrypted**: Use base64 encode/decode for token storage
+5. **Company extraction**: The `extractCompanyFromEmail()` function is exported and reusable
+6. **Store both IDs and names**: Always store `companyId` (for relationships) AND `companyName` (for display)
 
 **Current Data Flow:**
 1. User clicks "Connect Gmail" → OAuth flow

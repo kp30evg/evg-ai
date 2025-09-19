@@ -15,6 +15,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { theme } from '@/lib/evercore/theme'
+import TableAddColumnButton from '../table/TableAddColumnButton'
 
 export interface Column {
   id: string
@@ -39,6 +40,9 @@ export interface EntityTableProps {
   onSort?: (columnId: string) => void
   isLoading?: boolean
   emptyMessage?: string
+  entityType?: 'contact' | 'company' | 'deal' | 'lead' | 'product' | 'order'
+  onAddColumn?: (field: any) => void
+  showAddColumn?: boolean
 }
 
 export default function EntityTable({
@@ -54,6 +58,9 @@ export default function EntityTable({
   onSort,
   isLoading = false,
   emptyMessage = 'No data available',
+  entityType,
+  onAddColumn,
+  showAddColumn = false,
 }: EntityTableProps) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null)
   const [menuOpenRow, setMenuOpenRow] = useState<string | null>(null)
@@ -95,14 +102,26 @@ export default function EntityTable({
       backgroundColor: theme.colors.white,
       border: `1px solid ${theme.colors.lightGray}`,
       borderRadius: theme.borderRadius.md,
+      width: '100%',
+      position: 'relative',
       overflow: 'hidden',
     }}>
       {/* Table Container */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{
+      <div 
+        className="table-container"
+        style={{ 
+          overflowX: 'auto',
+          overflowY: 'hidden',
           width: '100%',
-          borderCollapse: 'collapse',
+          maxWidth: '100%',
+          paddingBottom: '20px',
         }}>
+        <table 
+          style={{
+            width: 'max-content',
+            minWidth: '100%',
+            borderCollapse: 'collapse',
+          }}>
           {/* Header */}
           <thead>
             <tr style={{
@@ -137,7 +156,8 @@ export default function EntityTable({
                   style={{
                     padding: `${theme.spacing.md} ${theme.spacing.lg}`,
                     textAlign: column.align || 'left',
-                    width: column.width || 'auto',
+                    width: column.width,
+                    minWidth: column.width || '120px',
                     fontSize: theme.typography.fontSize.sm,
                     fontWeight: theme.typography.fontWeight.semibold,
                     color: theme.colors.charcoal,
@@ -198,6 +218,21 @@ export default function EntityTable({
                   padding: theme.spacing.md,
                 }}></th>
               )}
+              
+              {/* Add Column Button */}
+              {showAddColumn && entityType && (
+                <th style={{
+                  width: '60px',
+                  minWidth: '60px',
+                  padding: 0,
+                  backgroundColor: theme.colors.lightGray + '30',
+                }}>
+                  <TableAddColumnButton
+                    entityType={entityType}
+                    onAddField={onAddColumn}
+                  />
+                </th>
+              )}
             </tr>
           </thead>
 
@@ -205,7 +240,7 @@ export default function EntityTable({
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={columns.length + (onSelectionChange ? 1 : 0) + (onRowEdit || onRowDelete ? 1 : 0)}>
+                <td colSpan={columns.length + (onSelectionChange ? 1 : 0) + (onRowEdit || onRowDelete ? 1 : 0) + (showAddColumn ? 1 : 0)}>
                   <div style={{
                     padding: theme.spacing['3xl'],
                     textAlign: 'center',
@@ -231,7 +266,7 @@ export default function EntityTable({
               </tr>
             ) : data.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + (onSelectionChange ? 1 : 0) + (onRowEdit || onRowDelete ? 1 : 0)}>
+                <td colSpan={columns.length + (onSelectionChange ? 1 : 0) + (onRowEdit || onRowDelete ? 1 : 0) + (showAddColumn ? 1 : 0)}>
                   <div style={{
                     padding: theme.spacing['3xl'],
                     textAlign: 'center',
@@ -295,8 +330,11 @@ export default function EntityTable({
                         style={{
                           padding: `${theme.spacing.lg} ${theme.spacing.lg}`,
                           textAlign: column.align || 'left',
+                          width: column.width || 'auto',
+                          minWidth: column.width || 'auto',
                           fontSize: theme.typography.fontSize.sm,
                           color: theme.colors.charcoal,
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {column.render ? column.render(value, row) : value}
@@ -430,6 +468,20 @@ export default function EntityTable({
                         </AnimatePresence>
                       </div>
                     </td>
+                  )}
+                  
+                  {/* Empty cell for Add Column button column */}
+                  {showAddColumn && (
+                    <td style={{
+                      width: '60px',
+                      minWidth: '60px',
+                      padding: theme.spacing.md,
+                      backgroundColor: hoveredRow === row.id 
+                        ? theme.colors.softGreen + '10' 
+                        : selectedRows.includes(row.id)
+                        ? theme.colors.lightGray + '10'
+                        : 'transparent',
+                    }}></td>
                   )}
                 </motion.tr>
               ))

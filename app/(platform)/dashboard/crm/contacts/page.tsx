@@ -29,9 +29,12 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Grid3x3,
+  List
 } from 'lucide-react'
 import { trpc } from '@/lib/trpc/client'
+import ContactsTableView from '@/components/evercore/ContactsTableView'
 
 interface Contact {
   id: string
@@ -66,6 +69,7 @@ export default function ContactsPage() {
   const [selectedSourceFilter, setSelectedSourceFilter] = useState<string | null>(null)
   const [selectedContact, setSelectedContact] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('table')
   
   // Fetch contacts with tRPC
   const { data: contacts, isLoading, refetch } = trpc.unified.getContacts.useQuery(
@@ -230,6 +234,58 @@ export default function ContactsPage() {
           </div>
           
           <div style={{ display: 'flex', gap: '12px' }}>
+            {/* View Mode Toggle */}
+            <div style={{
+              display: 'flex',
+              backgroundColor: colors.lightGray + '20',
+              borderRadius: '8px',
+              padding: '2px',
+              border: `1px solid ${colors.lightGray}40`
+            }}>
+              <button
+                onClick={() => setViewMode('table')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  backgroundColor: viewMode === 'table' ? colors.white : 'transparent',
+                  color: viewMode === 'table' ? colors.evergreen : colors.mediumGray,
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                }}
+              >
+                <Grid3x3 size={16} />
+                Table
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  backgroundColor: viewMode === 'list' ? colors.white : 'transparent',
+                  color: viewMode === 'list' ? colors.evergreen : colors.mediumGray,
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                }}
+              >
+                <List size={16} />
+                List
+              </button>
+            </div>
+            
             <button
               onClick={handleImport}
               style={{
@@ -489,7 +545,7 @@ export default function ContactsPage() {
         </div>
       )}
 
-      {/* Contacts List */}
+      {/* Contacts View */}
       <div style={{ padding: '24px 32px' }}>
         {isLoading ? (
           <div style={{
@@ -568,6 +624,15 @@ export default function ContactsPage() {
               </div>
             )}
           </div>
+        ) : viewMode === 'table' ? (
+          <ContactsTableView
+            contacts={filteredContacts}
+            companies={companies}
+            onContactClick={(contact) => handleContactClick(contact.id)}
+            onContactEdit={(contact) => router.push(`/contacts/${contact.id}/edit`)}
+            onContactDelete={(contact) => console.log('Delete contact:', contact.id)}
+            isLoading={isLoading}
+          />
         ) : (
           <div style={{
             backgroundColor: colors.white,

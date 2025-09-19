@@ -4,7 +4,7 @@
  * ALL business data lives in the entities table
  */
 
-import { pgTable, uuid, varchar, jsonb, text, timestamp, index, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, jsonb, text, timestamp, index, boolean, integer } from 'drizzle-orm/pg-core';
 
 // Workspaces table - ONLY for authentication/multi-tenancy
 export const workspaces = pgTable('workspaces', {
@@ -65,6 +65,45 @@ export const entities = pgTable('entities', {
   createdAtIdx: index('idx_entities_created').on(table.createdAt),
 }));
 
+// Activities table for timeline tracking
+export const activities = pgTable('activities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull(),
+  userId: uuid('user_id'), // User who performed the activity
+  entityId: uuid('entity_id').references(() => entities.id, { onDelete: 'cascade' }),
+  activityType: varchar('activity_type', { length: 50 }).notNull(),
+  sourceModule: varchar('source_module', { length: 50 }),
+  content: jsonb('content').default({}).$type<Record<string, any>>(),
+  participants: uuid('participants').array(),
+  metadata: jsonb('metadata').default({}).$type<Record<string, any>>(),
+  timestamp: timestamp('timestamp', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index('idx_activities_workspace').on(table.workspaceId),
+  entityIdx: index('idx_activities_entity').on(table.entityId),
+  timestampIdx: index('idx_activities_timestamp').on(table.timestamp),
+  typeIdx: index('idx_activities_type').on(table.activityType),
+  userIdx: index('idx_activities_user').on(table.userId),
+}));
+
+// Relationships table for advanced entity linking
+export const relationships = pgTable('relationships', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull(),
+  sourceEntityId: uuid('source_entity_id').references(() => entities.id, { onDelete: 'cascade' }),
+  targetEntityId: uuid('target_entity_id').references(() => entities.id, { onDelete: 'cascade' }),
+  relationshipType: varchar('relationship_type', { length: 50 }).notNull(),
+  strengthScore: integer('strength_score').default(50),
+  metadata: jsonb('metadata').default({}).$type<Record<string, any>>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  workspaceIdx: index('idx_relationships_workspace').on(table.workspaceId),
+  sourceIdx: index('idx_relationships_source').on(table.sourceEntityId),
+  targetIdx: index('idx_relationships_target').on(table.targetEntityId),
+  typeIdx: index('idx_relationships_type').on(table.relationshipType),
+}));
+
 // Type exports
 export type Workspace = typeof workspaces.$inferSelect;
 export type NewWorkspace = typeof workspaces.$inferInsert;
@@ -72,6 +111,10 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Entity = typeof entities.$inferSelect;
 export type NewEntity = typeof entities.$inferInsert;
+export type Activity = typeof activities.$inferSelect;
+export type NewActivity = typeof activities.$inferInsert;
+export type Relationship = typeof relationships.$inferSelect;
+export type NewRelationship = typeof relationships.$inferInsert;
 
 // Common entity type definitions (for TypeScript)
 export interface CustomerData {

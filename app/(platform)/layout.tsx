@@ -211,8 +211,7 @@ export default function PlatformLayout({
         display: 'flex',
         height: '100vh',
         backgroundColor: tokens.colors.white,
-        fontFamily: tokens.typography.fontFamily,
-        overflow: 'hidden'
+        fontFamily: tokens.typography.fontFamily
       }}>
         {/* Main Icon Navigation Bar */}
       <div style={{
@@ -470,7 +469,7 @@ export default function PlatformLayout({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        overflow: 'auto',
         backgroundColor: tokens.colors.white
       }}>
         {children}
