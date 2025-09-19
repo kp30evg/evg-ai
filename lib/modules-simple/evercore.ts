@@ -48,8 +48,78 @@ export interface DealData {
 }
 
 /**
+ * Extract company name from email domain
+ * Handles subdomains, multi-level TLDs, and personal email providers
+ */
+export function extractCompanyFromEmail(email: string): string | null {
+  // List of personal email providers to skip
+  const personalDomains = [
+    'gmail', 'yahoo', 'outlook', 'hotmail', 'icloud', 'me', 'mac', 
+    'aol', 'protonmail', 'yandex', 'mail', 'zoho', 'gmx', 'ymail',
+    'live', 'msn', 'qq', '163', '126', 'sina', 'foxmail'
+  ];
+  
+  // Extract everything after @
+  const domainMatch = email.toLowerCase().match(/@(.+)$/);
+  if (!domainMatch) return null;
+  
+  const fullDomain = domainMatch[1];
+  const parts = fullDomain.split('.');
+  
+  // Determine which part is the company name
+  let companyPart: string;
+  
+  if (parts.length === 2) {
+    // Simple case: company.com → company
+    companyPart = parts[0];
+  } else if (parts.length >= 3) {
+    // Common TLDs and country codes
+    const tlds = ['com', 'org', 'net', 'io', 'ai', 'co', 'dev', 'app', 'edu', 'gov', 'mil', 'biz', 'info', 'name', 'tv', 'me', 'cc'];
+    const countryTlds = ['uk', 'us', 'ca', 'au', 'de', 'fr', 'jp', 'cn', 'in', 'br', 'ru', 'it', 'es', 'nl', 'se', 'no', 'dk', 'fi', 'pl', 'kr', 'sg', 'hk', 'tw', 'mx', 'ar', 'cl', 'pe', 'za', 'eg', 'sa', 'ae', 'il', 'tr'];
+    
+    const lastPart = parts[parts.length - 1];
+    const secondLastPart = parts[parts.length - 2];
+    
+    // Check for country TLD patterns like .co.uk, .com.au
+    if (countryTlds.includes(lastPart) && (secondLastPart === 'co' || secondLastPart === 'com' || secondLastPart === 'org' || secondLastPart === 'net')) {
+      // domain.co.uk → domain is at position length-3
+      companyPart = parts[parts.length - 3] || parts[0];
+    } else if (tlds.includes(lastPart)) {
+      // subdomain.company.com → company is at position length-2
+      companyPart = parts[parts.length - 2];
+    } else {
+      // Fallback: assume last part is TLD, take second-to-last
+      companyPart = secondLastPart || parts[0];
+    }
+  } else {
+    // Single part domain (unlikely but handle it)
+    companyPart = parts[0];
+  }
+  
+  // Skip personal email providers
+  if (personalDomains.includes(companyPart)) return null;
+  
+  // Skip common email prefixes that might have become the company part
+  const skipPrefixes = ['mail', 'smtp', 'email', 'noreply', 'no-reply', 'support', 'help', 'info', 'contact', 'admin', 'webmaster', 'postmaster'];
+  if (skipPrefixes.includes(companyPart)) return null;
+  
+  // Clean the company name
+  companyPart = companyPart.replace(/[^a-z0-9]/gi, ''); // Remove special characters
+  if (!companyPart) return null;
+  
+  // Handle special capitalization cases
+  if (companyPart.length <= 3 && companyPart === companyPart.toUpperCase()) {
+    return companyPart.toUpperCase(); // Keep acronyms like MIT, IBM uppercase
+  }
+  
+  // Capitalize first letter, rest lowercase
+  return companyPart.charAt(0).toUpperCase() + companyPart.slice(1).toLowerCase();
+}
+
+/**
  * Create a contact (person)
  * Automatically creates or links to company if companyName is provided
+ * Automatically extracts company from email if no company is specified
  */
 async function createContactWithData(
   workspaceId: string,
@@ -67,6 +137,15 @@ async function createContactWithData(
   }
 
   let companyId = data.companyId;
+  
+  // Auto-extract company from email if no company info provided
+  if (!companyId && !data.companyName && data.email) {
+    const extractedCompany = extractCompanyFromEmail(data.email);
+    if (extractedCompany) {
+      data.companyName = extractedCompany;
+      console.log(`🔍 Auto-extracted company from email ${data.email}: ${extractedCompany}`);
+    }
+  }
 
   // Handle company name resolution - CRITICAL for interdependent relationships
   if (!companyId && data.companyName && data.companyName.trim()) {
@@ -108,13 +187,22 @@ async function createContactWithData(
   }
 
   // Create the contact with company relationship
+  // Store both companyId (for relationships) and companyName (for display)
+  const contactData = {
+    ...data,
+    companyId, // For relationships
+  };
+  
+  // CRITICAL: Also store the company name for display purposes
+  if (data.companyName) {
+    contactData.companyName = data.companyName;
+    contactData.company = data.companyName; // Store in both fields for compatibility
+  }
+  
   const contact = await entityService.create(
     workspaceId,
     'contact',
-    {
-      ...data,
-      companyId, // Ensure the resolved companyId is stored
-    },
+    contactData,
     companyId ? { company: companyId } : {},
     { userId, source: data.source || 'manual' }
   );

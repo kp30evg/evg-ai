@@ -248,6 +248,8 @@ export class GmailSyncService {
   private async createContactFromEmail(email: string, name?: string) {
     try {
       const { sql } = await import('drizzle-orm');
+      const { extractCompanyFromEmail } = await import('../modules-simple/evercore');
+      
       // Check if contact already exists for this user
       const existingContact = await db
         .select()
@@ -263,7 +265,10 @@ export class GmailSyncService {
         .limit(1);
       
       if (existingContact.length === 0) {
-        // Create new contact with USER ISOLATION
+        // Extract company from email domain
+        const extractedCompany = extractCompanyFromEmail(email);
+        
+        // Create new contact with USER ISOLATION and extracted company
         await db.insert(entities).values({
           workspaceId: this.workspaceId,
           userId: this.userId, // CRITICAL: Set user ID for isolation
@@ -272,7 +277,10 @@ export class GmailSyncService {
             name: name || email.split('@')[0],
             email: email,
             source: 'gmail_import',
-            createdFrom: 'email_sync'
+            createdFrom: 'email_sync',
+            // Add company fields for display
+            company: extractedCompany || '',
+            companyName: extractedCompany || ''
           },
           metadata: {
             autoCreated: true,

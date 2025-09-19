@@ -668,6 +668,55 @@ export const unifiedRouter = router({
         companyId: input.companyId,
       });
     }),
+  
+  // Get database contacts with user isolation
+  getDBContacts: protectedProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(200).default(100),
+      includeEmailImports: z.boolean().default(true),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Get database user ID
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, ctx.userId))
+        .limit(1);
+      
+      if (!dbUser) {
+        console.warn('User not found in database for contacts fetch');
+        return [];
+      }
+      
+      // Fetch contacts with user isolation
+      const contacts = await entityService.find({
+        workspaceId,
+        userId: dbUser.id, // User isolation - only get this user's contacts
+        type: 'contact',
+        limit: input.limit,
+        orderBy: 'createdAt',
+        orderDirection: 'desc',
+      });
+      
+      // Transform to CRM format
+      return contacts.map((entity: any) => ({
+        id: entity.id,
+        name: entity.data.name || `${entity.data.firstName || ''} ${entity.data.lastName || ''}`.trim() || 'Unknown',
+        email: entity.data.email || '',
+        company: entity.data.companyName || entity.data.company || '',
+        title: entity.data.jobTitle || entity.data.title || '',
+        phone: entity.data.phone || '',
+        lastContact: entity.data.lastContactedAt || entity.createdAt,
+        dealValue: entity.data.dealValue || 0,
+        status: entity.data.sentimentScore > 70 ? 'Hot' : entity.data.sentimentScore > 40 ? 'Warm' : 'Cold',
+        source: entity.data.source || entity.data.createdFrom || 'manual',
+        tags: entity.data.tags || [],
+        isFromEmail: entity.data.createdFrom === 'email_sync' || entity.data.source === 'gmail_import',
+        createdAt: entity.createdAt,
+      }));
+    }),
 
   // Get companies
   getCompanies: protectedProcedure

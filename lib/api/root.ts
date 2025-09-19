@@ -3,12 +3,16 @@ import { everchatRouter } from './routers/everchat';
 import { evermailRouter } from './routers/evermail';
 import { unifiedRouter } from './routers/unified';
 import { oauthRouter } from './routers/oauth';
+import { workspaceConfigRouter } from './routers/workspace-config';
+import { entityTypesRouter } from './routers/entity-types';
 
 export const appRouter = router({
   everchat: everchatRouter,
   evermail: evermailRouter,
   unified: unifiedRouter, // The unified API for single-table architecture
   oauth: oauthRouter, // OAuth connection management
+  workspaceConfig: workspaceConfigRouter, // Workspace configuration management
+  entityTypes: entityTypesRouter, // Dynamic entity types management
 });
 
 export type AppRouter = typeof appRouter;
