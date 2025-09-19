@@ -262,6 +262,83 @@ export class EverTaskService {
     return { ...task, data: updatedData }
   }
 
+  // Update task (general update)
+  async updateTask(workspaceId: string, taskId: string, updates: any) {
+    const [task] = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.id, taskId),
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, TASK_ENTITY_TYPES.TASK)
+        )
+      )
+      .limit(1)
+
+    if (!task) {
+      throw new Error('Task not found')
+    }
+
+    const updatedData = {
+      ...task.data,
+      ...updates,
+      dueDate: updates.dueDate ? new Date(updates.dueDate).toISOString() : task.data.dueDate,
+      updatedAt: new Date().toISOString()
+    }
+
+    await db
+      .update(entities)
+      .set({
+        data: updatedData,
+        updatedAt: new Date()
+      })
+      .where(eq(entities.id, taskId))
+
+    return { ...task, data: updatedData }
+  }
+
+  // Delete task
+  async deleteTask(workspaceId: string, taskId: string) {
+    // First get the task to find its project
+    const [task] = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.id, taskId),
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, TASK_ENTITY_TYPES.TASK)
+        )
+      )
+      .limit(1)
+    
+    if (!task) {
+      throw new Error('Task not found')
+    }
+
+    // Delete the task by updating its type to mark it as deleted
+    // Or we can use a deletedAt field, but for now let's change the type
+    await db
+      .update(entities)
+      .set({
+        type: 'deleted_task',
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(entities.id, taskId),
+          eq(entities.workspaceId, workspaceId)
+        )
+      )
+    
+    // Update project stats if task belonged to a project
+    const projectId = task.relationships?.find(r => r.type === 'belongs_to')?.targetId
+    if (projectId) {
+      await this.updateProjectStats(workspaceId, projectId)
+    }
+  }
+  
   // Update project statistics
   async updateProjectStats(workspaceId: string, projectId: string) {
     const tasks = await this.getProjectTasks(workspaceId, projectId)
@@ -313,6 +390,22 @@ export class EverTaskService {
         )
       )
       .orderBy(asc(entities.createdAt))
+
+    return tasks
+  }
+
+  // Get all tasks in workspace
+  async getAllTasks(workspaceId: string) {
+    const tasks = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, TASK_ENTITY_TYPES.TASK)
+        )
+      )
+      .orderBy(desc(entities.createdAt))
 
     return tasks
   }

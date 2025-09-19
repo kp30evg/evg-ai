@@ -120,11 +120,11 @@ export const evertaskRouter = router({
     .input(z.object({
       title: z.string().min(1),
       description: z.string().optional(),
-      projectId: z.string(),
+      projectId: z.string().optional(),
       status: z.string().optional(),
       priority: z.string().optional(),
       assigneeId: z.string().optional(),
-      dueDate: z.string().optional(),
+      dueDate: z.date().optional(),
       column: z.string().optional(),
       linkedEntities: z.array(z.string()).optional()
     }))
@@ -151,12 +151,30 @@ export const evertaskRouter = router({
         })
       }
 
+      // If no project is specified, we need to create or find a default one
+      let projectId = input.projectId
+      if (!projectId) {
+        // Create a default inbox project if needed
+        const projects = await everTaskService.getProjects(workspaceId, dbUser.id)
+        let inboxProject = projects.find(p => p.data?.name === 'Inbox')
+        
+        if (!inboxProject) {
+          inboxProject = await everTaskService.createProject(workspaceId, dbUser.id, {
+            name: 'Inbox',
+            description: 'Default project for standalone tasks',
+            privacy: 'private'
+          })
+        }
+        projectId = inboxProject.id
+      }
+
       const task = await everTaskService.createTask(
         workspaceId,
         dbUser.id,
         {
           ...input,
-          dueDate: input.dueDate ? new Date(input.dueDate) : undefined
+          projectId,
+          dueDate: input.dueDate
         }
       )
 
@@ -207,6 +225,58 @@ export const evertaskRouter = router({
       return task
     }),
 
+  // Update task (general update including assignee)
+  updateTask: protectedProcedure
+    .input(z.object({
+      taskId: z.string(),
+      updates: z.object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        status: z.string().optional(),
+        priority: z.string().optional(),
+        assigneeId: z.string().optional(),
+        dueDate: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        column: z.string().optional()
+      })
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No workspace found'
+        })
+      }
+      const workspaceId = ctx.workspace.id
+
+      const task = await everTaskService.updateTask(
+        workspaceId,
+        input.taskId,
+        input.updates
+      )
+
+      return task
+    }),
+  
+  // Delete task
+  deleteTask: protectedProcedure
+    .input(z.object({
+      taskId: z.string()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No workspace found'
+        })
+      }
+      const workspaceId = ctx.workspace.id
+
+      await everTaskService.deleteTask(workspaceId, input.taskId)
+      
+      return { success: true }
+    }),
+
   // Get user's tasks
   getUserTasks: protectedProcedure
     .query(async ({ ctx }) => {
@@ -233,9 +303,27 @@ export const evertaskRouter = router({
       return tasks
     }),
 
+  // Get all tasks in workspace
+  getAllTasks: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No workspace found'
+        })
+      }
+      const workspaceId = ctx.workspace.id
+
+      const tasks = await everTaskService.getAllTasks(workspaceId)
+      return tasks
+    }),
+
   // Get overview statistics
   getOverviewStats: protectedProcedure
-    .query(async ({ ctx }) => {
+    .input(z.object({
+      userId: z.string().optional()
+    }).optional())
+    .query(async ({ ctx, input }) => {
       if (!ctx.workspace) {
         throw new TRPCError({
           code: 'UNAUTHORIZED',

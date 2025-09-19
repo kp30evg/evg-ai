@@ -6,6 +6,7 @@ import { unifiedRouter } from './routers/unified';
 import { oauthRouter } from './routers/oauth';
 import { workspaceConfigRouter } from './routers/workspace-config';
 import { entityTypesRouter } from './routers/entity-types';
+import { organizationRouter } from './routers/organization';
 
 export const appRouter = router({
   everchat: everchatRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   oauth: oauthRouter, // OAuth connection management
   workspaceConfig: workspaceConfigRouter, // Workspace configuration management
   entityTypes: entityTypesRouter, // Dynamic entity types management
+  organization: organizationRouter, // Organization and team management
 });
 
 export type AppRouter = typeof appRouter;
