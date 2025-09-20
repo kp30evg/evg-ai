@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { workspaces, invitations, users, entities } from '@/lib/db/schema/unified'
+import { workspaces, users, entities } from '@/lib/db/schema/unified'
 import { eq } from 'drizzle-orm'
 
 export async function POST(req: Request) {
@@ -38,17 +38,22 @@ export async function POST(req: Request) {
       )
     }
 
-    // Save invitations
+    // Save invitations in entities table
     if (invites && invites.length > 0) {
       for (const invite of invites) {
         if (invite.email && invite.email.trim() !== '') {
-          await db.insert(invitations).values({
+          await db.insert(entities).values({
             workspaceId: workspace.id,
-            email: invite.email,
-            role: invite.role || 'member',
-            invitedBy: user?.id || null,
-            status: 'pending',
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+            userId: user?.id || undefined,
+            type: 'invitation',
+            data: {
+              email: invite.email,
+              role: invite.role || 'member',
+              invitedBy: userId,
+              status: 'pending',
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            metadata: { source: 'onboarding' }
           })
         }
       }
@@ -56,21 +61,24 @@ export async function POST(req: Request) {
       // Track event
       await db.insert(entities).values({
         workspaceId: workspace.id,
-        userId: userId,
-        event: 'step_completed',
-        stepName: 'team_invites',
-        metadata: { inviteCount: invites.filter(i => i.email?.trim()).length }
+        type: 'event',
+        data: {
+          event: 'step_completed',
+          stepName: 'team_invites',
+          userId: userId
+        },
+        metadata: { inviteCount: invites.filter((i: any) => i.email?.trim()).length }
       })
     }
 
-    // Update onboarding step
-    await db
-      .update(workspaces)
-      .set({
-        onboardingStep: 3,
-        updatedAt: new Date()
-      })
-      .where(eq(workspaces.clerkOrgId, orgId))
+    // Update onboarding step (if this field exists)
+    // await db
+    //   .update(workspaces)
+    //   .set({
+    //     onboardingStep: 3,
+    //     updatedAt: new Date()
+    //   })
+    //   .where(eq(workspaces.clerkOrgId, orgId))
 
     return NextResponse.json({ success: true })
   } catch (error) {

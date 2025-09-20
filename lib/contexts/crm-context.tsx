@@ -1,7 +1,6 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
-import { initializeSampleData } from '@/lib/utils/sample-data'
 import { trpc } from '@/lib/trpc/client'
 
 // Types matching our CRM entities
@@ -24,6 +23,11 @@ export interface Contact {
   isFromEmail?: boolean      // Added: indicates if from email sync
   isFromDatabase?: boolean   // Added: indicates if from database
   createdAt?: Date          // Added: creation timestamp
+  contactSource?: 'manual' | 'imported' | 'promoted' // Track origin of contact
+  importedFrom?: string     // Source of import (gmail, outlook, csv)
+  importedAt?: Date         // When imported
+  promotedAt?: Date         // When promoted to My Contacts
+  promotedBy?: string       // User who promoted
 }
 
 export interface Lead {
@@ -204,18 +208,15 @@ const CRMContext = createContext<CRMContextState | undefined>(undefined)
 
 // Context Provider Component
 export function CRMProvider({ children }: { children: ReactNode }) {
-  // Initialize with sample data as default
-  const sampleData = initializeSampleData()
-  
-  // Entity States - Initialize with sample data
-  const [contacts, setContacts] = useState<Contact[]>(sampleData.contacts)
-  const [leads, setLeads] = useState<Lead[]>(sampleData.leads)
-  const [deals, setDeals] = useState<Deal[]>(sampleData.deals)
-  const [companies, setCompanies] = useState<Company[]>(sampleData.companies)
-  const [products, setProducts] = useState<Product[]>(sampleData.products)
-  const [orders, setOrders] = useState<Order[]>(sampleData.orders)
-  const [activities, setActivities] = useState<Activity[]>(sampleData.activities)
-  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>(sampleData.emailTemplates)
+  // Entity States - Initialize with empty arrays (no mock data)
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([])
   
   // UI States
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([])
@@ -374,6 +375,11 @@ export function CRMProvider({ children }: { children: ReactNode }) {
           lastContact: new Date(dbContact.lastContact),
           createdAt: dbContact.createdAt ? new Date(dbContact.createdAt) : undefined,
           isFromDatabase: true,
+          contactSource: dbContact.contactSource || dbContact.data?.contactSource || 'manual',
+          importedFrom: dbContact.importedFrom || dbContact.data?.importedFrom,
+          importedAt: dbContact.importedAt || dbContact.data?.importedAt,
+          promotedAt: dbContact.promotedAt || dbContact.data?.promotedAt,
+          promotedBy: dbContact.promotedBy || dbContact.data?.promotedBy,
         } as Contact)
       }
     })
@@ -559,11 +565,34 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     return newContact
   }, [contacts, createContactMutation])
 
+  const updateContactMutation = trpc.unified.updateEntity.useMutation()
+  
   const updateContact = useCallback(async (id: string, updates: Partial<Contact>) => {
+    // Update local state immediately
     setContacts(prev => prev.map(contact => 
       contact.id === id ? { ...contact, ...updates } : contact
     ))
-  }, [])
+    
+    // Update in database if it's a database contact
+    const contact = contacts.find(c => c.id === id)
+    if (contact?.isFromDatabase) {
+      try {
+        await updateContactMutation.mutateAsync({
+          id,
+          data: {
+            ...contact,
+            ...updates,
+            contactSource: updates.contactSource || contact.contactSource,
+            promotedAt: updates.promotedAt,
+            promotedBy: updates.promotedBy,
+            company: updates.company || contact.company,
+          }
+        })
+      } catch (error) {
+        console.error('Failed to update contact in database:', error)
+      }
+    }
+  }, [contacts, updateContactMutation])
 
   const deleteContact = useCallback(async (id: string) => {
     setContacts(prev => prev.filter(c => c.id !== id))

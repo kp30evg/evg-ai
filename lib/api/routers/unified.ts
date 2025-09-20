@@ -715,6 +715,11 @@ export const unifiedRouter = router({
         tags: entity.data.tags || [],
         isFromEmail: entity.data.createdFrom === 'email_sync' || entity.data.source === 'gmail_import',
         createdAt: entity.createdAt,
+        contactSource: entity.data.contactSource || 'manual', // Add contactSource field
+        importedFrom: entity.data.importedFrom,
+        importedAt: entity.data.importedAt,
+        promotedAt: entity.data.promotedAt,
+        promotedBy: entity.data.promotedBy,
       }));
     }),
 

@@ -30,12 +30,15 @@ import {
   Database,
   Sparkles,
   Settings,
-  Plus
+  Plus,
+  CheckCircle,
+  Trash2
 } from 'lucide-react'
 
 export default function CRMDashboard() {
   const { organization } = useOrganization()
   const router = useRouter()
+  const utils = trpc.useUtils()
   const { 
     contacts, 
     leads,
@@ -49,8 +52,10 @@ export default function CRMDashboard() {
   const { navigation, config, loading: configLoading } = useWorkspaceConfig()
   
   const [activeTab, setActiveTab] = useState<string>('overview')
+  const [contactSubTab, setContactSubTab] = useState<string>('my-contacts') // Sub-tab for contacts
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
+  const [selectedImportedContacts, setSelectedImportedContacts] = useState<string[]>([])
   const [selectedDeals, setSelectedDeals] = useState<string[]>([])
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
@@ -64,6 +69,12 @@ export default function CRMDashboard() {
   const [customDealColumns, setCustomDealColumns] = useState<Column[]>([])
   const [customCompanyColumns, setCustomCompanyColumns] = useState<Column[]>([])  
   const [customLeadColumns, setCustomLeadColumns] = useState<Column[]>([])
+  
+  // Hidden columns state (for persistence)
+  const [hiddenContactColumns, setHiddenContactColumns] = useState<string[]>([])
+  const [hiddenDealColumns, setHiddenDealColumns] = useState<string[]>([])
+  const [hiddenCompanyColumns, setHiddenCompanyColumns] = useState<string[]>([])
+  const [hiddenLeadColumns, setHiddenLeadColumns] = useState<string[]>([])
   
   // Load existing custom fields
   const { data: contactFields } = trpc.workspaceConfig.getCustomFields.useQuery(
@@ -87,27 +98,69 @@ export default function CRMDashboard() {
   const createContactField = trpc.workspaceConfig.createCustomField.useMutation({
     onSuccess: () => {
       // Refetch custom fields after creation
-      trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'contact' })
+      utils.workspaceConfig.getCustomFields.invalidate()
     }
   })
   
   const createDealField = trpc.workspaceConfig.createCustomField.useMutation({
     onSuccess: () => {
-      trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'deal' })
+      utils.workspaceConfig.getCustomFields.invalidate()
     }
   })
   
   const createCompanyField = trpc.workspaceConfig.createCustomField.useMutation({
     onSuccess: () => {
-      trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'company' })
+      utils.workspaceConfig.getCustomFields.invalidate()
     }
   })
   
   const createLeadField = trpc.workspaceConfig.createCustomField.useMutation({
     onSuccess: () => {
-      trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'lead' })
+      utils.workspaceConfig.getCustomFields.invalidate()
     }
   })
+
+  // Load hidden columns from localStorage on mount
+  useEffect(() => {
+    const loadHiddenColumns = () => {
+      const storedHiddenContact = localStorage.getItem('hiddenContactColumns')
+      const storedHiddenDeal = localStorage.getItem('hiddenDealColumns')
+      const storedHiddenCompany = localStorage.getItem('hiddenCompanyColumns')
+      const storedHiddenLead = localStorage.getItem('hiddenLeadColumns')
+      
+      if (storedHiddenContact) setHiddenContactColumns(JSON.parse(storedHiddenContact))
+      if (storedHiddenDeal) setHiddenDealColumns(JSON.parse(storedHiddenDeal))
+      if (storedHiddenCompany) setHiddenCompanyColumns(JSON.parse(storedHiddenCompany))
+      if (storedHiddenLead) setHiddenLeadColumns(JSON.parse(storedHiddenLead))
+    }
+    
+    loadHiddenColumns()
+  }, [])
+
+  // Save hidden columns to localStorage whenever they change
+  useEffect(() => {
+    if (hiddenContactColumns.length > 0 || hiddenContactColumns.length === 0) {
+      localStorage.setItem('hiddenContactColumns', JSON.stringify(hiddenContactColumns))
+    }
+  }, [hiddenContactColumns])
+
+  useEffect(() => {
+    if (hiddenDealColumns.length > 0 || hiddenDealColumns.length === 0) {
+      localStorage.setItem('hiddenDealColumns', JSON.stringify(hiddenDealColumns))
+    }
+  }, [hiddenDealColumns])
+
+  useEffect(() => {
+    if (hiddenCompanyColumns.length > 0 || hiddenCompanyColumns.length === 0) {
+      localStorage.setItem('hiddenCompanyColumns', JSON.stringify(hiddenCompanyColumns))
+    }
+  }, [hiddenCompanyColumns])
+
+  useEffect(() => {
+    if (hiddenLeadColumns.length > 0 || hiddenLeadColumns.length === 0) {
+      localStorage.setItem('hiddenLeadColumns', JSON.stringify(hiddenLeadColumns))
+    }
+  }, [hiddenLeadColumns])
 
   // Load custom fields into columns when they're fetched
   useEffect(() => {
@@ -227,7 +280,13 @@ export default function CRMDashboard() {
   const getEntityCount = (entityType?: string) => {
     switch (entityType) {
       case 'lead': return leads.length
-      case 'contact': return contacts.length
+      case 'contact': {
+        // Count only My Contacts (manual or promoted)
+        const myContactsCount = contacts.filter(c => 
+          (!c.contactSource || c.contactSource === 'manual' || c.contactSource === 'promoted')
+        ).length
+        return myContactsCount
+      }
       case 'company': return companies.length
       case 'deal': return deals.length
       default: return 0
@@ -379,6 +438,7 @@ export default function CRMDashboard() {
       accessor: 'name',
       sortable: true,
       width: '200px',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string, row: any) => (
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
@@ -392,6 +452,7 @@ export default function CRMDashboard() {
       accessor: 'company',
       sortable: true,
       width: '180px',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => (
         <span className="text-sm text-gray-600">{value || '—'}</span>
       )
@@ -401,6 +462,7 @@ export default function CRMDashboard() {
       label: 'Email',
       accessor: 'email',
       width: '280px',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => (
         <span className="text-sm text-gray-600">{value}</span>
       )
@@ -410,6 +472,7 @@ export default function CRMDashboard() {
       label: 'Status',
       accessor: 'status',
       width: '100px',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => {
         const colors = {
           Hot: 'bg-red-100 text-red-700',
@@ -429,6 +492,7 @@ export default function CRMDashboard() {
       accessor: 'dealValue',
       sortable: true,
       width: '100px',
+      isCustomField: true, // Enable dropdown menu
       render: (value: number) => (
         <span className="text-sm text-gray-600">${(value / 1000).toFixed(0)}K</span>
       )
@@ -439,6 +503,7 @@ export default function CRMDashboard() {
       accessor: 'lastContact',
       sortable: true,
       width: '120px',
+      isCustomField: true, // Enable dropdown menu
       render: (value: Date) => {
         const days = Math.floor((Date.now() - new Date(value).getTime()) / (1000 * 60 * 60 * 24))
         return (
@@ -454,6 +519,7 @@ export default function CRMDashboard() {
       label: 'Task Name',
       accessor: 'name',
       sortable: true,
+      isCustomField: true, // Enable dropdown menu
       render: (value: string, row: any) => (
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
@@ -466,6 +532,7 @@ export default function CRMDashboard() {
       label: 'Status',
       accessor: 'status',
       width: 'w-32',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => {
         const colors = {
           New: 'bg-gray-100 text-gray-700',
@@ -485,6 +552,7 @@ export default function CRMDashboard() {
       label: 'Assignee',
       accessor: (row: any) => row.owner || '',
       width: 'w-32',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => (
         value ? (
           <span className="text-sm text-gray-700">{value}</span>
@@ -498,6 +566,7 @@ export default function CRMDashboard() {
       label: 'Due Date',
       accessor: (row: any) => row.dueDate || '',
       sortable: true,
+      isCustomField: true, // Enable dropdown menu
       width: 'w-32',
       render: (value: any) => (
         value ? (
@@ -527,12 +596,36 @@ export default function CRMDashboard() {
     }
   ]
 
-  // Filter data based on search
-  const filteredContacts = contacts.filter(c => 
+  // Filter data based on search and contact source
+  const myContacts = contacts.filter(c => 
+    (!c.contactSource || c.contactSource === 'manual' || c.contactSource === 'promoted')
+  )
+  
+  const importedContacts = contacts.filter(c => 
+    c.contactSource === 'imported'
+  )
+  
+  const filteredMyContacts = myContacts.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.company?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   )
+  
+  const filteredImportedContacts = importedContacts.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.company?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+  )
+  
+  const filteredContacts = contactSubTab === 'my-contacts' 
+    ? filteredMyContacts 
+    : contactSubTab === 'imported' 
+      ? filteredImportedContacts
+      : contacts.filter(c => 
+          c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (c.company?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+        )
 
   const filteredLeads = leads.filter(l =>
     l.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -562,11 +655,61 @@ export default function CRMDashboard() {
     console.log('Edit contact:', contact)
   }
   
+  const handlePromoteContacts = async (contactIds: string[]) => {
+    try {
+      // Promote selected contacts to "My Contacts"
+      for (const contactId of contactIds) {
+        const contact = contacts.find(c => c.id === contactId)
+        if (contact) {
+          await updateContact(contactId, {
+            ...contact,
+            contactSource: 'promoted',
+            promotedAt: new Date(),
+            promotedBy: organization?.id,
+            // Set company if it was extracted
+            company: contact.extractedCompany || contact.company || ''
+          })
+        }
+      }
+      
+      // Clear selection and refresh
+      setSelectedImportedContacts([])
+      await refreshContacts()
+      
+      // Show success message (you can add a toast notification here)
+      console.log(`Successfully promoted ${contactIds.length} contacts to My Contacts`)
+    } catch (error) {
+      console.error('Failed to promote contacts:', error)
+    }
+  }
+  
+  const handleBulkDelete = async (contactIds: string[]) => {
+    const confirmMessage = `Are you sure you want to delete ${contactIds.length} contact${contactIds.length > 1 ? 's' : ''}?`
+    if (confirm(confirmMessage)) {
+      try {
+        await deleteContacts(contactIds)
+        setSelectedImportedContacts([])
+        console.log(`Successfully deleted ${contactIds.length} contacts`)
+      } catch (error) {
+        console.error('Failed to delete contacts:', error)
+      }
+    }
+  }
+  
   // Handle adding custom columns
   const handleAddContactColumn = async (field: any) => {
     try {
       // First, save the field to the database
-      const createdField = await createContactField.mutateAsync(field)
+      const createdField = await createContactField.mutateAsync({
+        name: field.name,
+        label: field.label || field.name,
+        type: field.type || 'text',
+        entityType: 'contact',
+        required: field.required || false,
+        config: field.config || {},
+        sortable: field.sortable !== false,
+        filterable: field.filterable !== false
+      })
       
       // Use the returned field ID from the database
       const fieldId = createdField.id || createdField.name || field.name
@@ -599,7 +742,16 @@ export default function CRMDashboard() {
   const handleAddDealColumn = async (field: any) => {
     try {
       // First, save the field to the database
-      const createdField = await createDealField.mutateAsync(field)
+      const createdField = await createDealField.mutateAsync({
+        name: field.name,
+        label: field.label || field.name,
+        type: field.type || 'text',
+        entityType: 'deal',
+        required: field.required || false,
+        config: field.config || {},
+        sortable: field.sortable !== false,
+        filterable: field.filterable !== false
+      })
       
       // Use the returned field ID from the database
       const fieldId = createdField.id || createdField.name || field.name
@@ -632,7 +784,16 @@ export default function CRMDashboard() {
   const handleAddCompanyColumn = async (field: any) => {
     try {
       // First, save the field to the database
-      const createdField = await createCompanyField.mutateAsync(field)
+      const createdField = await createCompanyField.mutateAsync({
+        name: field.name,
+        label: field.label || field.name,
+        type: field.type || 'text',
+        entityType: 'company',
+        required: field.required || false,
+        config: field.config || {},
+        sortable: field.sortable !== false,
+        filterable: field.filterable !== false
+      })
       
       // Use the returned field ID from the database
       const fieldId = createdField.id || createdField.name || field.name
@@ -665,7 +826,16 @@ export default function CRMDashboard() {
   const handleAddLeadColumn = async (field: any) => {
     try {
       // First, save the field to the database
-      const createdField = await createLeadField.mutateAsync(field)
+      const createdField = await createLeadField.mutateAsync({
+        name: field.name,
+        label: field.label || field.name,
+        type: field.type || 'text',
+        entityType: 'lead',
+        required: field.required || false,
+        config: field.config || {},
+        sortable: field.sortable !== false,
+        filterable: field.filterable !== false
+      })
       
       // Use the returned field ID from the database
       const fieldId = createdField.id || createdField.name || field.name
@@ -696,23 +866,79 @@ export default function CRMDashboard() {
   }
   
   const handleDeleteContactColumn = (columnId: string) => {
-    setCustomContactColumns(prev => prev.filter(col => col.id !== columnId))
-    trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'contact' })
+    // Check if it's a custom column
+    const isCustom = customContactColumns.some(col => col.id === columnId)
+    
+    if (isCustom) {
+      // Remove from custom columns
+      setCustomContactColumns(prev => prev.filter(col => col.id !== columnId))
+      utils.workspaceConfig.getCustomFields.invalidate()
+    } else {
+      // It's a default column, just hide it (add to hidden columns list)
+      setHiddenContactColumns(prev => {
+        const newHidden = prev.includes(columnId) ? prev : [...prev, columnId]
+        // Save to localStorage immediately
+        localStorage.setItem('hiddenContactColumns', JSON.stringify(newHidden))
+        return newHidden
+      })
+    }
   }
   
   const handleDeleteDealColumn = (columnId: string) => {
-    setCustomDealColumns(prev => prev.filter(col => col.id !== columnId))
-    trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'deal' })
+    // Check if it's a custom column
+    const isCustom = customDealColumns.some(col => col.id === columnId)
+    
+    if (isCustom) {
+      // Remove from custom columns
+      setCustomDealColumns(prev => prev.filter(col => col.id !== columnId))
+      utils.workspaceConfig.getCustomFields.invalidate()
+    } else {
+      // It's a default column, just hide it (add to hidden columns list)
+      setHiddenDealColumns(prev => {
+        const newHidden = prev.includes(columnId) ? prev : [...prev, columnId]
+        // Save to localStorage immediately
+        localStorage.setItem('hiddenDealColumns', JSON.stringify(newHidden))
+        return newHidden
+      })
+    }
   }
   
   const handleDeleteCompanyColumn = (columnId: string) => {
-    setCustomCompanyColumns(prev => prev.filter(col => col.id !== columnId))
-    trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'company' })
+    // Check if it's a custom column
+    const isCustom = customCompanyColumns.some(col => col.id === columnId)
+    
+    if (isCustom) {
+      // Remove from custom columns
+      setCustomCompanyColumns(prev => prev.filter(col => col.id !== columnId))
+      utils.workspaceConfig.getCustomFields.invalidate()
+    } else {
+      // It's a default column, just hide it (add to hidden columns list)
+      setHiddenCompanyColumns(prev => {
+        const newHidden = prev.includes(columnId) ? prev : [...prev, columnId]
+        // Save to localStorage immediately
+        localStorage.setItem('hiddenCompanyColumns', JSON.stringify(newHidden))
+        return newHidden
+      })
+    }
   }
   
   const handleDeleteLeadColumn = (columnId: string) => {
-    setCustomLeadColumns(prev => prev.filter(col => col.id !== columnId))
-    trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'lead' })
+    // Check if it's a custom column
+    const isCustom = customLeadColumns.some(col => col.id === columnId)
+    
+    if (isCustom) {
+      // Remove from custom columns
+      setCustomLeadColumns(prev => prev.filter(col => col.id !== columnId))
+      utils.workspaceConfig.getCustomFields.invalidate()
+    } else {
+      // It's a default column, just hide it (add to hidden columns list)
+      setHiddenLeadColumns(prev => {
+        const newHidden = prev.includes(columnId) ? prev : [...prev, columnId]
+        // Save to localStorage immediately
+        localStorage.setItem('hiddenLeadColumns', JSON.stringify(newHidden))
+        return newHidden
+      })
+    }
   }
 
   // Define columns for all entity types
@@ -722,6 +948,7 @@ export default function CRMDashboard() {
       label: 'Deal Name',
       accessor: 'name',
       sortable: true,
+      isCustomField: true, // Enable dropdown menu
       render: (value: string, row: any) => (
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
@@ -737,6 +964,7 @@ export default function CRMDashboard() {
       label: 'Stage',
       accessor: 'stage',
       width: 'w-36',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => {
         const colors = {
           'Prospecting': 'bg-blue-100 text-blue-700',
@@ -759,6 +987,7 @@ export default function CRMDashboard() {
       accessor: 'value',
       sortable: true,
       width: 'w-32',
+      isCustomField: true, // Enable dropdown menu
       render: (value: number) => (
         <span className="text-sm text-gray-700">${(value / 1000).toFixed(0)}K</span>
       )
@@ -769,6 +998,7 @@ export default function CRMDashboard() {
       accessor: 'probability',
       sortable: true,
       width: 'w-28',
+      isCustomField: true, // Enable dropdown menu
       render: (value: number) => (
         <span className="text-sm text-gray-700">{value}%</span>
       )
@@ -779,6 +1009,7 @@ export default function CRMDashboard() {
       accessor: 'closeDate',
       sortable: true,
       width: 'w-32',
+      isCustomField: true, // Enable dropdown menu
       render: (value: Date) => (
         <span className="text-sm text-gray-700">{new Date(value).toLocaleDateString()}</span>
       )
@@ -788,6 +1019,7 @@ export default function CRMDashboard() {
       label: 'Owner',
       accessor: 'owner',
       width: 'w-32',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => (
         <span className="text-sm text-gray-700">{value || '—'}</span>
       )
@@ -800,6 +1032,7 @@ export default function CRMDashboard() {
       label: 'Company',
       accessor: 'name',
       sortable: true,
+      isCustomField: true, // Enable dropdown menu
       render: (value: string, row: any) => (
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
@@ -815,6 +1048,7 @@ export default function CRMDashboard() {
       label: 'Industry',
       accessor: 'industry',
       width: 'w-36',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => (
         <span className="text-sm text-gray-700">{value || '—'}</span>
       )
@@ -824,6 +1058,7 @@ export default function CRMDashboard() {
       label: 'Size',
       accessor: 'size',
       width: 'w-32',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => (
         <span className="text-sm text-gray-700">{value || '—'}</span>
       )
@@ -833,6 +1068,7 @@ export default function CRMDashboard() {
       label: 'Location',
       accessor: 'location',
       width: 'w-40',
+      isCustomField: true, // Enable dropdown menu
       render: (value: string) => (
         <span className="text-sm text-gray-700">{value || '—'}</span>
       )
@@ -843,6 +1079,7 @@ export default function CRMDashboard() {
       accessor: 'id',
       sortable: false,
       width: 'w-24',
+      isCustomField: true, // Enable dropdown menu
       render: (_: any, row: any) => {
         const companyContacts = contacts.filter(c => 
           c.companyId === row.id || c.company === row.name
@@ -858,6 +1095,7 @@ export default function CRMDashboard() {
       accessor: 'id',
       sortable: false,
       width: 'w-28',
+      isCustomField: true, // Enable dropdown menu
       render: (_: any, row: any) => {
         const companyDeals = deals.filter(d => 
           d.companyId === row.id || d.company === row.name
@@ -1001,7 +1239,7 @@ export default function CRMDashboard() {
                 Recent Contacts
               </h2>
               <CleanTaskTable
-                columns={contactColumns}
+                columns={contactColumns.filter(col => !hiddenContactColumns.includes(col.id))}
                 data={filteredContacts.slice(0, 5)}
                 onRowClick={(row) => router.push(`/dashboard/crm/contacts/${row.id}`)}
               />
@@ -1010,27 +1248,248 @@ export default function CRMDashboard() {
         )}
 
         {activeTab === 'contacts' && (
-          <div className="p-6">
-            <CleanTaskTable
-              columns={[...contactColumns, ...customContactColumns]}
-              data={filteredContacts}
-              onRowClick={(row) => router.push(`/dashboard/crm/contacts/${row.id}`)}
-              onRowEdit={handleContactEdit}
-              onRowDelete={handleContactDelete}
-              selectedRows={selectedContacts}
-              onSelectionChange={setSelectedContacts}
-              entityType="contact"
-              showAddColumn={true}
-              onAddColumn={handleAddContactColumn}
-              onDeleteColumn={handleDeleteContactColumn}
-            />
+          <div>
+            {/* Sub-tabs for Contacts */}
+            <div style={{
+              backgroundColor: theme.colors.white,
+              borderBottom: `1px solid ${theme.colors.border}`,
+              paddingLeft: theme.spacing['2xl'],
+              paddingRight: theme.spacing['2xl'],
+            }}>
+              <div style={{
+                display: 'flex',
+                gap: theme.spacing.lg,
+              }}>
+                <button
+                  onClick={() => setContactSubTab('my-contacts')}
+                  style={{
+                    padding: `${theme.spacing.md} 0`,
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderBottom: contactSubTab === 'my-contacts'
+                      ? `2px solid ${theme.colors.evergreen}`
+                      : '2px solid transparent',
+                    color: contactSubTab === 'my-contacts' 
+                      ? theme.colors.evergreen 
+                      : theme.colors.mediumGray,
+                    fontSize: theme.typography.fontSize.sm,
+                    fontWeight: theme.typography.fontWeight.medium,
+                    cursor: 'pointer',
+                    transition: theme.transitions.fast,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                  }}
+                >
+                  My Contacts
+                  <span style={{
+                    backgroundColor: contactSubTab === 'my-contacts'
+                      ? theme.colors.evergreen
+                      : theme.colors.lightGray,
+                    color: contactSubTab === 'my-contacts'
+                      ? theme.colors.white
+                      : theme.colors.mediumGray,
+                    fontSize: '12px',
+                    fontWeight: theme.typography.fontWeight.medium,
+                    padding: '2px 6px',
+                    borderRadius: theme.borderRadius.sm,
+                    minWidth: '20px',
+                    textAlign: 'center',
+                  }}>
+                    {myContacts.length > 99 ? '99+' : myContacts.length}
+                  </span>
+                </button>
+                
+                <button
+                  onClick={() => setContactSubTab('imported')}
+                  style={{
+                    padding: `${theme.spacing.md} 0`,
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderBottom: contactSubTab === 'imported'
+                      ? `2px solid ${theme.colors.evergreen}`
+                      : '2px solid transparent',
+                    color: contactSubTab === 'imported'
+                      ? theme.colors.evergreen
+                      : theme.colors.mediumGray,
+                    fontSize: theme.typography.fontSize.sm,
+                    fontWeight: theme.typography.fontWeight.medium,
+                    cursor: 'pointer',
+                    transition: theme.transitions.fast,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                  }}
+                >
+                  Imported Contacts
+                  <span style={{
+                    backgroundColor: contactSubTab === 'imported'
+                      ? theme.colors.evergreen
+                      : theme.colors.lightGray,
+                    color: contactSubTab === 'imported'
+                      ? theme.colors.white
+                      : theme.colors.mediumGray,
+                    fontSize: '12px',
+                    fontWeight: theme.typography.fontWeight.medium,
+                    padding: '2px 6px',
+                    borderRadius: theme.borderRadius.sm,
+                    minWidth: '20px',
+                    textAlign: 'center',
+                  }}>
+                    {importedContacts.length > 999 ? '999+' : importedContacts.length}
+                  </span>
+                </button>
+                
+                <button
+                  onClick={() => setContactSubTab('all')}
+                  style={{
+                    padding: `${theme.spacing.md} 0`,
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderBottom: contactSubTab === 'all'
+                      ? `2px solid ${theme.colors.evergreen}`
+                      : '2px solid transparent',
+                    color: contactSubTab === 'all'
+                      ? theme.colors.evergreen
+                      : theme.colors.mediumGray,
+                    fontSize: theme.typography.fontSize.sm,
+                    fontWeight: theme.typography.fontWeight.medium,
+                    cursor: 'pointer',
+                    transition: theme.transitions.fast,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                  }}
+                >
+                  All Contacts
+                  <span style={{
+                    backgroundColor: contactSubTab === 'all'
+                      ? theme.colors.evergreen
+                      : theme.colors.lightGray,
+                    color: contactSubTab === 'all'
+                      ? theme.colors.white
+                      : theme.colors.mediumGray,
+                    fontSize: '12px',
+                    fontWeight: theme.typography.fontWeight.medium,
+                    padding: '2px 6px',
+                    borderRadius: theme.borderRadius.sm,
+                    minWidth: '20px',
+                    textAlign: 'center',
+                  }}>
+                    {contacts.length > 999 ? '999+' : contacts.length}
+                  </span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6">
+              {/* Bulk operations toolbar for imported contacts */}
+              {contactSubTab === 'imported' && selectedImportedContacts.length > 0 && (
+                <div style={{
+                  padding: '12px 16px',
+                  backgroundColor: theme.colors.softGreen,
+                  borderRadius: theme.borderRadius.md,
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    color: theme.colors.evergreen,
+                    fontSize: '14px',
+                    fontWeight: 500
+                  }}>
+                    <CheckCircle size={18} />
+                    {selectedImportedContacts.length} contacts selected
+                  </div>
+                  
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px'
+                  }}>
+                    <button
+                      onClick={() => handlePromoteContacts(selectedImportedContacts)}
+                      style={{
+                        padding: '6px 14px',
+                        backgroundColor: theme.colors.evergreen,
+                        color: theme.colors.white,
+                        border: 'none',
+                        borderRadius: theme.borderRadius.sm,
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <TrendingUp size={14} />
+                      Promote to My Contacts
+                    </button>
+                    
+                    <button
+                      onClick={() => handleBulkDelete(selectedImportedContacts)}
+                      style={{
+                        padding: '6px 14px',
+                        backgroundColor: 'transparent',
+                        color: theme.colors.red,
+                        border: `1px solid ${theme.colors.red}`,
+                        borderRadius: theme.borderRadius.sm,
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                    
+                    <button
+                      onClick={() => setSelectedImportedContacts([])}
+                      style={{
+                        padding: '6px 14px',
+                        backgroundColor: 'transparent',
+                        color: theme.colors.mediumGray,
+                        border: `1px solid ${theme.colors.lightGray}`,
+                        borderRadius: theme.borderRadius.sm,
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              <CleanTaskTable
+                columns={[...contactColumns, ...customContactColumns].filter(col => !hiddenContactColumns.includes(col.id))}
+                data={filteredContacts}
+                onRowClick={(row) => router.push(`/dashboard/crm/contacts/${row.id}`)}
+                onRowEdit={handleContactEdit}
+                onRowDelete={handleContactDelete}
+                selectedRows={contactSubTab === 'imported' ? selectedImportedContacts : selectedContacts}
+                onSelectionChange={contactSubTab === 'imported' ? setSelectedImportedContacts : setSelectedContacts}
+                entityType="contact"
+                showAddColumn={true}
+                onAddColumn={handleAddContactColumn}
+                onDeleteColumn={handleDeleteContactColumn}
+              />
+            </div>
           </div>
         )}
 
         {activeTab === 'leads' && (
           <div className="p-6">
             <CleanTaskTable
-            columns={[...leadColumns, ...customLeadColumns]}
+            columns={[...leadColumns, ...customLeadColumns].filter(col => !hiddenLeadColumns.includes(col.id))}
             data={filteredLeads}
             onRowClick={(row) => router.push(`/dashboard/crm/leads/${row.id}`)}
             onRowEdit={(row) => console.log('Edit lead', row)}
@@ -1048,7 +1507,7 @@ export default function CRMDashboard() {
         {activeTab === 'companies' && (
           <div className="p-6">
             <CleanTaskTable
-            columns={[...companyColumns, ...customCompanyColumns]}
+            columns={[...companyColumns, ...customCompanyColumns].filter(col => !hiddenCompanyColumns.includes(col.id))}
             data={filteredCompanies}
             onRowClick={(row) => router.push(`/dashboard/crm/companies/${row.id}`)}
             onRowEdit={(row) => console.log('Edit company', row)}
@@ -1066,7 +1525,7 @@ export default function CRMDashboard() {
         {activeTab === 'deals' && (
           <div className="p-6">
             <CleanTaskTable
-            columns={[...dealColumns, ...customDealColumns]}
+            columns={[...dealColumns, ...customDealColumns].filter(col => !hiddenDealColumns.includes(col.id))}
             data={filteredDeals}
             onRowClick={(row) => router.push(`/dashboard/crm/deals/${row.id}`)}
             onRowEdit={(row) => console.log('Edit deal', row)}

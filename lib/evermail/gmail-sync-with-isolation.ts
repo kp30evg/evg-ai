@@ -273,6 +273,56 @@ export class GmailSyncService {
       const { sql } = await import('drizzle-orm');
       const { extractCompanyFromEmail } = await import('../modules-simple/evercore');
       
+      // Smart filtering: Skip obvious non-contacts
+      const skipPatterns = [
+        /^no-?reply@/i,
+        /^notification@/i,
+        /^newsletter@/i,
+        /^system@/i,
+        /^support@/i,
+        /^info@/i,
+        /^hello@/i,
+        /^contact@/i,
+        /^admin@/i,
+        /^webmaster@/i,
+        /^postmaster@/i,
+        /^mailer-daemon@/i,
+        /^bounces@/i
+      ];
+      
+      const skipDomains = [
+        'mailchimp.com',
+        'sendgrid.net',
+        'amazonses.com',
+        'mailgun.org',
+        'postmarkapp.com',
+        'mandrillapp.com',
+        'constantcontact.com',
+        'mailjet.com',
+        'sendinblue.com',
+        'github.com',
+        'stripe.com',
+        'paypal.com',
+        'google.com',
+        'microsoft.com',
+        'apple.com',
+        'facebook.com',
+        'twitter.com',
+        'linkedin.com'
+      ];
+      
+      // Check if email should be skipped
+      const emailLower = email.toLowerCase();
+      const emailDomain = email.split('@')[1]?.toLowerCase();
+      
+      const shouldSkip = skipPatterns.some(pattern => pattern.test(emailLower)) ||
+                         skipDomains.includes(emailDomain);
+      
+      if (shouldSkip) {
+        console.log(`Skipping non-contact email: ${email}`);
+        return null;
+      }
+      
       // Check if contact already exists for this user
       const existingContact = await db
         .select()
@@ -294,7 +344,7 @@ export class GmailSyncService {
       // Extract company from email domain
       const extractedCompany = extractCompanyFromEmail(email);
       
-      // Create new contact with USER ISOLATION and extracted company
+      // Create new contact with USER ISOLATION and mark as imported
       const [newContact] = await db.insert(entities).values({
         workspaceId: this.workspaceId,
         userId: this.userId, // CRITICAL: Set user ID for isolation
@@ -304,14 +354,19 @@ export class GmailSyncService {
           email: email,
           source: 'gmail_import',
           createdFrom: 'email_sync',
-          // Add company fields for display
-          company: extractedCompany || '',
-          companyName: extractedCompany || ''
+          contactSource: 'imported', // Mark as imported contact
+          importedFrom: 'gmail',
+          importedAt: new Date().toISOString(),
+          // Don't auto-create company for imported contacts
+          company: '', // Will be set when promoted
+          companyName: '', // Will be set when promoted
+          extractedCompany: extractedCompany || '' // Store for later use
         },
         metadata: {
           autoCreated: true,
           source: 'gmail_sync',
-          userEmail: this.userEmail
+          userEmail: this.userEmail,
+          contactSource: 'imported'
         }
       }).returning();
       

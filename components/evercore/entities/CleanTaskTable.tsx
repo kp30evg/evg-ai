@@ -54,7 +54,6 @@ export default function CleanTaskTable({
   const [selectedType, setSelectedType] = useState<ColumnTypeDefinition | null>(null)
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 })
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; columnId: string; columnLabel: string } | null>(null)
-  const [deletedColumns, setDeletedColumns] = useState<Array<{ column: Column; deletedAt: number }>>([])
   const buttonRef = useRef<HTMLButtonElement>(null)
   const { toasts, success, error } = useToast()
   
@@ -119,38 +118,22 @@ export default function CleanTaskTable({
     if (!columnToDelete) return
     
     try {
-      // Soft delete - store deleted column for undo
-      const deletedColumn = {
-        column: columnToDelete,
-        deletedAt: Date.now()
-      }
-      setDeletedColumns(prev => [...prev, deletedColumn])
-      
       // Call the deletion handler
       onDeleteColumn?.(columnId)
       
-      // Delete from backend (soft delete by default)
+      // Delete from backend PERMANENTLY - immediate deletion
       await deleteColumnMutation.mutateAsync({
         fieldId: columnId,
-        removeData: false // Keep data for 30 days
+        removeData: true // PERMANENTLY DELETE DATA IMMEDIATELY
       })
       
-      // Show success toast with undo option
+      // Show success toast
       success(`Deleted '${columnLabel}' column`, {
-        message: 'Column data will be kept for 30 days',
-        duration: 8000,
-        action: {
-          label: 'Undo',
-          onClick: () => handleUndoDelete(deletedColumn)
-        }
+        message: 'Column has been permanently deleted',
+        duration: 3000
       })
       
       setDeleteConfirmation(null)
-      
-      // Auto-remove from deleted columns after 30 seconds (for undo capability)
-      setTimeout(() => {
-        setDeletedColumns(prev => prev.filter(d => d !== deletedColumn))
-      }, 30000)
     } catch (err) {
       error('Failed to delete column', {
         message: 'Please try again or contact support'
@@ -159,29 +142,6 @@ export default function CleanTaskTable({
     }
   }
   
-  const handleUndoDelete = async (deletedColumn: { column: Column; deletedAt: number }) => {
-    try {
-      // Re-create the field
-      const { column } = deletedColumn
-      onAddColumn?.({
-        name: column.id,
-        label: column.label,
-        type: 'text', // Default type, should be stored with column metadata
-        entityType: entityType
-      })
-      
-      // Remove from deleted columns
-      setDeletedColumns(prev => prev.filter(d => d !== deletedColumn))
-      
-      success('Column restored', {
-        message: `'${column.label}' has been restored`
-      })
-    } catch (err) {
-      error('Failed to restore column', {
-        message: 'Please try again'
-      })
-    }
-  }
 
   return (
     <div className="w-full bg-white">
@@ -378,7 +338,7 @@ export default function CleanTaskTable({
           onClose={() => setDeleteConfirmation(null)}
           onConfirm={confirmDeleteColumn}
           title={`Delete '${deleteConfirmation.columnLabel}' column?`}
-          message="Are you sure you want to delete this column? All data in this column will be moved to the trash for 30 days before being permanently deleted."
+          message="Are you sure you want to delete this column? All data in this column will be permanently deleted immediately."
           confirmText="Delete"
           cancelText="Cancel"
           variant="danger"

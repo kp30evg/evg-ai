@@ -46,6 +46,8 @@ export default function ContactActivityTimeline({
   const getActivityIcon = (type: string) => {
     const icons: Record<string, React.ReactNode> = {
       email: <Mail size={16} />,
+      email_sent: <Mail size={16} />,
+      email_received: <Mail size={16} />,
       call: <Phone size={16} />,
       meeting: <Calendar size={16} />,
       note: <FileText size={16} />,
@@ -55,12 +57,22 @@ export default function ContactActivityTimeline({
       contact: <User size={16} />,
       invoice: <DollarSign size={16} />
     }
+    // Check if type starts with any known prefix
+    if (type.startsWith('email')) return <Mail size={16} />
+    if (type.startsWith('call')) return <Phone size={16} />
+    if (type.startsWith('meeting')) return <Calendar size={16} />
+    if (type.startsWith('task')) return <CheckCircle size={16} />
+    if (type.startsWith('deal')) return <Target size={16} />
+    if (type.startsWith('note')) return <FileText size={16} />
+    
     return icons[type] || <Activity size={16} />
   }
   
   const getActivityColor = (type: string) => {
     const colorMap: Record<string, string> = {
       email: colors.blue,
+      email_sent: colors.blue,
+      email_received: colors.blue,
       call: colors.green,
       meeting: colors.purple,
       note: colors.orange,
@@ -70,6 +82,14 @@ export default function ContactActivityTimeline({
       contact: colors.charcoal,
       invoice: colors.green
     }
+    // Check if type starts with any known prefix
+    if (type.startsWith('email')) return colors.blue
+    if (type.startsWith('call')) return colors.green
+    if (type.startsWith('meeting')) return colors.purple
+    if (type.startsWith('task')) return colors.gold
+    if (type.startsWith('deal')) return colors.evergreen
+    if (type.startsWith('note')) return colors.orange
+    
     return colorMap[type] || colors.mediumGray
   }
   
@@ -93,7 +113,12 @@ export default function ContactActivityTimeline({
     // Generate title based on type
     switch (activity.type) {
       case 'email':
-        return activity.data?.subject || 'Email sent'
+      case 'email_sent':
+      case 'email_received':
+        // For email activities, show the subject from content
+        const subject = activity.content?.subject || activity.data?.subject
+        if (subject) return subject
+        return activity.type === 'email_sent' ? 'Email sent' : 'Email received'
       case 'call':
         return `Call logged (${activity.data?.duration || 'unknown duration'})`
       case 'meeting':
@@ -105,6 +130,12 @@ export default function ContactActivityTimeline({
       case 'deal':
         return `Deal: ${activity.data?.name || 'New deal'}`
       default:
+        // Check if type starts with known prefixes
+        if (activity.type?.startsWith('email')) {
+          const subject = activity.content?.subject || activity.data?.subject
+          if (subject) return subject
+          return activity.type.includes('sent') ? 'Email sent' : 'Email received'
+        }
         return `${activity.type} activity`
     }
   }
@@ -115,7 +146,18 @@ export default function ContactActivityTimeline({
     // Generate description based on type and data
     switch (activity.type) {
       case 'email':
-        return activity.data?.preview || activity.data?.body?.substring(0, 100) || ''
+      case 'email_sent':
+      case 'email_received':
+        // For email activities, show snippet or preview
+        const snippet = activity.content?.snippet || activity.data?.snippet || activity.data?.preview || activity.data?.body?.substring(0, 100)
+        const from = activity.content?.from || activity.data?.from
+        const to = activity.content?.to || activity.data?.to
+        
+        if (activity.type === 'email_sent' || activity.type?.includes('sent')) {
+          return snippet ? `To: ${to} • ${snippet}` : `Sent to: ${to}`
+        } else {
+          return snippet ? `From: ${from} • ${snippet}` : `Received from: ${from}`
+        }
       case 'call':
         return activity.data?.notes || ''
       case 'note':
@@ -125,6 +167,18 @@ export default function ContactActivityTimeline({
       case 'deal':
         return `Value: $${activity.data?.value || 0} • Stage: ${activity.data?.stage || 'Unknown'}`
       default:
+        // Check if type starts with email
+        if (activity.type?.startsWith('email')) {
+          const snippet = activity.content?.snippet || activity.data?.snippet
+          const from = activity.content?.from || activity.data?.from
+          const to = activity.content?.to || activity.data?.to
+          
+          if (activity.type.includes('sent')) {
+            return snippet ? `To: ${to} • ${snippet}` : `Sent to: ${to}`
+          } else {
+            return snippet ? `From: ${from} • ${snippet}` : `Received from: ${from}`
+          }
+        }
         return ''
     }
   }

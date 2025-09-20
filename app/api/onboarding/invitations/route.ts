@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { workspaces, invitations, entities } from '@/lib/db/schema/unified'
+import { workspaces, entities } from '@/lib/db/schema/unified'
 import { eq } from 'drizzle-orm'
 
 export async function POST(req: Request) {
@@ -32,18 +32,22 @@ export async function POST(req: Request) {
       )
     }
 
-    // Create invitations
+    // Create invitations in entities table
     const invitationPromises = teamMembers.map(async (member: any) => {
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 7) // Expire in 7 days
 
-      return db.insert(invitations).values({
+      return db.insert(entities).values({
         workspaceId: workspace.id,
-        email: member.email,
-        role: member.role,
-        invitedBy: userId,
-        status: 'pending',
-        expiresAt
+        type: 'invitation',
+        data: {
+          email: member.email,
+          role: member.role || 'member',
+          invitedBy: userId,
+          status: 'pending',
+          expiresAt: expiresAt.toISOString()
+        },
+        metadata: { source: 'onboarding' }
       })
     })
 
@@ -52,9 +56,12 @@ export async function POST(req: Request) {
     // Track event
     await db.insert(entities).values({
       workspaceId: workspace.id,
-      userId: userId,
-      event: 'team_invited',
-      stepName: 'invite_team',
+      type: 'event',
+      data: {
+        event: 'team_invited',
+        stepName: 'invite_team',
+        userId: userId
+      },
       metadata: { 
         inviteCount: teamMembers.length,
         emails: teamMembers.map((m: any) => m.email)

@@ -117,6 +117,15 @@ export default function ContactDetailPageV2() {
   // Filter activities based on selected filters
   const filteredActivities = activities?.filter(activity => {
     if (activityFilters.length === 0) return true
+    
+    // Handle email filter for both email_sent and email_received
+    if (activityFilters.includes('email')) {
+      if (activity.type === 'email' || activity.type === 'email_sent' || activity.type === 'email_received') {
+        return true
+      }
+    }
+    
+    // Check other filters
     return activityFilters.includes(activity.type)
   }) || []
   
