@@ -789,6 +789,8 @@ export default function ContactDetailPageV2() {
           contacts={[contact]}
           deals={relatedDeals}
           companies={relatedCompanies}
+          defaultContactId={contact.id}
+          defaultTitle={`Follow up with ${contact.data.firstName} ${contact.data.lastName}`}
         />
       )}
       

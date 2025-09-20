@@ -46,19 +46,43 @@ interface CreateProjectData {
   useAI?: boolean
   views?: string[]
   dueDate?: Date
+  startDate?: Date
   members?: string[]
+  budget?: number
+  category?: string
+  client?: string
+  tags?: string[]
+  customFields?: Record<string, any>
+  template?: string
+  milestones?: Array<{
+    name: string
+    dueDate: Date
+    description?: string
+  }>
 }
 
 interface CreateTaskData {
   title: string
   description?: string
   projectId: string
+  parentTaskId?: string  // For subtasks
   status?: string
   priority?: string
   assigneeId?: string
   dueDate?: Date
   column?: string
   linkedEntities?: string[]
+  estimatedHours?: number
+  actualHours?: number
+  tags?: string[]
+  attachments?: Array<{
+    name: string
+    url: string
+    type: string
+    size: number
+  }>
+  dependencies?: string[]  // Task IDs this task depends on
+  customFields?: Record<string, any>
 }
 
 export class EverTaskService {
@@ -80,11 +104,21 @@ export class EverTaskService {
         osLink: data.osLink || null,
         useAI: data.useAI || false,
         views: data.views || ['board', 'list', 'dashboard'],
+        startDate: data.startDate?.toISOString() || new Date().toISOString(),
         dueDate: data.dueDate?.toISOString() || null,
         members: data.members || [userId],
+        budget: data.budget || null,
+        actualCost: 0,
+        category: data.category || 'general',
+        client: data.client || null,
+        tags: data.tags || [],
+        customFields: data.customFields || {},
+        template: data.template || null,
         progress: 0,
         tasksCount: 0,
         completedTasks: 0,
+        health: 'good', // good, at-risk, critical
+        lastActivityAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       },
@@ -95,13 +129,44 @@ export class EverTaskService {
       }] : [],
       metadata: {
         searchable: true,
-        version: 1
+        version: 2,
+        milestones: data.milestones || []
       },
       createdAt: new Date(),
       updatedAt: new Date()
     }
 
     await db.insert(entities).values(projectEntity)
+    
+    // Create milestone entities if provided
+    if (data.milestones && data.milestones.length > 0) {
+      const milestoneEntities = data.milestones.map(milestone => ({
+        id: uuidv4(),
+        workspaceId,
+        userId,
+        type: 'project_milestone',
+        data: {
+          name: milestone.name,
+          description: milestone.description || '',
+          dueDate: milestone.dueDate.toISOString(),
+          status: 'pending',
+          completedAt: null
+        },
+        relationships: [{
+          type: 'belongs_to',
+          targetId: projectId,
+          metadata: { relationshipType: 'project_milestone' }
+        }],
+        metadata: {
+          searchable: true
+        },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }))
+      
+      await db.insert(entities).values(milestoneEntities)
+    }
+    
     return projectEntity
   }
 
@@ -147,10 +212,135 @@ export class EverTaskService {
 
     return project
   }
+  
+  // Update project
+  async updateProject(workspaceId: string, projectId: string, updates: Partial<CreateProjectData>) {
+    const [project] = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.id, projectId),
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, TASK_ENTITY_TYPES.PROJECT)
+        )
+      )
+      .limit(1)
+
+    if (!project) {
+      throw new Error('Project not found')
+    }
+
+    const updatedData = {
+      ...project.data,
+      ...updates,
+      startDate: updates.startDate ? updates.startDate.toISOString() : project.data.startDate,
+      dueDate: updates.dueDate ? updates.dueDate.toISOString() : project.data.dueDate,
+      updatedAt: new Date().toISOString()
+    }
+
+    await db
+      .update(entities)
+      .set({
+        data: updatedData,
+        updatedAt: new Date()
+      })
+      .where(eq(entities.id, projectId))
+
+    return { ...project, data: updatedData }
+  }
+  
+  // Get project milestones
+  async getProjectMilestones(workspaceId: string, projectId: string) {
+    const milestones = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, 'project_milestone'),
+          sql`relationships @> ${JSON.stringify([{targetId: projectId}])}::jsonb`
+        )
+      )
+      .orderBy(asc(sql`data->>'dueDate'`))
+
+    return milestones
+  }
+  
+  // Update milestone
+  async updateMilestone(workspaceId: string, milestoneId: string, updates: any) {
+    const [milestone] = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.id, milestoneId),
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, 'project_milestone')
+        )
+      )
+      .limit(1)
+
+    if (!milestone) {
+      throw new Error('Milestone not found')
+    }
+
+    const updatedData = {
+      ...milestone.data,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    }
+
+    await db
+      .update(entities)
+      .set({
+        data: updatedData,
+        updatedAt: new Date()
+      })
+      .where(eq(entities.id, milestoneId))
+
+    return { ...milestone, data: updatedData }
+  }
 
   // Create a task
   async createTask(workspaceId: string, userId: string, data: CreateTaskData) {
     const taskId = uuidv4()
+    
+    // Build relationships array
+    const relationships = [
+      {
+        type: 'belongs_to',
+        targetId: data.projectId,
+        metadata: { relationshipType: 'project_task' }
+      }
+    ]
+    
+    // Add parent task relationship if it's a subtask
+    if (data.parentTaskId) {
+      relationships.push({
+        type: 'subtask_of',
+        targetId: data.parentTaskId,
+        metadata: { relationshipType: 'parent_child' }
+      })
+    }
+    
+    // Add linked entities
+    if (data.linkedEntities && data.linkedEntities.length > 0) {
+      relationships.push(...data.linkedEntities.map(entityId => ({
+        type: 'linked_to',
+        targetId: entityId,
+        metadata: { linkType: 'related_entity' }
+      })))
+    }
+    
+    // Add dependencies
+    if (data.dependencies && data.dependencies.length > 0) {
+      relationships.push(...data.dependencies.map(taskId => ({
+        type: 'depends_on',
+        targetId: taskId,
+        metadata: { relationshipType: 'task_dependency' }
+      })))
+    }
     
     const taskEntity = {
       id: taskId,
@@ -165,25 +355,20 @@ export class EverTaskService {
         assigneeId: data.assigneeId || userId,
         dueDate: data.dueDate?.toISOString() || null,
         column: data.column || 'To Do',
+        estimatedHours: data.estimatedHours || null,
+        actualHours: data.actualHours || 0,
+        tags: data.tags || [],
+        attachments: data.attachments || [],
+        customFields: data.customFields || {},
+        isSubtask: !!data.parentTaskId,
         completedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       },
-      relationships: [
-        {
-          type: 'belongs_to',
-          targetId: data.projectId,
-          metadata: { relationshipType: 'project_task' }
-        },
-        ...(data.linkedEntities || []).map(entityId => ({
-          type: 'linked_to',
-          targetId: entityId,
-          metadata: { linkType: 'related_entity' }
-        }))
-      ],
+      relationships,
       metadata: {
         searchable: true,
-        version: 1
+        version: 2
       },
       createdAt: new Date(),
       updatedAt: new Date()
@@ -321,22 +506,64 @@ export class EverTaskService {
       throw new Error('Task not found')
     }
 
+    // Extract linkedEntities from updates if present
+    const { linkedEntities, ...dataUpdates } = updates
+    
     const updatedData = {
       ...task.data,
-      ...updates,
-      dueDate: updates.dueDate ? new Date(updates.dueDate).toISOString() : task.data.dueDate,
+      ...dataUpdates,
+      dueDate: dataUpdates.dueDate ? new Date(dataUpdates.dueDate).toISOString() : task.data.dueDate,
       updatedAt: new Date().toISOString()
+    }
+
+    // Handle relationships update if linkedEntities is provided
+    let updatedRelationships = task.relationships || []
+    if (linkedEntities !== undefined) {
+      // Keep the project relationship (belongs_to)
+      const projectRelationship = updatedRelationships.find(r => r.type === 'belongs_to')
+      
+      // Build new relationships array with project + linked entities
+      updatedRelationships = [
+        ...(projectRelationship ? [projectRelationship] : []),
+        ...linkedEntities.map((entityId: string) => ({
+          type: 'linked_to',
+          targetId: entityId,
+          metadata: { linkType: 'related_entity' }
+        }))
+      ]
     }
 
     await db
       .update(entities)
       .set({
         data: updatedData,
+        relationships: updatedRelationships,
         updatedAt: new Date()
       })
       .where(eq(entities.id, taskId))
+    
+    // Log activity for newly linked entities
+    if (linkedEntities) {
+      const oldLinkedIds = task.relationships?.filter(r => r.type === 'linked_to')?.map(r => r.targetId) || []
+      const newLinkedIds = linkedEntities.filter((id: string) => !oldLinkedIds.includes(id))
+      
+      for (const entityId of newLinkedIds) {
+        await activityService.logActivity(
+          workspaceId,
+          entityId,
+          'task_updated',
+          'evertask',
+          {
+            taskId: taskId,
+            title: updatedData.title || task.data.title,
+            action: 'linked_to_task'
+          },
+          { userId: task.userId || undefined }
+        )
+      }
+    }
 
-    return { ...task, data: updatedData }
+    return { ...task, data: updatedData, relationships: updatedRelationships }
   }
 
   // Delete task
@@ -433,6 +660,61 @@ export class EverTaskService {
       .orderBy(asc(entities.createdAt))
 
     return tasks
+  }
+  
+  // Get subtasks for a task
+  async getSubtasks(workspaceId: string, parentTaskId: string) {
+    const subtasks = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, TASK_ENTITY_TYPES.TASK),
+          sql`relationships @> ${JSON.stringify([{
+            type: 'subtask_of',
+            targetId: parentTaskId
+          }])}::jsonb`
+        )
+      )
+      .orderBy(asc(entities.createdAt))
+
+    return subtasks
+  }
+  
+  // Get task dependencies
+  async getTaskDependencies(workspaceId: string, taskId: string) {
+    const [task] = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.id, taskId),
+          eq(entities.workspaceId, workspaceId),
+          eq(entities.type, TASK_ENTITY_TYPES.TASK)
+        )
+      )
+      .limit(1)
+
+    if (!task) return []
+
+    const dependencyIds = task.relationships
+      ?.filter(r => r.type === 'depends_on')
+      ?.map(r => r.targetId) || []
+
+    if (dependencyIds.length === 0) return []
+
+    const dependencies = await db
+      .select()
+      .from(entities)
+      .where(
+        and(
+          eq(entities.workspaceId, workspaceId),
+          or(...dependencyIds.map(id => eq(entities.id, id)))!
+        )
+      )
+
+    return dependencies
   }
 
   // Get all tasks in workspace

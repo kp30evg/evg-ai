@@ -17,8 +17,20 @@ export const evertaskRouter = router({
       osLink: z.string().optional(),
       useAI: z.boolean().optional(),
       views: z.array(z.string()).optional(),
+      startDate: z.string().optional(),
       dueDate: z.string().optional(),
-      members: z.array(z.string()).optional()
+      members: z.array(z.string()).optional(),
+      budget: z.number().optional(),
+      category: z.string().optional(),
+      client: z.string().optional(),
+      tags: z.array(z.string()).optional(),
+      customFields: z.record(z.any()).optional(),
+      template: z.string().optional(),
+      milestones: z.array(z.object({
+        name: z.string(),
+        dueDate: z.string(),
+        description: z.string().optional()
+      })).optional()
     }))
     .mutation(async ({ ctx, input }) => {
       try {
@@ -54,7 +66,12 @@ export const evertaskRouter = router({
           dbUser.id,
           {
             ...input,
-            dueDate: input.dueDate ? new Date(input.dueDate) : undefined
+            startDate: input.startDate ? new Date(input.startDate) : undefined,
+            dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+            milestones: input.milestones?.map(m => ({
+              ...m,
+              dueDate: new Date(m.dueDate)
+            }))
           }
         )
 
@@ -114,6 +131,64 @@ export const evertaskRouter = router({
       const project = await everTaskService.getProject(workspaceId, input.projectId)
       return project
     }),
+    
+  // Update project
+  updateProject: protectedProcedure
+    .input(z.object({
+      projectId: z.string(),
+      updates: z.object({
+        name: z.string().optional(),
+        description: z.string().optional(),
+        privacy: z.enum(['public', 'private']).optional(),
+        team: z.string().optional(),
+        budget: z.number().optional(),
+        category: z.string().optional(),
+        client: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        customFields: z.record(z.any()).optional(),
+        startDate: z.string().optional(),
+        dueDate: z.string().optional(),
+        members: z.array(z.string()).optional()
+      })
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No workspace found'
+        })
+      }
+      const workspaceId = ctx.workspace.id
+
+      const project = await everTaskService.updateProject(
+        workspaceId,
+        input.projectId,
+        {
+          ...input.updates,
+          startDate: input.updates.startDate ? new Date(input.updates.startDate) : undefined,
+          dueDate: input.updates.dueDate ? new Date(input.updates.dueDate) : undefined
+        }
+      )
+      return project
+    }),
+    
+  // Get project milestones
+  getProjectMilestones: protectedProcedure
+    .input(z.object({
+      projectId: z.string()
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No workspace found'
+        })
+      }
+      const workspaceId = ctx.workspace.id
+
+      const milestones = await everTaskService.getProjectMilestones(workspaceId, input.projectId)
+      return milestones
+    }),
 
   // Create a task
   createTask: protectedProcedure
@@ -121,12 +196,17 @@ export const evertaskRouter = router({
       title: z.string().min(1),
       description: z.string().optional(),
       projectId: z.string().optional(),
+      parentTaskId: z.string().optional(),
       status: z.string().optional(),
       priority: z.string().optional(),
       assigneeId: z.string().optional(),
       dueDate: z.date().optional(),
       column: z.string().optional(),
-      linkedEntities: z.array(z.string()).optional()
+      linkedEntities: z.array(z.string()).optional(),
+      estimatedHours: z.number().optional(),
+      tags: z.array(z.string()).optional(),
+      dependencies: z.array(z.string()).optional(),
+      customFields: z.record(z.any()).optional()
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.workspace) {
@@ -237,7 +317,8 @@ export const evertaskRouter = router({
         assigneeId: z.string().optional(),
         dueDate: z.string().optional(),
         tags: z.array(z.string()).optional(),
-        column: z.string().optional()
+        column: z.string().optional(),
+        linkedEntities: z.array(z.string()).optional()
       })
     }))
     .mutation(async ({ ctx, input }) => {
@@ -318,6 +399,42 @@ export const evertaskRouter = router({
       return tasks
     }),
 
+  // Get subtasks for a task
+  getSubtasks: protectedProcedure
+    .input(z.object({
+      parentTaskId: z.string()
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No workspace found'
+        })
+      }
+      const workspaceId = ctx.workspace.id
+
+      const subtasks = await everTaskService.getSubtasks(workspaceId, input.parentTaskId)
+      return subtasks
+    }),
+    
+  // Get task dependencies
+  getTaskDependencies: protectedProcedure
+    .input(z.object({
+      taskId: z.string()
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.workspace) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'No workspace found'
+        })
+      }
+      const workspaceId = ctx.workspace.id
+
+      const dependencies = await everTaskService.getTaskDependencies(workspaceId, input.taskId)
+      return dependencies
+    }),
+  
   // Get overview statistics
   getOverviewStats: protectedProcedure
     .input(z.object({

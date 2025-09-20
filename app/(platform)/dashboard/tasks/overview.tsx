@@ -44,6 +44,12 @@ export default function TaskOverview() {
     { enabled: !!organization && !!user }
   )
   
+  // Fetch ALL tasks for CRM relationship filtering
+  const { data: allTasks = [] } = trpc.evertask.getAllTasks.useQuery(
+    undefined,
+    { enabled: !!organization }
+  )
+  
   // Fetch CRM entities for linking
   const { data: deals = [] } = trpc.evercore.getDeals.useQuery(undefined, { enabled: !!organization })
   const { data: contacts = [] } = trpc.evercore.getContacts.useQuery(undefined, { enabled: !!organization })
@@ -60,23 +66,29 @@ export default function TaskOverview() {
   const thisWeekCount = overviewData?.tasksDueThisWeek?.length || 0
   const myOpenCount = overviewData?.activeTasksCount || 0
   
-  // Group tasks by CRM relationship
-  const tasksWithDeals = overviewData?.tasksDueThisWeek?.filter(t => 
-    t.relationships?.some(r => r.type === 'linked_to' && 
-      deals.some(d => d.id === r.targetId))
-  ) || []
+  // Group tasks by CRM relationship - using ALL tasks, not just due this week
+  const tasksWithDeals = allTasks.filter(t => 
+    Array.isArray(t.relationships) && t.relationships.some(r => 
+      r.type === 'linked_to' && deals.some(d => d.id === r.targetId))
+  )
   
-  const tasksWithContacts = overviewData?.tasksDueThisWeek?.filter(t => 
-    t.relationships?.some(r => r.type === 'linked_to' && 
-      contacts.some(c => c.id === r.targetId))
-  ) || []
+  const tasksWithContacts = allTasks.filter(t => 
+    Array.isArray(t.relationships) && t.relationships.some(r => 
+      r.type === 'linked_to' && contacts.some(c => c.id === r.targetId))
+  )
   
-  const unlinkedTasks = overviewData?.tasksDueThisWeek?.filter(t => 
-    !t.relationships?.some(r => r.type === 'linked_to' && 
+  const tasksWithCompanies = allTasks.filter(t => 
+    Array.isArray(t.relationships) && t.relationships.some(r => 
+      r.type === 'linked_to' && companies.some(co => co.id === r.targetId))
+  )
+  
+  const unlinkedTasks = allTasks.filter(t => 
+    !Array.isArray(t.relationships) || !t.relationships.some(r => 
+      r.type === 'linked_to' && 
       (deals.some(d => d.id === r.targetId) || 
        contacts.some(c => c.id === r.targetId) ||
        companies.some(co => co.id === r.targetId)))
-  ) || []
+  )
   
   const getDealInfo = (dealId: string) => {
     const deal = deals.find(d => d.id === dealId)
@@ -89,10 +101,22 @@ export default function TaskOverview() {
   
   const getContactInfo = (contactId: string) => {
     const contact = contacts.find(c => c.id === contactId)
-    const company = contact?.relationships?.find(r => r.type === 'works_at')?.targetId
-    const companyData = companies.find(co => co.id === company)
+    
+    // Handle both array and object formats for relationships
+    let companyId = null
+    if (contact?.relationships) {
+      if (Array.isArray(contact.relationships)) {
+        // Array format (newer style, used by tasks)
+        companyId = contact.relationships.find(r => r.type === 'works_at')?.targetId
+      } else if (typeof contact.relationships === 'object') {
+        // Object format (legacy style, used by contacts/deals)
+        companyId = contact.relationships.company
+      }
+    }
+    
+    const companyData = companies.find(co => co.id === companyId)
     return contact ? {
-      name: contact.data?.name || 'Unknown',
+      name: contact.data?.name || `${contact.data?.firstName || ''} ${contact.data?.lastName || ''}`.trim() || 'Unknown',
       company: companyData?.data?.name || ''
     } : null
   }
@@ -667,6 +691,55 @@ export default function TaskOverview() {
                                   <span>{contactInfo.company}</span>
                                 </>
                               )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Tasks for Companies */}
+                {tasksWithCompanies.length > 0 && (
+                  <div style={{ marginBottom: theme.spacing.xl }}>
+                    <h3 style={{
+                      fontSize: theme.typography.fontSize.sm,
+                      fontWeight: theme.typography.fontWeight.medium,
+                      color: theme.colors.mediumGray,
+                      marginBottom: theme.spacing.md,
+                      textTransform: 'uppercase'
+                    }}>Tasks for Companies</h3>
+                    {tasksWithCompanies.slice(0, 3).map((task) => {
+                      const companyId = task.relationships?.find(r => 
+                        r.type === 'linked_to' && companies.some(co => co.id === r.targetId)
+                      )?.targetId
+                      const company = companies.find(co => co.id === companyId)
+                      
+                      return (
+                        <div key={task.id} style={{
+                          padding: theme.spacing.md,
+                          backgroundColor: theme.colors.softGray,
+                          borderRadius: theme.borderRadius.base,
+                          marginBottom: theme.spacing.sm,
+                          cursor: 'pointer'
+                        }}>
+                          <div style={{
+                            fontSize: theme.typography.fontSize.base,
+                            color: theme.colors.charcoal,
+                            marginBottom: theme.spacing.xs
+                          }}>
+                            {task.data?.title}
+                          </div>
+                          {company && (
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: theme.spacing.sm,
+                              fontSize: theme.typography.fontSize.sm,
+                              color: theme.colors.mediumGray
+                            }}>
+                              <Building2 size={14} />
+                              <span>{company.data?.name}</span>
                             </div>
                           )}
                         </div>

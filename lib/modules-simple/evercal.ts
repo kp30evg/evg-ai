@@ -8,6 +8,7 @@ import { google } from 'googleapis';
 import { addDays, format, parseISO, isWithinInterval } from 'date-fns';
 import * as evercore from './evercore';
 import * as everchat from './everchat';
+import { activityService } from '@/lib/services/activity-service';
 
 // Entity data types
 export interface EventData {
@@ -55,7 +56,7 @@ export async function createEvent(
     { userId }
   );
 
-  // Auto-link to contacts if attendees exist
+  // Auto-link to contacts if attendees exist and log activities
   for (const attendeeEmail of data.attendees) {
     const contacts = await entityService.find({
       workspaceId,
@@ -69,6 +70,24 @@ export async function createEvent(
         event.id,
         contacts[0].id,
         'attendee'
+      );
+      
+      // Log meeting scheduled activity for each contact
+      await activityService.logActivity(
+        workspaceId,
+        contacts[0].id,
+        'meeting_scheduled',
+        'evercal',
+        {
+          eventId: event.id,
+          title: data.title,
+          description: data.description,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          location: data.location,
+          attendees: data.attendees
+        },
+        { userId, participants: contacts.map(c => c.id) }
       );
     }
   }
@@ -381,12 +400,39 @@ export async function cancelEvent(
   eventId: string,
   userId?: string
 ): Promise<any> {
-  return await entityService.update(
+  // Get the event details first
+  const event = await entityService.findById(workspaceId, eventId);
+  
+  // Update the event status
+  const updatedEvent = await entityService.update(
     workspaceId,
     eventId,
     { status: 'cancelled' },
     { userId }
   );
+  
+  // Log cancellation activity for all linked contacts
+  if (event) {
+    const linkedContacts = await entityService.findRelated(workspaceId, eventId, 'attendee');
+    
+    for (const contact of linkedContacts) {
+      await activityService.logActivity(
+        workspaceId,
+        contact.id,
+        'meeting_cancelled',
+        'evercal',
+        {
+          eventId: eventId,
+          title: event.data.title,
+          originalTime: event.data.startTime,
+          reason: 'Event cancelled'
+        },
+        { userId }
+      );
+    }
+  }
+  
+  return updatedEvent;
 }
 
 /**

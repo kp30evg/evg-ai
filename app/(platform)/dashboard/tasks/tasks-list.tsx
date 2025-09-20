@@ -20,8 +20,14 @@ import {
   ChevronDown,
   CircleDot,
   ArrowUpDown,
-  MoreHorizontal
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Copy,
+  CheckSquare
 } from 'lucide-react'
+import EditTaskModal from '@/components/tasks/EditTaskModal'
+import NewTaskModal from '@/components/tasks/NewTaskModal'
 
 export default function TasksListView() {
   const { organization } = useOrganization()
@@ -31,6 +37,9 @@ export default function TasksListView() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'dueDate' | 'priority' | 'assignee' | 'created'>('dueDate')
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false)
+  const [activeDropdownTask, setActiveDropdownTask] = useState<string | null>(null)
+  const [editingTask, setEditingTask] = useState<any>(null)
+  const [duplicatingTask, setDuplicatingTask] = useState<any>(null)
   
   // Fetch all tasks in workspace
   const { data: allTasks = [], isLoading } = trpc.evertask.getAllTasks.useQuery(
@@ -49,6 +58,19 @@ export default function TasksListView() {
   const { data: contacts = [] } = trpc.evercore.getContacts.useQuery(undefined, { enabled: !!organization })
   const { data: companies = [] } = trpc.evercore.getCompanies.useQuery(undefined, { enabled: !!organization })
   const { data: projects = [] } = trpc.evertask.getProjects.useQuery(undefined, { enabled: !!organization })
+  
+  // Mutations
+  const utils = trpc.useContext()
+  const deleteTask = trpc.evertask.deleteTask.useMutation({
+    onSuccess: () => {
+      utils.evertask.getAllTasks.invalidate()
+    }
+  })
+  const updateTaskStatus = trpc.evertask.updateTaskStatus.useMutation({
+    onSuccess: () => {
+      utils.evertask.getAllTasks.invalidate()
+    }
+  })
   
   // Filter and sort tasks
   const filteredTasks = useMemo(() => {
@@ -359,18 +381,200 @@ export default function TasksListView() {
         </div>
         
         {/* Actions */}
-        <div>
+        <div style={{ position: 'relative' }}>
           <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setActiveDropdownTask(activeDropdownTask === task.id ? null : task.id)
+            }}
             style={{
               background: 'none',
               border: 'none',
               padding: theme.spacing.xs,
               cursor: 'pointer',
-              color: theme.colors.mediumGray
+              color: theme.colors.mediumGray,
+              borderRadius: theme.borderRadius.base,
+              transition: theme.transitions.fast
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.softGray
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
             }}
           >
             <MoreHorizontal size={16} />
           </button>
+          
+          {/* Dropdown Menu */}
+          {activeDropdownTask === task.id && (
+            <div style={{
+              position: 'absolute',
+              right: 0,
+              top: '100%',
+              marginTop: theme.spacing.xs,
+              backgroundColor: theme.colors.white,
+              border: `1px solid ${theme.colors.lightGray}`,
+              borderRadius: theme.borderRadius.base,
+              boxShadow: theme.shadows.md,
+              minWidth: '160px',
+              zIndex: 10
+            }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setEditingTask(task)
+                  setActiveDropdownTask(null)
+                }}
+                style={{
+                  width: '100%',
+                  padding: theme.spacing.sm,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: theme.spacing.sm,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: theme.typography.fontSize.sm,
+                  color: theme.colors.charcoal,
+                  textAlign: 'left',
+                  transition: theme.transitions.fast
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.softGray
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                <Edit size={14} />
+                Edit Task
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDuplicatingTask(task)
+                  setActiveDropdownTask(null)
+                }}
+                style={{
+                  width: '100%',
+                  padding: theme.spacing.sm,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: theme.spacing.sm,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: theme.typography.fontSize.sm,
+                  color: theme.colors.charcoal,
+                  textAlign: 'left',
+                  transition: theme.transitions.fast
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.softGray
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                <Copy size={14} />
+                Duplicate
+              </button>
+              
+              <div style={{
+                borderTop: `1px solid ${theme.colors.lightGray}`,
+                margin: `${theme.spacing.xs} 0`
+              }} />
+              
+              {/* Quick Status Change */}
+              <div style={{
+                padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
+                fontSize: theme.typography.fontSize.xs,
+                color: theme.colors.mediumGray,
+                fontWeight: theme.typography.fontWeight.semibold
+              }}>
+                Change Status
+              </div>
+              {['todo', 'in_progress', 'review', 'done'].map(status => (
+                <button
+                  key={status}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    updateTaskStatus.mutate({
+                      taskId: task.id,
+                      status
+                    })
+                    setActiveDropdownTask(null)
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: theme.spacing.sm,
+                    paddingLeft: theme.spacing.lg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: theme.spacing.sm,
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: theme.typography.fontSize.sm,
+                    color: task.data?.status === status ? theme.colors.evergreen : theme.colors.charcoal,
+                    fontWeight: task.data?.status === status ? theme.typography.fontWeight.semibold : 'normal',
+                    textAlign: 'left',
+                    textTransform: 'capitalize',
+                    transition: theme.transitions.fast
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = theme.colors.softGray
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
+                >
+                  {task.data?.status === status && <CheckSquare size={12} />}
+                  {status.replace('_', ' ')}
+                </button>
+              ))}
+              
+              <div style={{
+                borderTop: `1px solid ${theme.colors.lightGray}`,
+                margin: `${theme.spacing.xs} 0`
+              }} />
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (confirm('Are you sure you want to delete this task?')) {
+                    deleteTask.mutate({ taskId: task.id })
+                  }
+                  setActiveDropdownTask(null)
+                }}
+                style={{
+                  width: '100%',
+                  padding: theme.spacing.sm,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: theme.spacing.sm,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: theme.typography.fontSize.sm,
+                  color: theme.colors.red,
+                  textAlign: 'left',
+                  transition: theme.transitions.fast
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.red + '10'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                <Trash2 size={14} />
+                Delete Task
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -761,6 +965,32 @@ export default function TasksListView() {
           ))
         )}
       </div>
+      
+      {/* Edit Task Modal */}
+      {editingTask && (
+        <EditTaskModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onUpdate={() => {
+            utils.evertask.getAllTasks.invalidate()
+          }}
+          onDelete={() => {
+            utils.evertask.getAllTasks.invalidate()
+          }}
+        />
+      )}
+      
+      {/* Duplicate Task Modal (using NewTaskModal with pre-filled data) */}
+      {duplicatingTask && (
+        <NewTaskModal
+          onClose={() => setDuplicatingTask(null)}
+          deals={deals}
+          contacts={contacts}
+          companies={companies}
+          projects={projects}
+          // TODO: Add defaultTitle, defaultDescription, etc. props to NewTaskModal
+        />
+      )}
     </div>
   )
 }

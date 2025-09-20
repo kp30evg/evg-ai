@@ -1,64 +1,99 @@
 'use client'
 
-import React, { useState } from 'react'
-import { X, Calendar, User, Flag, Link2, Building2, DollarSign, Users, Search } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, Calendar, User, Flag, Link2, Building2, DollarSign, Users, Search, Trash2 } from 'lucide-react'
 import { theme } from '@/lib/evercore/theme'
 import { trpc } from '@/lib/trpc/client'
 import { useOrganization, useUser } from '@clerk/nextjs'
 
-interface NewTaskModalProps {
+interface EditTaskModalProps {
+  task: any // The task entity to edit
   onClose: () => void
-  deals?: any[]
-  contacts?: any[]
-  companies?: any[]
-  projects?: any[]
-  // Context-aware defaults
-  defaultContactId?: string
-  defaultDealId?: string
-  defaultCompanyId?: string
-  defaultProjectId?: string
-  defaultTitle?: string
-  defaultDescription?: string
+  onDelete?: () => void // Optional callback after deletion
+  onUpdate?: () => void // Optional callback after update
 }
 
-export default function NewTaskModal({ 
-  onClose, 
-  deals = [], 
-  contacts = [], 
-  companies = [], 
-  projects = [],
-  defaultContactId,
-  defaultDealId,
-  defaultCompanyId,
-  defaultProjectId,
-  defaultTitle = '',
-  defaultDescription = ''
-}: NewTaskModalProps) {
+export default function EditTaskModal({ 
+  task,
+  onClose,
+  onDelete,
+  onUpdate
+}: EditTaskModalProps) {
   const { organization } = useOrganization()
   const { user } = useUser()
-  const [title, setTitle] = useState(defaultTitle)
-  const [description, setDescription] = useState(defaultDescription)
-  const [priority, setPriority] = useState('medium')
+  
+  // Extract existing task data
+  const existingRelationships = Array.isArray(task.relationships) ? task.relationships : []
+  const projectRelationship = existingRelationships.find(r => r.type === 'belongs_to')
+  const linkedRelationships = existingRelationships.filter(r => r.type === 'linked_to')
+  
+  // Initialize state with existing task data
+  const [title, setTitle] = useState(task.data?.title || '')
+  const [description, setDescription] = useState(task.data?.description || '')
+  const [priority, setPriority] = useState(task.data?.priority || 'medium')
   const [dueDate, setDueDate] = useState('')
   const [dueTime, setDueTime] = useState('')
-  const [selectedProject, setSelectedProject] = useState(defaultProjectId || '')
-  const [selectedDeal, setSelectedDeal] = useState(defaultDealId || '')
-  const [selectedContact, setSelectedContact] = useState(defaultContactId || '')
-  const [selectedCompany, setSelectedCompany] = useState(defaultCompanyId || '')
+  const [selectedProject, setSelectedProject] = useState(projectRelationship?.targetId || '')
+  const [selectedDeal, setSelectedDeal] = useState('')
+  const [selectedContact, setSelectedContact] = useState('')
+  const [selectedCompany, setSelectedCompany] = useState('')
   const [showDealSearch, setShowDealSearch] = useState(false)
   const [showContactSearch, setShowContactSearch] = useState(false)
   const [showCompanySearch, setShowCompanySearch] = useState(false)
   const [dealSearchQuery, setDealSearchQuery] = useState('')
   const [contactSearchQuery, setContactSearchQuery] = useState('')
   const [companySearchQuery, setCompanySearchQuery] = useState('')
-  const [selectedAssignee, setSelectedAssignee] = useState('')
+  const [selectedAssignee, setSelectedAssignee] = useState(task.data?.assigneeId || '')
   const [showAssigneeSearch, setShowAssigneeSearch] = useState(false)
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   
-  // Fetch organization members
-  const { data: members = [], isLoading: isLoadingMembers, error: membersError } = trpc.organization.getMembers.useQuery()
+  // Fetch data
+  const { data: members = [] } = trpc.organization.getMembers.useQuery()
+  const { data: projects = [] } = trpc.evertask.getProjects.useQuery()
+  const { data: deals = [] } = trpc.evercore.getDeals.useQuery(undefined, { enabled: !!organization })
+  const { data: contacts = [] } = trpc.evercore.getContacts.useQuery(undefined, { enabled: !!organization })
+  const { data: companies = [] } = trpc.evercore.getCompanies.useQuery(undefined, { enabled: !!organization })
   
-  const createTask = trpc.evertask.createTask.useMutation()
+  // Mutations
+  const updateTask = trpc.evertask.updateTask.useMutation({
+    onSuccess: () => {
+      onUpdate?.()
+      onClose()
+    }
+  })
+  
+  const deleteTask = trpc.evertask.deleteTask.useMutation({
+    onSuccess: () => {
+      onDelete?.()
+      onClose()
+    }
+  })
+  
+  // Set up linked entities from existing relationships
+  useEffect(() => {
+    if (linkedRelationships.length > 0 && deals.length > 0 && contacts.length > 0 && companies.length > 0) {
+      linkedRelationships.forEach(rel => {
+        const targetId = rel.targetId
+        if (deals.some(d => d.id === targetId)) {
+          setSelectedDeal(targetId)
+        } else if (contacts.some(c => c.id === targetId)) {
+          setSelectedContact(targetId)
+        } else if (companies.some(c => c.id === targetId)) {
+          setSelectedCompany(targetId)
+        }
+      })
+    }
+  }, [linkedRelationships, deals, contacts, companies])
+  
+  // Parse due date and time from existing task
+  useEffect(() => {
+    if (task.data?.dueDate) {
+      const date = new Date(task.data.dueDate)
+      setDueDate(date.toISOString().split('T')[0])
+      setDueTime(date.toTimeString().slice(0, 5))
+    }
+  }, [task.data?.dueDate])
   
   const handleSubmit = async () => {
     if (!title.trim()) return
@@ -69,18 +104,27 @@ export default function NewTaskModal({
     if (selectedCompany) linkedEntities.push(selectedCompany)
     
     try {
-      await createTask.mutateAsync({
-        title,
-        description,
-        projectId: selectedProject || undefined,
-        priority,
-        assigneeId: selectedAssignee || undefined,
-        dueDate: dueDate ? new Date(`${dueDate} ${dueTime || '00:00'}`) : undefined,
-        linkedEntities: linkedEntities.length > 0 ? linkedEntities : undefined
+      await updateTask.mutateAsync({
+        taskId: task.id,
+        updates: {
+          title,
+          description,
+          priority,
+          assigneeId: selectedAssignee || undefined,
+          dueDate: dueDate ? `${dueDate} ${dueTime || '00:00'}` : undefined,
+          linkedEntities
+        }
       })
-      onClose()
     } catch (error) {
-      console.error('Failed to create task:', error)
+      console.error('Failed to update task:', error)
+    }
+  }
+  
+  const handleDelete = async () => {
+    try {
+      await deleteTask.mutateAsync({ taskId: task.id })
+    } catch (error) {
+      console.error('Failed to delete task:', error)
     }
   }
   
@@ -88,9 +132,10 @@ export default function NewTaskModal({
     deal.data?.name?.toLowerCase().includes(dealSearchQuery.toLowerCase())
   )
   
-  const filteredContacts = contacts.filter(contact => 
-    contact.data?.name?.toLowerCase().includes(contactSearchQuery.toLowerCase())
-  )
+  const filteredContacts = contacts.filter(contact => {
+    const name = contact.data?.name || `${contact.data?.firstName || ''} ${contact.data?.lastName || ''}`.trim()
+    return name.toLowerCase().includes(contactSearchQuery.toLowerCase())
+  })
   
   const filteredCompanies = companies.filter(company => 
     company.data?.name?.toLowerCase().includes(companySearchQuery.toLowerCase())
@@ -147,32 +192,115 @@ export default function NewTaskModal({
             fontWeight: theme.typography.fontWeight.semibold,
             color: theme.colors.charcoal,
             margin: 0
-          }}>Create New Task</h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: theme.spacing.sm,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: theme.borderRadius.base,
-              transition: theme.transitions.fast
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.softGray
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
-          >
-            <X size={20} color={theme.colors.mediumGray} />
-          </button>
+          }}>Edit Task</h2>
+          <div style={{
+            display: 'flex',
+            gap: theme.spacing.sm
+          }}>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: theme.spacing.sm,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: theme.borderRadius.base,
+                transition: theme.transitions.fast,
+                color: theme.colors.red
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.red + '10'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+              title="Delete Task"
+            >
+              <Trash2 size={20} />
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: theme.spacing.sm,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: theme.borderRadius.base,
+                transition: theme.transitions.fast
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = theme.colors.softGray
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+            >
+              <X size={20} color={theme.colors.mediumGray} />
+            </button>
+          </div>
         </div>
 
-        {/* Form */}
+        {/* Delete Confirmation */}
+        {showDeleteConfirm && (
+          <div style={{
+            padding: theme.spacing.lg,
+            backgroundColor: theme.colors.red + '10',
+            borderBottom: `1px solid ${theme.colors.red}40`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <span style={{
+              fontSize: theme.typography.fontSize.sm,
+              color: theme.colors.red
+            }}>
+              Are you sure you want to delete this task?
+            </span>
+            <div style={{
+              display: 'flex',
+              gap: theme.spacing.sm
+            }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  padding: `${theme.spacing.xs} ${theme.spacing.md}`,
+                  backgroundColor: theme.colors.white,
+                  color: theme.colors.charcoal,
+                  border: `1px solid ${theme.colors.lightGray}`,
+                  borderRadius: theme.borderRadius.base,
+                  fontSize: theme.typography.fontSize.sm,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteTask.isLoading}
+                style={{
+                  padding: `${theme.spacing.xs} ${theme.spacing.md}`,
+                  backgroundColor: theme.colors.red,
+                  color: theme.colors.white,
+                  border: 'none',
+                  borderRadius: theme.borderRadius.base,
+                  fontSize: theme.typography.fontSize.sm,
+                  cursor: 'pointer',
+                  opacity: deleteTask.isLoading ? 0.7 : 1
+                }}
+              >
+                {deleteTask.isLoading ? 'Deleting...' : 'Delete Task'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Form - Same as NewTaskModal but with pre-filled values */}
         <div style={{ padding: theme.spacing.xl }}>
           {/* Task Title */}
           <div style={{ marginBottom: theme.spacing.xl }}>
@@ -244,7 +372,7 @@ export default function NewTaskModal({
             />
           </div>
 
-          {/* CRM Linking Section */}
+          {/* CRM Linking Section - Interactive */}
           <div style={{
             backgroundColor: theme.colors.softGray,
             borderRadius: theme.borderRadius.base,
@@ -423,7 +551,7 @@ export default function NewTaskModal({
                       fontSize: theme.typography.fontSize.sm,
                       color: theme.colors.charcoal
                     }}>
-                      {getSelectedContact()?.data?.name}
+                      {getSelectedContact()?.data?.name || `${getSelectedContact()?.data?.firstName} ${getSelectedContact()?.data?.lastName}`}
                     </span>
                     <button
                       onClick={() => setSelectedContact('')}
@@ -467,30 +595,33 @@ export default function NewTaskModal({
                         fontSize: theme.typography.fontSize.sm
                       }}
                     />
-                    {filteredContacts.map(contact => (
-                      <div
-                        key={contact.id}
-                        onClick={() => {
-                          setSelectedContact(contact.id)
-                          setShowContactSearch(false)
-                          setContactSearchQuery('')
-                        }}
-                        style={{
-                          padding: theme.spacing.sm,
-                          cursor: 'pointer',
-                          fontSize: theme.typography.fontSize.sm,
-                          transition: theme.transitions.fast
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = theme.colors.softGray
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent'
-                        }}
-                      >
-                        {contact.data?.name} - {contact.data?.email}
-                      </div>
-                    ))}
+                    {filteredContacts.map(contact => {
+                      const name = contact.data?.name || `${contact.data?.firstName || ''} ${contact.data?.lastName || ''}`.trim()
+                      return (
+                        <div
+                          key={contact.id}
+                          onClick={() => {
+                            setSelectedContact(contact.id)
+                            setShowContactSearch(false)
+                            setContactSearchQuery('')
+                          }}
+                          style={{
+                            padding: theme.spacing.sm,
+                            cursor: 'pointer',
+                            fontSize: theme.typography.fontSize.sm,
+                            transition: theme.transitions.fast
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.colors.softGray
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                        >
+                          {name} - {contact.data?.email}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -613,14 +744,14 @@ export default function NewTaskModal({
             </div>
           </div>
 
-          {/* Project, Priority, Due Date Row */}
+          {/* Project, Priority Row */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: theme.spacing.lg,
             marginBottom: theme.spacing.xl
           }}>
-            {/* Project */}
+            {/* Project (Read-only) */}
             <div>
               <label style={{
                 display: 'block',
@@ -631,27 +762,16 @@ export default function NewTaskModal({
               }}>
                 Project
               </label>
-              <select
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: theme.spacing.md,
-                  border: `1px solid ${theme.colors.lightGray}`,
-                  borderRadius: theme.borderRadius.base,
-                  fontSize: theme.typography.fontSize.sm,
-                  backgroundColor: theme.colors.white,
-                  cursor: 'pointer',
-                  outline: 'none'
-                }}
-              >
-                <option value="">No project</option>
-                {projects.map(project => (
-                  <option key={project.id} value={project.id}>
-                    {project.data?.name || 'Untitled'}
-                  </option>
-                ))}
-              </select>
+              <div style={{
+                padding: theme.spacing.md,
+                border: `1px solid ${theme.colors.lightGray}`,
+                borderRadius: theme.borderRadius.base,
+                fontSize: theme.typography.fontSize.sm,
+                backgroundColor: theme.colors.softGray,
+                color: theme.colors.mediumGray
+              }}>
+                {projects.find(p => p.id === selectedProject)?.data?.name || 'No project'}
+              </div>
             </div>
 
             {/* Priority */}
@@ -733,7 +853,7 @@ export default function NewTaskModal({
                     }}
                   >
                     <User size={16} />
-                    Select team member...
+                    Unassigned
                   </div>
                 ) : (
                   <div style={{
@@ -781,7 +901,7 @@ export default function NewTaskModal({
                     </button>
                   </div>
                 )}
-                {showAssigneeSearch && !selectedAssignee && (
+                {showAssigneeSearch && (
                   <div style={{
                     position: 'absolute',
                     top: '100%',
@@ -811,16 +931,6 @@ export default function NewTaskModal({
                       }}
                       onClick={(e) => e.stopPropagation()}
                     />
-                    {filteredMembers.length === 0 && (
-                      <div style={{
-                        padding: theme.spacing.sm,
-                        fontSize: theme.typography.fontSize.sm,
-                        color: theme.colors.mediumGray,
-                        textAlign: 'center'
-                      }}>
-                        {isLoadingMembers ? 'Loading team members...' : 'No team members found'}
-                      </div>
-                    )}
                     {filteredMembers.map(member => (
                       <div
                         key={member.id}
@@ -860,58 +970,8 @@ export default function NewTaskModal({
                           {member.name?.[0] || member.email?.[0] || '?'}
                         </div>
                         <span>{member.name || member.email}</span>
-                        {member.role && (
-                          <span style={{
-                            fontSize: theme.typography.fontSize.xs,
-                            color: theme.colors.mediumGray
-                          }}>
-                            {member.role}
-                          </span>
-                        )}
                       </div>
                     ))}
-                    {user && (
-                      <div
-                        onClick={() => {
-                          setSelectedAssignee(user.id)
-                          setShowAssigneeSearch(false)
-                          setAssigneeSearchQuery('')
-                        }}
-                        style={{
-                          padding: theme.spacing.sm,
-                          cursor: 'pointer',
-                          fontSize: theme.typography.fontSize.sm,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: theme.spacing.sm,
-                          borderTop: `1px solid ${theme.colors.lightGray}`,
-                          backgroundColor: theme.colors.softGray,
-                          transition: theme.transitions.fast
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = theme.colors.lightGray
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = theme.colors.softGray
-                        }}
-                      >
-                        <div style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          backgroundColor: theme.colors.blue,
-                          color: theme.colors.white,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: theme.typography.fontSize.xs,
-                          fontWeight: theme.typography.fontWeight.semibold
-                        }}>
-                          Me
-                        </div>
-                        <span>Assign to myself</span>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -932,30 +992,6 @@ export default function NewTaskModal({
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: theme.spacing.md,
-                  border: `1px solid ${theme.colors.lightGray}`,
-                  borderRadius: theme.borderRadius.base,
-                  fontSize: theme.typography.fontSize.sm,
-                  outline: 'none'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{
-                display: 'block',
-                marginBottom: theme.spacing.sm,
-                fontSize: theme.typography.fontSize.sm,
-                fontWeight: theme.typography.fontWeight.medium,
-                color: theme.colors.charcoal
-              }}>
-                Due Time
-              </label>
-              <input
-                type="time"
-                value={dueTime}
-                onChange={(e) => setDueTime(e.target.value)}
                 style={{
                   width: '100%',
                   padding: theme.spacing.md,
@@ -998,7 +1034,7 @@ export default function NewTaskModal({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!title.trim() || createTask.isLoading}
+              disabled={!title.trim() || updateTask.isLoading}
               style={{
                 padding: `${theme.spacing.md} ${theme.spacing.xl}`,
                 backgroundColor: title.trim() ? theme.colors.evergreen : theme.colors.lightGray,
@@ -1008,7 +1044,7 @@ export default function NewTaskModal({
                 fontSize: theme.typography.fontSize.sm,
                 fontWeight: theme.typography.fontWeight.medium,
                 cursor: title.trim() ? 'pointer' : 'not-allowed',
-                opacity: createTask.isLoading ? 0.7 : 1,
+                opacity: updateTask.isLoading ? 0.7 : 1,
                 transition: theme.transitions.fast
               }}
               onMouseEnter={(e) => {
@@ -1022,7 +1058,7 @@ export default function NewTaskModal({
                 }
               }}
             >
-              {createTask.isLoading ? 'Creating...' : 'Create Task'}
+              {updateTask.isLoading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>
