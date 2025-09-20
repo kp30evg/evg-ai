@@ -7,7 +7,6 @@ import {
   Star, MoreVertical, Sparkles 
 } from 'lucide-react'
 import EntityTable, { Column } from './entities/EntityTable'
-import AddFieldButton from './table/AddFieldButton'
 import { trpc } from '@/lib/trpc/client'
 
 interface Contact {
@@ -432,17 +431,10 @@ export default function ContactsTableView({
             onSort={handleSort}
             isLoading={isLoading}
             emptyMessage="No contacts found"
+            entityType="contact"
+            onAddColumn={handleAddField}
+            showAddColumn={true}
           />
-          
-          {/* Add Field Button - Positioned at the right of table header */}
-          <div style={{
-            position: 'absolute',
-            top: '12px',
-            right: '12px',
-            zIndex: 10
-          }}>
-            <AddFieldButton onAddField={handleAddField} />
-          </div>
         </div>
       </div>
     </div>

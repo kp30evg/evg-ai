@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { entities } from '@/lib/db/schema'
 import { eq, and, or, desc, asc, sql, isNull } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
+import { activityService } from '@/lib/services/activity-service'
 
 // Entity types for EverTask
 export const TASK_ENTITY_TYPES = {
@@ -192,6 +193,27 @@ export class EverTaskService {
 
     // Update project task count
     await this.updateProjectStats(workspaceId, data.projectId)
+    
+    // Log activity for linked entities
+    if (data.linkedEntities && data.linkedEntities.length > 0) {
+      for (const entityId of data.linkedEntities) {
+        await activityService.logActivity(
+          workspaceId,
+          entityId,
+          'task_created',
+          'evertask',
+          {
+            taskId: taskId,
+            title: data.title,
+            description: data.description,
+            priority: data.priority,
+            dueDate: data.dueDate,
+            assignee: data.assigneeId
+          },
+          { userId }
+        )
+      }
+    }
 
     return taskEntity
   }
@@ -257,6 +279,25 @@ export class EverTaskService {
     const projectId = task.relationships?.find(r => r.type === 'belongs_to')?.targetId
     if (projectId) {
       await this.updateProjectStats(workspaceId, projectId)
+    }
+    
+    // Log activity for linked entities
+    const linkedEntities = task.relationships?.filter(r => r.type === 'linked_to')?.map(r => r.targetId) || []
+    for (const entityId of linkedEntities) {
+      await activityService.logActivity(
+        workspaceId,
+        entityId,
+        status === TASK_STATUS.DONE ? 'task_completed' : 'task_updated',
+        'evertask',
+        {
+          taskId: taskId,
+          title: task.data.title,
+          status: status,
+          column: column,
+          completedAt: updatedData.completedAt
+        },
+        { userId: task.userId || undefined }
+      )
     }
 
     return { ...task, data: updatedData }

@@ -74,6 +74,8 @@ export default function ContactDetailPageV2() {
   const [showMeetingScheduler, setShowMeetingScheduler] = useState(false)
   const [activityFilters, setActivityFilters] = useState<string[]>([])
   const [noteContent, setNoteContent] = useState('')
+  const [callDuration, setCallDuration] = useState('')
+  const [callNotes, setCallNotes] = useState('')
   
   // Data fetching
   const { data: contact, isLoading, refetch: refetchContact } = trpc.unified.getEntity.useQuery(
@@ -987,6 +989,8 @@ export default function ContactDetailPageV2() {
                 <input
                   type="text"
                   placeholder="e.g., 15 minutes"
+                  value={callDuration}
+                  onChange={(e) => setCallDuration(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '10px',
@@ -1009,6 +1013,8 @@ export default function ContactDetailPageV2() {
                 </label>
                 <textarea
                   placeholder="What was discussed?"
+                  value={callNotes}
+                  onChange={(e) => setCallNotes(e.target.value)}
                   style={{
                     width: '100%',
                     minHeight: '100px',
@@ -1043,20 +1049,26 @@ export default function ContactDetailPageV2() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    // TODO: Implement call logging
+                  onClick={async () => {
+                    if (!callDuration.trim() || !callNotes.trim()) return
+                    
+                    await handleLogCall(callDuration, callNotes)
+                    setCallDuration('')
+                    setCallNotes('')
                     setShowCallLog(false)
                     refetchActivities()
                   }}
+                  disabled={!callDuration.trim() || !callNotes.trim()}
                   style={{
                     padding: '8px 16px',
-                    backgroundColor: colors.evergreen,
+                    backgroundColor: (!callDuration.trim() || !callNotes.trim()) ? colors.lightGray : colors.evergreen,
                     color: colors.white,
                     border: 'none',
                     borderRadius: '8px',
                     fontSize: '14px',
                     fontWeight: '500',
-                    cursor: 'pointer'
+                    cursor: (!callDuration.trim() || !callNotes.trim()) ? 'not-allowed' : 'pointer',
+                    opacity: (!callDuration.trim() || !callNotes.trim()) ? 0.6 : 1
                   }}
                 >
                   Log Call

@@ -24,6 +24,9 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
     company: '',
     title: '',
     status: 'Cold' as 'Hot' | 'Warm' | 'Cold',
+    leadStatus: 'New' as 'New' | 'Open' | 'Unqualified' | 'Attempted to Contact' | 'Connected' | 'Bad Timing',
+    lifecycleStage: 'Lead' as 'Lead' | 'MQL' | 'SQL' | 'Opportunity' | 'Customer' | 'Evangelist',
+    owner: '',
     source: 'Direct',
     tags: [] as string[],
     customFields: {} as Record<string, any>
@@ -184,6 +187,9 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
         company: formData.company,
         title: formData.title,
         status: formData.status,
+        leadStatus: formData.leadStatus,
+        lifecycleStage: formData.lifecycleStage,
+        owner: formData.owner,
         source: formData.source,
         tags: formData.tags,
         customFields: formData.customFields,
@@ -206,6 +212,9 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
           company: '',
           title: '',
           status: 'Cold',
+          leadStatus: 'New',
+          lifecycleStage: 'Lead',
+          owner: '',
           source: 'Direct',
           tags: [],
           customFields: {}
@@ -264,8 +273,8 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
               backgroundColor: theme.colors.surface,
               borderRadius: theme.borderRadius.lg,
               width: '90%',
-              maxWidth: '600px',
-              maxHeight: '90vh',
+              maxWidth: '720px',
+              maxHeight: '85vh',
               overflow: 'auto',
               boxShadow: theme.shadows['2xl'],
               zIndex: 1001,
@@ -333,30 +342,30 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
             </AnimatePresence>
             
             {/* Form */}
-            <form onSubmit={handleSubmit} style={{ padding: theme.spacing.xl }}>
-              {/* Basic Information */}
-              <div style={{ marginBottom: theme.spacing.xl }}>
+            <form onSubmit={handleSubmit} style={{ padding: `${theme.spacing.lg} ${theme.spacing.xl}` }}>
+              {/* Basic Information - Two Column Grid */}
+              <div style={{ marginBottom: theme.spacing.lg }}>
                 <h3 style={{
                   fontSize: theme.typography.fontSize.base,
                   fontWeight: theme.typography.fontWeight.medium,
                   color: theme.colors.text,
-                  marginBottom: theme.spacing.lg,
+                  marginBottom: theme.spacing.md,
                 }}>
-                  Basic Information
+                  Contact Information
                 </h3>
                 
-                <div style={{ display: 'grid', gap: theme.spacing.lg }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.md }}>
                   {/* Name Field */}
                   <div>
                     <label style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: theme.spacing.sm,
+                      gap: theme.spacing.xs,
                       fontSize: theme.typography.fontSize.sm,
                       color: theme.colors.text,
-                      marginBottom: theme.spacing.sm,
+                      marginBottom: theme.spacing.xs,
                     }}>
-                      <User size={16} />
+                      <User size={14} />
                       Name *
                     </label>
                     <input
@@ -368,7 +377,7 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                       disabled={isSubmitting}
                       style={{
                         width: '100%',
-                        padding: theme.spacing.md,
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                         border: `1px solid ${errors.name && touched.name ? theme.colors.error : theme.colors.lightGray}`,
                         borderRadius: theme.borderRadius.base,
                         fontSize: theme.typography.fontSize.sm,
@@ -397,12 +406,12 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                     <label style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: theme.spacing.sm,
+                      gap: theme.spacing.xs,
                       fontSize: theme.typography.fontSize.sm,
                       color: theme.colors.text,
-                      marginBottom: theme.spacing.sm,
+                      marginBottom: theme.spacing.xs,
                     }}>
-                      <Mail size={16} />
+                      <Mail size={14} />
                       Email *
                     </label>
                     <input
@@ -414,7 +423,7 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                       disabled={isSubmitting}
                       style={{
                         width: '100%',
-                        padding: theme.spacing.md,
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                         border: `1px solid ${errors.email && touched.email ? theme.colors.error : theme.colors.lightGray}`,
                         borderRadius: theme.borderRadius.base,
                         fontSize: theme.typography.fontSize.sm,
@@ -443,12 +452,12 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                     <label style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: theme.spacing.sm,
+                      gap: theme.spacing.xs,
                       fontSize: theme.typography.fontSize.sm,
                       color: theme.colors.text,
-                      marginBottom: theme.spacing.sm,
+                      marginBottom: theme.spacing.xs,
                     }}>
-                      <Phone size={16} />
+                      <Phone size={14} />
                       Phone
                     </label>
                     <input
@@ -460,7 +469,7 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                       disabled={isSubmitting}
                       style={{
                         width: '100%',
-                        padding: theme.spacing.md,
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                         border: `1px solid ${errors.phone && touched.phone ? theme.colors.error : theme.colors.lightGray}`,
                         borderRadius: theme.borderRadius.base,
                         fontSize: theme.typography.fontSize.sm,
@@ -483,32 +492,65 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                       </div>
                     )}
                   </div>
+                  
+                  {/* Job Title Field */}
+                  <div>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: theme.spacing.xs,
+                      fontSize: theme.typography.fontSize.sm,
+                      color: theme.colors.text,
+                      marginBottom: theme.spacing.xs,
+                    }}>
+                      <Briefcase size={14} />
+                      Job Title
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => handleChange('title', e.target.value)}
+                      onBlur={() => handleBlur('title')}
+                      placeholder="e.g. Sales Manager"
+                      disabled={isSubmitting}
+                      style={{
+                        width: '100%',
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
+                        border: `1px solid ${theme.colors.lightGray}`,
+                        borderRadius: theme.borderRadius.base,
+                        fontSize: theme.typography.fontSize.sm,
+                        backgroundColor: theme.colors.surface,
+                        color: theme.colors.text,
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
               
-              {/* Professional Information */}
-              <div style={{ marginBottom: theme.spacing.xl }}>
+              {/* Company and Ownership */}
+              <div style={{ marginBottom: theme.spacing.lg }}>
                 <h3 style={{
                   fontSize: theme.typography.fontSize.base,
                   fontWeight: theme.typography.fontWeight.medium,
                   color: theme.colors.text,
-                  marginBottom: theme.spacing.lg,
+                  marginBottom: theme.spacing.md,
                 }}>
-                  Professional Information
+                  Company & Assignment
                 </h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.lg }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.md }}>
                   {/* Company Field */}
                   <div>
                     <label style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: theme.spacing.sm,
+                      gap: theme.spacing.xs,
                       fontSize: theme.typography.fontSize.sm,
                       color: theme.colors.text,
-                      marginBottom: theme.spacing.sm,
+                      marginBottom: theme.spacing.xs,
                     }}>
-                      <Building2 size={16} />
+                      <Building2 size={14} />
                       Company
                     </label>
                     <input
@@ -520,7 +562,7 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                       disabled={isSubmitting}
                       style={{
                         width: '100%',
-                        padding: theme.spacing.md,
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                         border: `1px solid ${theme.colors.lightGray}`,
                         borderRadius: theme.borderRadius.base,
                         fontSize: theme.typography.fontSize.sm,
@@ -531,29 +573,29 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                     />
                   </div>
                   
-                  {/* Title Field */}
+                  {/* Contact Owner Field */}
                   <div>
                     <label style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: theme.spacing.sm,
+                      gap: theme.spacing.xs,
                       fontSize: theme.typography.fontSize.sm,
                       color: theme.colors.text,
-                      marginBottom: theme.spacing.sm,
+                      marginBottom: theme.spacing.xs,
                     }}>
-                      <Briefcase size={16} />
-                      Title
+                      <User size={14} />
+                      Contact Owner
                     </label>
                     <input
                       type="text"
-                      value={formData.title}
-                      onChange={(e) => handleChange('title', e.target.value)}
-                      onBlur={() => handleBlur('title')}
-                      placeholder="Job title"
+                      value={formData.owner}
+                      onChange={(e) => handleChange('owner', e.target.value)}
+                      onBlur={() => handleBlur('owner')}
+                      placeholder="Assign to team member"
                       disabled={isSubmitting}
                       style={{
                         width: '100%',
-                        padding: theme.spacing.md,
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                         border: `1px solid ${theme.colors.lightGray}`,
                         borderRadius: theme.borderRadius.base,
                         fontSize: theme.typography.fontSize.sm,
@@ -566,18 +608,97 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                 </div>
               </div>
               
-              {/* Status and Source */}
-              <div style={{ marginBottom: theme.spacing.xl }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.lg }}>
+              {/* Lead Status and Pipeline */}
+              <div style={{ marginBottom: theme.spacing.lg }}>
+                <h3 style={{
+                  fontSize: theme.typography.fontSize.base,
+                  fontWeight: theme.typography.fontWeight.medium,
+                  color: theme.colors.text,
+                  marginBottom: theme.spacing.md,
+                }}>
+                  Lead & Pipeline Status
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing.md }}>
+                  {/* Lead Status */}
+                  <div>
+                    <label style={{
+                      fontSize: theme.typography.fontSize.sm,
+                      color: theme.colors.text,
+                      marginBottom: theme.spacing.xs,
+                      display: 'block',
+                    }}>
+                      Lead Status
+                    </label>
+                    <select
+                      value={formData.leadStatus}
+                      onChange={(e) => handleChange('leadStatus', e.target.value)}
+                      disabled={isSubmitting}
+                      style={{
+                        width: '100%',
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
+                        border: `1px solid ${theme.colors.lightGray}`,
+                        borderRadius: theme.borderRadius.base,
+                        fontSize: theme.typography.fontSize.sm,
+                        backgroundColor: theme.colors.surface,
+                        color: theme.colors.text,
+                        outline: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <option value="New">New</option>
+                      <option value="Open">Open</option>
+                      <option value="Unqualified">Unqualified</option>
+                      <option value="Attempted to Contact">Attempted to Contact</option>
+                      <option value="Connected">Connected</option>
+                      <option value="Bad Timing">Bad Timing</option>
+                    </select>
+                  </div>
+                  
+                  {/* Lifecycle Stage */}
+                  <div>
+                    <label style={{
+                      fontSize: theme.typography.fontSize.sm,
+                      color: theme.colors.text,
+                      marginBottom: theme.spacing.xs,
+                      display: 'block',
+                    }}>
+                      Lifecycle Stage
+                    </label>
+                    <select
+                      value={formData.lifecycleStage}
+                      onChange={(e) => handleChange('lifecycleStage', e.target.value)}
+                      disabled={isSubmitting}
+                      style={{
+                        width: '100%',
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
+                        border: `1px solid ${theme.colors.lightGray}`,
+                        borderRadius: theme.borderRadius.base,
+                        fontSize: theme.typography.fontSize.sm,
+                        backgroundColor: theme.colors.surface,
+                        color: theme.colors.text,
+                        outline: 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <option value="Lead">Lead</option>
+                      <option value="MQL">Marketing Qualified Lead</option>
+                      <option value="SQL">Sales Qualified Lead</option>
+                      <option value="Opportunity">Opportunity</option>
+                      <option value="Customer">Customer</option>
+                      <option value="Evangelist">Evangelist</option>
+                    </select>
+                  </div>
+                  
                   {/* Status */}
                   <div>
                     <label style={{
                       fontSize: theme.typography.fontSize.sm,
                       color: theme.colors.text,
-                      marginBottom: theme.spacing.sm,
+                      marginBottom: theme.spacing.xs,
                       display: 'block',
                     }}>
-                      Status
+                      Temperature
                     </label>
                     <select
                       value={formData.status}
@@ -585,7 +706,7 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                       disabled={isSubmitting}
                       style={{
                         width: '100%',
-                        padding: theme.spacing.md,
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                         border: `1px solid ${theme.colors.lightGray}`,
                         borderRadius: theme.borderRadius.base,
                         fontSize: theme.typography.fontSize.sm,
@@ -606,7 +727,7 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                     <label style={{
                       fontSize: theme.typography.fontSize.sm,
                       color: theme.colors.text,
-                      marginBottom: theme.spacing.sm,
+                      marginBottom: theme.spacing.xs,
                       display: 'block',
                     }}>
                       Source
@@ -617,7 +738,7 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                       disabled={isSubmitting}
                       style={{
                         width: '100%',
-                        padding: theme.spacing.md,
+                        padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                         border: `1px solid ${theme.colors.lightGray}`,
                         borderRadius: theme.borderRadius.base,
                         fontSize: theme.typography.fontSize.sm,
@@ -639,16 +760,16 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
               </div>
               
               {/* Tags */}
-              <div style={{ marginBottom: theme.spacing.xl }}>
+              <div style={{ marginBottom: theme.spacing.lg }}>
                 <label style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: theme.spacing.sm,
+                  gap: theme.spacing.xs,
                   fontSize: theme.typography.fontSize.sm,
                   color: theme.colors.text,
-                  marginBottom: theme.spacing.sm,
+                  marginBottom: theme.spacing.xs,
                 }}>
-                  <Tag size={16} />
+                  <Tag size={14} />
                   Tags
                 </label>
                 <div style={{
@@ -665,7 +786,7 @@ export default function ContactCreateModal({ isOpen, onClose, onSuccess }: Conta
                     disabled={isSubmitting}
                     style={{
                       flex: 1,
-                      padding: theme.spacing.md,
+                      padding: `${theme.spacing.sm} ${theme.spacing.md}`,
                       border: `1px solid ${theme.colors.lightGray}`,
                       borderRadius: theme.borderRadius.base,
                       fontSize: theme.typography.fontSize.sm,

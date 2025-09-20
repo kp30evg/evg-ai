@@ -4,6 +4,7 @@
  */
 
 import { entityService } from '@/lib/entities/entity-service';
+import { activityService } from '@/lib/services/activity-service';
 
 // Type definitions for our core entities
 export interface ContactData {
@@ -319,6 +320,42 @@ async function createDealWithData(
       }
     );
     await entityService.link(workspaceId, data.primaryContactId, deal.id, 'deals');
+    
+    // Log activity for the contact
+    await activityService.logActivity(
+      workspaceId,
+      data.primaryContactId,
+      'deal_created',
+      'evercore',
+      {
+        dealId: deal.id,
+        dealName: data.name,
+        value: data.value,
+        stage: data.stage,
+        probability: data.probability,
+        closeDate: data.closeDate
+      },
+      { userId }
+    );
+  }
+  
+  // Log activity for the company if linked
+  if (data.companyId) {
+    await activityService.logActivity(
+      workspaceId,
+      data.companyId,
+      'deal_created',
+      'evercore',
+      {
+        dealId: deal.id,
+        dealName: data.name,
+        value: data.value,
+        stage: data.stage,
+        probability: data.probability,
+        closeDate: data.closeDate
+      },
+      { userId }
+    );
   }
 
   return deal;
@@ -415,8 +452,13 @@ export async function getDeals(
 export async function updateDealStage(
   workspaceId: string,
   dealId: string,
-  newStage: string
+  newStage: string,
+  userId?: string
 ): Promise<any> {
+  // Get the current deal to compare stage
+  const currentDeal = await entityService.findById(workspaceId, dealId);
+  const oldStage = currentDeal?.data?.stage;
+  
   const stageProbabilities: Record<string, number> = {
     'prospecting': 10,
     'qualification': 20,
@@ -440,7 +482,47 @@ export async function updateDealStage(
     updateData.lostDate = new Date();
   }
 
-  return await entityService.update(workspaceId, dealId, updateData);
+  const updatedDeal = await entityService.update(workspaceId, dealId, updateData);
+  
+  // Log activity for primary contact if exists
+  if (currentDeal?.relationships?.primaryContact) {
+    await activityService.logActivity(
+      workspaceId,
+      currentDeal.relationships.primaryContact,
+      'deal_stage_changed',
+      'evercore',
+      {
+        dealId: dealId,
+        dealName: currentDeal.data.name,
+        oldStage: oldStage,
+        newStage: newStage,
+        value: currentDeal.data.value,
+        probability: updateData.probability
+      },
+      { userId }
+    );
+  }
+  
+  // Log activity for company if exists
+  if (currentDeal?.relationships?.company) {
+    await activityService.logActivity(
+      workspaceId,
+      currentDeal.relationships.company,
+      'deal_stage_changed',
+      'evercore',
+      {
+        dealId: dealId,
+        dealName: currentDeal.data.name,
+        oldStage: oldStage,
+        newStage: newStage,
+        value: currentDeal.data.value,
+        probability: updateData.probability
+      },
+      { userId }
+    );
+  }
+  
+  return updatedDeal;
 }
 
 /**

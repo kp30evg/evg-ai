@@ -43,7 +43,7 @@ export default function NewTaskModal({
   const [assigneeSearchQuery, setAssigneeSearchQuery] = useState('')
   
   // Fetch organization members
-  const { data: members = [] } = trpc.organization.getMembers.useQuery()
+  const { data: members = [], isLoading: isLoadingMembers, error: membersError } = trpc.organization.getMembers.useQuery()
   
   const createTask = trpc.evertask.createTask.useMutation()
   
@@ -798,6 +798,16 @@ export default function NewTaskModal({
                       }}
                       onClick={(e) => e.stopPropagation()}
                     />
+                    {filteredMembers.length === 0 && (
+                      <div style={{
+                        padding: theme.spacing.sm,
+                        fontSize: theme.typography.fontSize.sm,
+                        color: theme.colors.mediumGray,
+                        textAlign: 'center'
+                      }}>
+                        {isLoadingMembers ? 'Loading team members...' : 'No team members found'}
+                      </div>
+                    )}
                     {filteredMembers.map(member => (
                       <div
                         key={member.id}

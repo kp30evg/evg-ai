@@ -10,13 +10,13 @@ import { useWorkspaceConfig } from '@/lib/contexts/workspace-config-context'
 import { trpc } from '@/lib/trpc/client'
 import CRMHeader from '@/components/evercore/layouts/CRMHeader'
 import CRMTabs, { Tab } from '@/components/evercore/layouts/CRMTabs'
-import MetricGrid from '@/components/evercore/dashboard/MetricGrid'
-import MetricCard from '@/components/evercore/dashboard/MetricCard'
-import PipelineKanban from '@/components/evercore/dashboard/PipelineKanban'
-import DealPipelineDragDrop from '@/components/evercore/features/DealPipelineDragDrop'
-import EntityTable, { Column } from '@/components/evercore/entities/EntityTable'
+import PremiumMetricGrid from '@/components/evercore/dashboard/PremiumMetricGrid'
+import PremiumMetricCard from '@/components/evercore/dashboard/PremiumMetricCard'
+import PremiumDealPipeline from '@/components/evercore/features/PremiumDealPipeline'
+import CleanTaskTable, { Column } from '@/components/evercore/entities/CleanTaskTable'
 import EditableCell from '@/components/evercore/cells/EditableCell'
 import ContactCreateModal from '@/components/evercore/features/ContactCreateModal'
+import ContactCreateSidebar from '@/components/evercore/features/ContactCreateSidebar'
 import { Badge } from '@/components/ui/badge'
 import * as Icons from 'lucide-react'
 import { 
@@ -26,8 +26,6 @@ import {
   TrendingUp, 
   DollarSign,
   BarChart3,
-  Package,
-  ShoppingCart,
   Mail,
   Database,
   Sparkles,
@@ -42,9 +40,7 @@ export default function CRMDashboard() {
     contacts, 
     leads,
     deals, 
-    companies, 
-    products,
-    orders,
+    companies,
     getMetrics,
     deleteContacts,
     updateContact,
@@ -58,8 +54,6 @@ export default function CRMDashboard() {
   const [selectedDeals, setSelectedDeals] = useState<string[]>([])
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([])
   const [selectedLeads, setSelectedLeads] = useState<string[]>([])
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([])
   const [showCreateContact, setShowCreateContact] = useState(false)
   const [showCreateDeal, setShowCreateDeal] = useState(false)
   const [showCreateCompany, setShowCreateCompany] = useState(false)
@@ -125,6 +119,7 @@ export default function CRMDashboard() {
           label: field.label,
           accessor: `data.customFields.${field.id}.value`,
           sortable: true,
+          isCustomField: true,
           render: (value: any, row: any) => (
             <EditableCell
               entityId={row.id}
@@ -147,6 +142,7 @@ export default function CRMDashboard() {
           label: field.label,
           accessor: `data.customFields.${field.id}.value`,
           sortable: true,
+          isCustomField: true,
           render: (value: any, row: any) => (
             <EditableCell
               entityId={row.id}
@@ -169,6 +165,7 @@ export default function CRMDashboard() {
           label: field.label,
           accessor: `data.customFields.${field.id}.value`,
           sortable: true,
+          isCustomField: true,
           render: (value: any, row: any) => (
             <EditableCell
               entityId={row.id}
@@ -191,6 +188,7 @@ export default function CRMDashboard() {
           label: field.label,
           accessor: `data.customFields.${field.id}.value`,
           sortable: true,
+          isCustomField: true,
           render: (value: any, row: any) => (
             <EditableCell
               entityId={row.id}
@@ -232,8 +230,6 @@ export default function CRMDashboard() {
       case 'contact': return contacts.length
       case 'company': return companies.length
       case 'deal': return deals.length
-      case 'product': return products.length
-      case 'order': return orders.length
       default: return 0
     }
   }
@@ -247,9 +243,7 @@ export default function CRMDashboard() {
         { id: 'leads', label: 'Leads', icon: Users, badge: leads.length },
         { id: 'contacts', label: 'Contacts', icon: Users, badge: contacts.length },
         { id: 'companies', label: 'Companies', icon: Building2, badge: companies.length },
-        { id: 'deals', label: 'Deals', icon: Target, badge: deals.length },
-        { id: 'products', label: 'Products', icon: Package, badge: products.length },
-        { id: 'orders', label: 'Orders', icon: ShoppingCart, badge: orders.length }
+        { id: 'deals', label: 'Deals', icon: Target, badge: deals.length }
       ]
     }
 
@@ -263,7 +257,7 @@ export default function CRMDashboard() {
         badge: item.entityType ? getEntityCount(item.entityType) : undefined,
         emoji: item.icon?.length <= 2 ? item.icon : undefined
       }))
-  }, [navigation, leads.length, contacts.length, companies.length, deals.length, products.length, orders.length])
+  }, [navigation, leads.length, contacts.length, companies.length, deals.length])
 
   // Get metrics from context
   const metricsData = getMetrics()
@@ -384,58 +378,11 @@ export default function CRMDashboard() {
       label: 'Name',
       accessor: 'name',
       sortable: true,
-      width: '280px',
+      width: '200px',
       render: (value: string, row: any) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.xs }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
-            <span style={{ fontWeight: theme.typography.fontWeight.medium }}>{value}</span>
-            {/* Source badges */}
-            {row.isFromEmail && (
-              <Badge style={{ 
-                backgroundColor: theme.colors.info + '20', 
-                color: theme.colors.info,
-                fontSize: '10px',
-                padding: '2px 6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px'
-              }}>
-                <Mail size={10} />
-                Email
-              </Badge>
-            )}
-            {row.isFromDatabase && (
-              <Badge style={{ 
-                backgroundColor: theme.colors.success + '20', 
-                color: theme.colors.success,
-                fontSize: '10px',
-                padding: '2px 6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px'
-              }}>
-                <Database size={10} />
-                Synced
-              </Badge>
-            )}
-            {!row.isFromDatabase && !row.isFromEmail && (
-              <Badge style={{ 
-                backgroundColor: theme.colors.softGreen, 
-                color: theme.colors.evergreen,
-                fontSize: '10px',
-                padding: '2px 6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px'
-              }}>
-                <Sparkles size={10} />
-                Local
-              </Badge>
-            )}
-          </div>
-          <span style={{ fontSize: theme.typography.fontSize.xs, color: theme.colors.mediumGray }}>
-            {row.title}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+          <span className="text-sm text-gray-900">{value}</span>
         </div>
       )
     },
@@ -444,67 +391,35 @@ export default function CRMDashboard() {
       label: 'Company',
       accessor: 'company',
       sortable: true,
-      width: '200px',
-      render: (value: string, row: any) => {
-        // If we have companyData, make it clickable
-        if (row.companyData) {
-          return (
-            <div
-              onClick={(e) => {
-                e.stopPropagation()
-                router.push(`/dashboard/crm/companies/${row.companyData.id}`)
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: theme.spacing.xs,
-                cursor: 'pointer',
-                color: theme.colors.evergreen,
-                fontWeight: theme.typography.fontWeight.medium,
-                transition: theme.transitions.base,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.textDecoration = 'underline'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.textDecoration = 'none'
-              }}
-            >
-              <Building2 size={14} />
-              {row.companyData.name}
-            </div>
-          )
-        }
-        // Fallback to text display
-        return value || <span style={{ color: theme.colors.mediumGray }}>—</span>
-      }
+      width: '180px',
+      render: (value: string) => (
+        <span className="text-sm text-gray-600">{value || '—'}</span>
+      )
     },
     {
       id: 'email',
       label: 'Email',
       accessor: 'email',
-      width: '250px',
+      width: '280px',
       render: (value: string) => (
-        <a href={`mailto:${value}`} style={{ color: theme.colors.evergreen }}>
-          {value}
-        </a>
+        <span className="text-sm text-gray-600">{value}</span>
       )
     },
     {
       id: 'status',
       label: 'Status',
       accessor: 'status',
-      width: '140px',
+      width: '100px',
       render: (value: string) => {
         const colors = {
-          Hot: theme.colors.error,
-          Warm: theme.colors.warning,
-          Cold: theme.colors.info
+          Hot: 'bg-red-100 text-red-700',
+          Warm: 'bg-yellow-100 text-yellow-700',
+          Cold: 'bg-blue-100 text-blue-700'
         }
         return (
-          <Badge style={{ backgroundColor: colors[value as keyof typeof colors] + '20', color: colors[value as keyof typeof colors] }}>
+          <span className={`px-2 py-1 text-xs font-medium rounded-md ${colors[value as keyof typeof colors] || 'bg-gray-100 text-gray-700'}`}>
             {value}
-          </Badge>
+          </span>
         )
       }
     },
@@ -513,18 +428,22 @@ export default function CRMDashboard() {
       label: 'Deal Value',
       accessor: 'dealValue',
       sortable: true,
-      width: '140px',
-      render: (value: number) => `$${(value / 1000).toFixed(0)}K`
+      width: '100px',
+      render: (value: number) => (
+        <span className="text-sm text-gray-600">${(value / 1000).toFixed(0)}K</span>
+      )
     },
     {
       id: 'lastContact',
       label: 'Last Contact',
       accessor: 'lastContact',
       sortable: true,
-      width: '160px',
+      width: '120px',
       render: (value: Date) => {
         const days = Math.floor((Date.now() - new Date(value).getTime()) / (1000 * 60 * 60 * 24))
-        return `${days} days ago`
+        return (
+          <span className="text-sm text-gray-500">{days}d ago</span>
+        )
       }
     }
   ]
@@ -532,78 +451,79 @@ export default function CRMDashboard() {
   const leadColumns: Column[] = [
     {
       id: 'name',
-      label: 'Name',
+      label: 'Task Name',
       accessor: 'name',
       sortable: true,
       render: (value: string, row: any) => (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontWeight: theme.typography.fontWeight.medium }}>{value}</span>
-          <span style={{ fontSize: theme.typography.fontSize.xs, color: theme.colors.textSecondary }}>
-            {row.email}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
+          <span className="text-sm text-gray-900">{value}</span>
         </div>
       )
-    },
-    {
-      id: 'company',
-      label: 'Company',
-      accessor: 'company',
-      sortable: true
-    },
-    {
-      id: 'source',
-      label: 'Source',
-      accessor: 'source'
     },
     {
       id: 'status',
       label: 'Status',
       accessor: 'status',
+      width: 'w-32',
       render: (value: string) => {
         const colors = {
-          New: theme.colors.info,
-          Contacted: theme.colors.warning,
-          Qualified: theme.colors.success,
-          Unqualified: theme.colors.mediumGray
+          New: 'bg-gray-100 text-gray-700',
+          Contacted: 'bg-gray-100 text-gray-700',
+          Qualified: 'bg-green-100 text-green-700',
+          Unqualified: 'bg-gray-100 text-gray-700'
         }
         return (
-          <Badge style={{ backgroundColor: colors[value as keyof typeof colors] + '20', color: colors[value as keyof typeof colors] }}>
-            {value}
-          </Badge>
+          <span className={`px-3 py-1 text-xs font-medium rounded-md ${colors[value as keyof typeof colors] || 'bg-gray-100 text-gray-700'}`}>
+            {value || 'Not Started'}
+          </span>
         )
       }
     },
     {
-      id: 'score',
-      label: 'Score',
-      accessor: 'score',
-      sortable: true,
-      render: (value: number) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-          <div style={{
-            width: '60px',
-            height: '6px',
-            backgroundColor: theme.colors.lightGray,
-            borderRadius: theme.borderRadius.full,
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${value}%`,
-              height: '100%',
-              backgroundColor: value > 70 ? theme.colors.success : value > 40 ? theme.colors.warning : theme.colors.error,
-              transition: theme.transitions.base
-            }} />
-          </div>
-          <span>{value}</span>
-        </div>
+      id: 'assignee',
+      label: 'Assignee',
+      accessor: (row: any) => row.owner || '',
+      width: 'w-32',
+      render: (value: string) => (
+        value ? (
+          <span className="text-sm text-gray-700">{value}</span>
+        ) : (
+          <button className="text-sm text-gray-400 hover:text-gray-600">+ Assign</button>
+        )
       )
     },
     {
-      id: 'createdAt',
-      label: 'Created',
-      accessor: 'createdAt',
+      id: 'dueDate',
+      label: 'Due Date',
+      accessor: (row: any) => row.dueDate || '',
       sortable: true,
-      render: (value: Date) => new Date(value).toLocaleDateString()
+      width: 'w-32',
+      render: (value: any) => (
+        value ? (
+          <span className="text-sm text-gray-700">{new Date(value).toLocaleDateString()}</span>
+        ) : (
+          <button className="text-sm text-gray-400 hover:text-gray-600">+ Set date</button>
+        )
+      )
+    },
+    {
+      id: 'priority',
+      label: 'Priority',
+      accessor: (row: any) => row.priority || 'Medium',
+      width: 'w-28',
+      render: (value: string) => {
+        const colors = {
+          High: 'bg-red-100 text-red-700',
+          Medium: 'bg-yellow-100 text-yellow-700',
+          Low: 'bg-gray-100 text-gray-700'
+        }
+        return (
+          <span className={`px-3 py-1 text-xs font-medium rounded-md ${colors[value as keyof typeof colors] || colors.Medium}`}>
+            {value}
+          </span>
+        )
+      }
     }
   ]
 
@@ -630,17 +550,6 @@ export default function CRMDashboard() {
     c.domain.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const filteredOrders = orders.filter(o =>
-    o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.customerEmail.toLowerCase().includes(searchQuery.toLowerCase())
-  )
 
   const handleContactDelete = async (contact: any) => {
     if (confirm(`Are you sure you want to delete ${contact.name}?`)) {
@@ -668,6 +577,7 @@ export default function CRMDashboard() {
         label: field.label,
         accessor: `data.customFields.${fieldId}.value`,
         sortable: field.sortable !== false,
+        isCustomField: true,
         render: (value: any, row: any) => (
           <EditableCell
             entityId={row.id}
@@ -700,6 +610,7 @@ export default function CRMDashboard() {
         label: field.label,
         accessor: `data.customFields.${fieldId}.value`,
         sortable: field.sortable !== false,
+        isCustomField: true,
         render: (value: any, row: any) => (
           <EditableCell
             entityId={row.id}
@@ -732,6 +643,7 @@ export default function CRMDashboard() {
         label: field.label,
         accessor: `data.customFields.${fieldId}.value`,
         sortable: field.sortable !== false,
+        isCustomField: true,
         render: (value: any, row: any) => (
           <EditableCell
             entityId={row.id}
@@ -764,6 +676,7 @@ export default function CRMDashboard() {
         label: field.label,
         accessor: `data.customFields.${fieldId}.value`,
         sortable: field.sortable !== false,
+        isCustomField: true,
         render: (value: any, row: any) => (
           <EditableCell
             entityId={row.id}
@@ -781,6 +694,26 @@ export default function CRMDashboard() {
       console.error('Failed to create custom field:', error)
     }
   }
+  
+  const handleDeleteContactColumn = (columnId: string) => {
+    setCustomContactColumns(prev => prev.filter(col => col.id !== columnId))
+    trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'contact' })
+  }
+  
+  const handleDeleteDealColumn = (columnId: string) => {
+    setCustomDealColumns(prev => prev.filter(col => col.id !== columnId))
+    trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'deal' })
+  }
+  
+  const handleDeleteCompanyColumn = (columnId: string) => {
+    setCustomCompanyColumns(prev => prev.filter(col => col.id !== columnId))
+    trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'company' })
+  }
+  
+  const handleDeleteLeadColumn = (columnId: string) => {
+    setCustomLeadColumns(prev => prev.filter(col => col.id !== columnId))
+    trpc.workspaceConfig.getCustomFields.invalidate({ entityType: 'lead' })
+  }
 
   // Define columns for all entity types
   const dealColumns: Column[] = [
@@ -790,11 +723,12 @@ export default function CRMDashboard() {
       accessor: 'name',
       sortable: true,
       render: (value: string, row: any) => (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontWeight: theme.typography.fontWeight.medium }}>{value}</span>
-          <span style={{ fontSize: theme.typography.fontSize.xs, color: theme.colors.mediumGray }}>
-            {row.company}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+          <div>
+            <div className="text-sm text-gray-900">{value}</div>
+            <div className="text-xs text-gray-500">{row.company}</div>
+          </div>
         </div>
       )
     },
@@ -802,19 +736,20 @@ export default function CRMDashboard() {
       id: 'stage',
       label: 'Stage',
       accessor: 'stage',
+      width: 'w-36',
       render: (value: string) => {
-        const stageColors: Record<string, string> = {
-          'Prospecting': theme.colors.stages.prospecting,
-          'Qualification': theme.colors.stages.qualification,
-          'Proposal': theme.colors.stages.proposal,
-          'Negotiation': theme.colors.stages.negotiation,
-          'Closed Won': theme.colors.stages.closedWon,
-          'Closed Lost': theme.colors.stages.closedLost
+        const colors = {
+          'Prospecting': 'bg-blue-100 text-blue-700',
+          'Qualification': 'bg-purple-100 text-purple-700',
+          'Proposal': 'bg-amber-100 text-amber-700',
+          'Negotiation': 'bg-orange-100 text-orange-700',
+          'Closed Won': 'bg-green-100 text-green-700',
+          'Closed Lost': 'bg-gray-100 text-gray-700'
         }
         return (
-          <Badge style={{ backgroundColor: stageColors[value] + '20', color: stageColors[value] }}>
+          <span className={`px-3 py-1 text-xs font-medium rounded-md ${colors[value] || 'bg-gray-100 text-gray-700'}`}>
             {value}
-          </Badge>
+          </span>
         )
       }
     },
@@ -823,31 +758,19 @@ export default function CRMDashboard() {
       label: 'Value',
       accessor: 'value',
       sortable: true,
-      render: (value: number) => `$${(value / 1000).toFixed(0)}K`
+      width: 'w-32',
+      render: (value: number) => (
+        <span className="text-sm text-gray-700">${(value / 1000).toFixed(0)}K</span>
+      )
     },
     {
       id: 'probability',
       label: 'Probability',
       accessor: 'probability',
       sortable: true,
+      width: 'w-28',
       render: (value: number) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-          <div style={{
-            width: '60px',
-            height: '6px',
-            backgroundColor: theme.colors.lightGray,
-            borderRadius: theme.borderRadius.full,
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${value}%`,
-              height: '100%',
-              backgroundColor: value > 60 ? theme.colors.success : value > 30 ? theme.colors.warning : theme.colors.error,
-              transition: theme.transitions.base
-            }} />
-          </div>
-          <span>{value}%</span>
-        </div>
+        <span className="text-sm text-gray-700">{value}%</span>
       )
     },
     {
@@ -855,12 +778,19 @@ export default function CRMDashboard() {
       label: 'Close Date',
       accessor: 'closeDate',
       sortable: true,
-      render: (value: Date) => new Date(value).toLocaleDateString()
+      width: 'w-32',
+      render: (value: Date) => (
+        <span className="text-sm text-gray-700">{new Date(value).toLocaleDateString()}</span>
+      )
     },
     {
       id: 'owner',
       label: 'Owner',
-      accessor: 'owner'
+      accessor: 'owner',
+      width: 'w-32',
+      render: (value: string) => (
+        <span className="text-sm text-gray-700">{value || '—'}</span>
+      )
     }
   ]
 
@@ -871,55 +801,54 @@ export default function CRMDashboard() {
       accessor: 'name',
       sortable: true,
       render: (value: string, row: any) => (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontWeight: theme.typography.fontWeight.medium }}>{value}</span>
-          <span style={{ fontSize: theme.typography.fontSize.xs, color: theme.colors.mediumGray }}>
-            {row.domain}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
+          <div>
+            <div className="text-sm text-gray-900">{value}</div>
+            <div className="text-xs text-gray-500">{row.domain}</div>
+          </div>
         </div>
       )
     },
     {
       id: 'industry',
       label: 'Industry',
-      accessor: 'industry'
+      accessor: 'industry',
+      width: 'w-36',
+      render: (value: string) => (
+        <span className="text-sm text-gray-700">{value || '—'}</span>
+      )
     },
     {
       id: 'size',
       label: 'Size',
-      accessor: 'size'
+      accessor: 'size',
+      width: 'w-32',
+      render: (value: string) => (
+        <span className="text-sm text-gray-700">{value || '—'}</span>
+      )
     },
     {
       id: 'location',
       label: 'Location',
-      accessor: 'location'
+      accessor: 'location',
+      width: 'w-40',
+      render: (value: string) => (
+        <span className="text-sm text-gray-700">{value || '—'}</span>
+      )
     },
     {
       id: 'contacts',
       label: 'Contacts',
       accessor: 'id',
       sortable: false,
+      width: 'w-24',
       render: (_: any, row: any) => {
-        // Count contacts linked to this company
         const companyContacts = contacts.filter(c => 
           c.companyId === row.id || c.company === row.name
         )
         return (
-          <div
-            onClick={(e) => {
-              e.stopPropagation()
-              // Could filter contacts view by company
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing.xs,
-              cursor: companyContacts.length > 0 ? 'pointer' : 'default',
-            }}
-          >
-            <Users size={14} color={theme.colors.mediumGray} />
-            <span>{companyContacts.length}</span>
-          </div>
+          <span className="text-sm text-gray-700">{companyContacts.length}</span>
         )
       }
     },
@@ -928,8 +857,8 @@ export default function CRMDashboard() {
       label: 'Active Deals',
       accessor: 'id',
       sortable: false,
+      width: 'w-28',
       render: (_: any, row: any) => {
-        // Count deals linked to this company
         const companyDeals = deals.filter(d => 
           d.companyId === row.id || d.company === row.name
         )
@@ -937,21 +866,7 @@ export default function CRMDashboard() {
           d.stage !== 'Closed Won' && d.stage !== 'Closed Lost'
         )
         return (
-          <div
-            onClick={(e) => {
-              e.stopPropagation()
-              // Could filter deals view by company
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing.xs,
-              cursor: activeDeals.length > 0 ? 'pointer' : 'default',
-            }}
-          >
-            <Target size={14} color={theme.colors.mediumGray} />
-            <span>{activeDeals.length}</span>
-          </div>
+          <span className="text-sm text-gray-700">{activeDeals.length}</span>
         )
       }
     },
@@ -960,8 +875,8 @@ export default function CRMDashboard() {
       label: 'Pipeline Value',
       accessor: 'id',
       sortable: false,
+      width: 'w-32',
       render: (_: any, row: any) => {
-        // Calculate total pipeline value for this company
         const companyDeals = deals.filter(d => 
           d.companyId === row.id || d.company === row.name
         )
@@ -969,12 +884,10 @@ export default function CRMDashboard() {
           .filter(d => d.stage !== 'Closed Lost')
           .reduce((sum, d) => sum + d.value, 0)
         
-        return totalValue > 0 ? (
-          <span style={{ fontWeight: theme.typography.fontWeight.medium }}>
-            ${(totalValue / 1000).toFixed(0)}K
+        return (
+          <span className="text-sm text-gray-700">
+            {totalValue > 0 ? `$${(totalValue / 1000).toFixed(0)}K` : '—'}
           </span>
-        ) : (
-          <span style={{ color: theme.colors.mediumGray }}>—</span>
         )
       }
     },
@@ -983,169 +896,19 @@ export default function CRMDashboard() {
       label: 'Last Activity',
       accessor: 'lastActivity',
       sortable: true,
+      width: 'w-32',
       render: (value: Date) => {
         const days = Math.floor((Date.now() - new Date(value).getTime()) / (1000 * 60 * 60 * 24))
-        return `${days} days ago`
-      }
-    }
-  ]
-
-  const productColumns: Column[] = [
-    {
-      id: 'name',
-      label: 'Product Name',
-      accessor: 'name',
-      sortable: true,
-      render: (value: string, row: any) => (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontWeight: theme.typography.fontWeight.medium }}>{value}</span>
-          <span style={{ fontSize: theme.typography.fontSize.xs, color: theme.colors.textSecondary }}>
-            SKU: {row.sku}
-          </span>
-        </div>
-      )
-    },
-    {
-      id: 'category',
-      label: 'Category',
-      accessor: 'category'
-    },
-    {
-      id: 'price',
-      label: 'Price',
-      accessor: 'price',
-      sortable: true,
-      render: (value: number) => `$${value.toFixed(2)}`
-    },
-    {
-      id: 'cost',
-      label: 'Cost',
-      accessor: 'cost',
-      sortable: true,
-      render: (value: number) => `$${value.toFixed(2)}`
-    },
-    {
-      id: 'margin',
-      label: 'Margin',
-      accessor: (row: any) => ((row.price - row.cost) / row.price * 100),
-      sortable: true,
-      render: (value: number) => `${value.toFixed(0)}%`
-    },
-    {
-      id: 'inventory',
-      label: 'Inventory',
-      accessor: 'inventory',
-      sortable: true,
-      render: (value: number, row: any) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-          <span>{value}</span>
-          {value === 0 && (
-            <Badge style={{ backgroundColor: theme.colors.error + '20', color: theme.colors.error }}>
-              Out of Stock
-            </Badge>
-          )}
-        </div>
-      )
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      accessor: 'status',
-      render: (value: string) => {
-        const colors = {
-          Active: theme.colors.success,
-          Inactive: theme.colors.warning,
-          'Out of Stock': theme.colors.error
-        }
         return (
-          <Badge style={{ backgroundColor: colors[value as keyof typeof colors] + '20', color: colors[value as keyof typeof colors] }}>
-            {value}
-          </Badge>
+          <span className="text-sm text-gray-500">{days}d ago</span>
         )
       }
     }
   ]
 
-  const orderColumns: Column[] = [
-    {
-      id: 'orderNumber',
-      label: 'Order #',
-      accessor: 'orderNumber',
-      sortable: true,
-      render: (value: string) => (
-        <span style={{ fontWeight: theme.typography.fontWeight.medium, color: theme.colors.evergreen }}>
-          {value}
-        </span>
-      )
-    },
-    {
-      id: 'customerName',
-      label: 'Customer',
-      accessor: 'customerName',
-      sortable: true,
-      render: (value: string, row: any) => (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontWeight: theme.typography.fontWeight.medium }}>{value}</span>
-          <span style={{ fontSize: theme.typography.fontSize.xs, color: theme.colors.textSecondary }}>
-            {row.customerEmail}
-          </span>
-        </div>
-      )
-    },
-    {
-      id: 'lineItems',
-      label: 'Products',
-      accessor: (row: any) => row.lineItems.length,
-      sortable: true
-    },
-    {
-      id: 'total',
-      label: 'Total',
-      accessor: 'total',
-      sortable: true,
-      render: (value: number) => `$${value.toFixed(2)}`
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      accessor: 'status',
-      render: (value: string) => {
-        const colors = {
-          Pending: theme.colors.warning,
-          Processing: theme.colors.info,
-          Shipped: theme.colors.stages.proposal,
-          Delivered: theme.colors.success,
-          Cancelled: theme.colors.error
-        }
-        return (
-          <Badge style={{ backgroundColor: colors[value as keyof typeof colors] + '20', color: colors[value as keyof typeof colors] }}>
-            {value}
-          </Badge>
-        )
-      }
-    },
-    {
-      id: 'orderDate',
-      label: 'Order Date',
-      accessor: 'orderDate',
-      sortable: true,
-      render: (value: Date) => new Date(value).toLocaleDateString()
-    },
-    {
-      id: 'deliveryDate',
-      label: 'Delivery',
-      accessor: 'deliveryDate',
-      sortable: true,
-      render: (value?: Date) => value ? new Date(value).toLocaleDateString() : 'TBD'
-    }
-  ]
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: theme.colors.background,
-      fontFamily: theme.typography.fontFamily,
-    }}>
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <CRMHeader
         searchValue={searchQuery}
@@ -1207,27 +970,22 @@ export default function CRMDashboard() {
       </div>
 
       {/* Content */}
-      <div style={{ padding: activeTab === 'overview' ? theme.spacing.xl : 0 }}>
+      <div className={activeTab === 'overview' ? 'p-6 bg-gray-50' : ''}>
         {activeTab === 'overview' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.xl }}>
+          <div className="space-y-6">
             {/* Metrics */}
-            <MetricGrid>
+            <PremiumMetricGrid>
               {metrics.map((metric, index) => (
-                <MetricCard key={index} {...metric} />
+                <PremiumMetricCard key={index} {...metric} />
               ))}
-            </MetricGrid>
+            </PremiumMetricGrid>
 
             {/* Pipeline with Drag & Drop */}
             <div>
-              <h2 style={{
-                fontSize: theme.typography.fontSize.lg,
-                fontWeight: theme.typography.fontWeight.semibold,
-                color: theme.colors.text,
-                marginBottom: theme.spacing.lg
-              }}>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Sales Pipeline
               </h2>
-              <DealPipelineDragDrop
+              <PremiumDealPipeline
                 onDealClick={(dealId) => router.push(`/dashboard/crm/deals/${dealId}`)}
                 onCreateDeal={(stageId) => {
                   console.log('Create deal in stage:', stageId)
@@ -1239,15 +997,10 @@ export default function CRMDashboard() {
 
             {/* Recent Contacts */}
             <div>
-              <h2 style={{
-                fontSize: theme.typography.fontSize.lg,
-                fontWeight: theme.typography.fontWeight.semibold,
-                color: theme.colors.text,
-                marginBottom: theme.spacing.lg
-              }}>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Recent Contacts
               </h2>
-              <EntityTable
+              <CleanTaskTable
                 columns={contactColumns}
                 data={filteredContacts.slice(0, 5)}
                 onRowClick={(row) => router.push(`/dashboard/crm/contacts/${row.id}`)}
@@ -1257,8 +1010,8 @@ export default function CRMDashboard() {
         )}
 
         {activeTab === 'contacts' && (
-          <div style={{ padding: `${theme.spacing.xl} ${theme.spacing.xl} ${theme.spacing.xl} ${theme.spacing.xl}` }}>
-            <EntityTable
+          <div className="p-6">
+            <CleanTaskTable
               columns={[...contactColumns, ...customContactColumns]}
               data={filteredContacts}
               onRowClick={(row) => router.push(`/dashboard/crm/contacts/${row.id}`)}
@@ -1266,18 +1019,17 @@ export default function CRMDashboard() {
               onRowDelete={handleContactDelete}
               selectedRows={selectedContacts}
               onSelectionChange={setSelectedContacts}
-              sortBy="name"
-              sortDirection="asc"
               entityType="contact"
               showAddColumn={true}
               onAddColumn={handleAddContactColumn}
+              onDeleteColumn={handleDeleteContactColumn}
             />
           </div>
         )}
 
         {activeTab === 'leads' && (
-          <div style={{ padding: theme.spacing.xl }}>
-            <EntityTable
+          <div className="p-6">
+            <CleanTaskTable
             columns={[...leadColumns, ...customLeadColumns]}
             data={filteredLeads}
             onRowClick={(row) => router.push(`/dashboard/crm/leads/${row.id}`)}
@@ -1285,18 +1037,17 @@ export default function CRMDashboard() {
             onRowDelete={(row) => console.log('Delete lead', row)}
             selectedRows={selectedLeads}
             onSelectionChange={setSelectedLeads}
-            sortBy="score"
-            sortDirection="desc"
             entityType="lead"
             showAddColumn={true}
             onAddColumn={handleAddLeadColumn}
+            onDeleteColumn={handleDeleteLeadColumn}
           />
           </div>
         )}
 
         {activeTab === 'companies' && (
-          <div style={{ padding: theme.spacing.xl }}>
-            <EntityTable
+          <div className="p-6">
+            <CleanTaskTable
             columns={[...companyColumns, ...customCompanyColumns]}
             data={filteredCompanies}
             onRowClick={(row) => router.push(`/dashboard/crm/companies/${row.id}`)}
@@ -1304,18 +1055,17 @@ export default function CRMDashboard() {
             onRowDelete={(row) => console.log('Delete company', row)}
             selectedRows={selectedCompanies}
             onSelectionChange={setSelectedCompanies}
-            sortBy="value"
-            sortDirection="desc"
             entityType="company"
             showAddColumn={true}
             onAddColumn={handleAddCompanyColumn}
+            onDeleteColumn={handleDeleteCompanyColumn}
           />
           </div>
         )}
 
         {activeTab === 'deals' && (
-          <div style={{ padding: theme.spacing.xl }}>
-            <EntityTable
+          <div className="p-6">
+            <CleanTaskTable
             columns={[...dealColumns, ...customDealColumns]}
             data={filteredDeals}
             onRowClick={(row) => router.push(`/dashboard/crm/deals/${row.id}`)}
@@ -1323,55 +1073,28 @@ export default function CRMDashboard() {
             onRowDelete={(row) => console.log('Delete deal', row)}
             selectedRows={selectedDeals}
             onSelectionChange={setSelectedDeals}
-            sortBy="value"
-            sortDirection="desc"
             entityType="deal"
             showAddColumn={true}
             onAddColumn={handleAddDealColumn}
+            onDeleteColumn={handleDeleteDealColumn}
           />
           </div>
         )}
 
-        {activeTab === 'products' && (
-          <div style={{ padding: theme.spacing.xl }}>
-            <EntityTable
-            columns={productColumns}
-            data={filteredProducts}
-            onRowClick={(row) => router.push(`/dashboard/crm/products/${row.id}`)}
-            onRowEdit={(row) => console.log('Edit product', row)}
-            onRowDelete={(row) => console.log('Delete product', row)}
-            selectedRows={selectedProducts}
-            onSelectionChange={setSelectedProducts}
-            sortBy="name"
-            sortDirection="asc"
-          />
-          </div>
-        )}
-
-        {activeTab === 'orders' && (
-          <div style={{ padding: theme.spacing.xl }}>
-            <EntityTable
-            columns={orderColumns}
-            data={filteredOrders}
-            onRowClick={(row) => router.push(`/dashboard/crm/orders/${row.id}`)}
-            onRowEdit={(row) => console.log('Edit order', row)}
-            onRowDelete={(row) => console.log('Delete order', row)}
-            selectedRows={selectedOrders}
-            onSelectionChange={setSelectedOrders}
-            sortBy="orderDate"
-            sortDirection="desc"
-          />
-          </div>
-        )}
       </div>
 
-      {/* Contact Create Modal */}
-      <ContactCreateModal
+      {/* Contact Create Sidebar - New Premium Experience */}
+      <ContactCreateSidebar
         isOpen={showCreateContact}
         onClose={() => setShowCreateContact(false)}
         onSuccess={(contact) => {
           console.log('Contact created:', contact)
           setShowCreateContact(false)
+          refreshContacts()
+        }}
+        onCreateAnother={() => {
+          console.log('Creating another contact')
+          refreshContacts()
         }}
       />
     </div>

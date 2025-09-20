@@ -1,5 +1,6 @@
 import { router } from './trpc';
 import { everchatRouter } from './routers/everchat';
+import { evercoreRouter } from './routers/evercore';
 import { evermailRouter } from './routers/evermail';
 import { evertaskRouter } from './routers/evertask';
 import { unifiedRouter } from './routers/unified';
@@ -10,6 +11,7 @@ import { organizationRouter } from './routers/organization';
 
 export const appRouter = router({
   everchat: everchatRouter,
+  evercore: evercoreRouter, // CRM endpoints  
   evermail: evermailRouter,
   evertask: evertaskRouter,
   unified: unifiedRouter, // The unified API for single-table architecture

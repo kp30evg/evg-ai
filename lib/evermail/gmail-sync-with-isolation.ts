@@ -3,6 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { db } from '@/lib/db';
 import { entities, users } from '@/lib/db/schema/unified';
 import { eq, and } from 'drizzle-orm';
+import { activityService } from '@/lib/services/activity-service';
 
 export class GmailSyncService {
   private gmail: any;
@@ -131,7 +132,7 @@ export class GmailSyncService {
       const fromEmail = fromMatch ? fromMatch[2] : from;
       
       // Create email entity with USER ISOLATION
-      await db.insert(entities).values({
+      const [emailEntity] = await db.insert(entities).values({
         workspaceId: this.workspaceId,
         userId: this.userId, // CRITICAL: Set user ID for isolation
         type: 'email',
@@ -162,10 +163,32 @@ export class GmailSyncService {
           syncedAt: new Date().toISOString(),
           userEmail: this.userEmail
         }
-      });
+      }).returning();
       
       // Auto-create contact if not exists
-      await this.createContactFromEmail(fromEmail, fromName);
+      const contact = await this.createContactFromEmail(fromEmail, fromName);
+      
+      // Log email activity for the contact if found
+      if (contact) {
+        const isSent = message.labelIds?.includes('SENT');
+        await activityService.logActivity(
+          this.workspaceId,
+          contact.id,
+          isSent ? 'email_sent' : 'email_received',
+          'evermail',
+          {
+            subject: subject || '(no subject)',
+            from: fromEmail,
+            to: to,
+            snippet: message.snippet,
+            date: date,
+            emailId: emailEntity.id
+          },
+          {
+            userId: this.userId
+          }
+        );
+      }
       
     } catch (error) {
       console.error(`Error syncing message ${messageId}:`, error);
@@ -264,34 +287,39 @@ export class GmailSyncService {
         )
         .limit(1);
       
-      if (existingContact.length === 0) {
-        // Extract company from email domain
-        const extractedCompany = extractCompanyFromEmail(email);
-        
-        // Create new contact with USER ISOLATION and extracted company
-        await db.insert(entities).values({
-          workspaceId: this.workspaceId,
-          userId: this.userId, // CRITICAL: Set user ID for isolation
-          type: 'contact',
-          data: {
-            name: name || email.split('@')[0],
-            email: email,
-            source: 'gmail_import',
-            createdFrom: 'email_sync',
-            // Add company fields for display
-            company: extractedCompany || '',
-            companyName: extractedCompany || ''
-          },
-          metadata: {
-            autoCreated: true,
-            source: 'gmail_sync',
-            userEmail: this.userEmail
-          }
-        });
+      if (existingContact.length > 0) {
+        return existingContact[0];
       }
+      
+      // Extract company from email domain
+      const extractedCompany = extractCompanyFromEmail(email);
+      
+      // Create new contact with USER ISOLATION and extracted company
+      const [newContact] = await db.insert(entities).values({
+        workspaceId: this.workspaceId,
+        userId: this.userId, // CRITICAL: Set user ID for isolation
+        type: 'contact',
+        data: {
+          name: name || email.split('@')[0],
+          email: email,
+          source: 'gmail_import',
+          createdFrom: 'email_sync',
+          // Add company fields for display
+          company: extractedCompany || '',
+          companyName: extractedCompany || ''
+        },
+        metadata: {
+          autoCreated: true,
+          source: 'gmail_sync',
+          userEmail: this.userEmail
+        }
+      }).returning();
+      
+      return newContact;
     } catch (error) {
       console.error(`Failed to create contact for ${email}:`, error);
       // Don't fail the sync if contact creation fails
+      return null;
     }
   }
 

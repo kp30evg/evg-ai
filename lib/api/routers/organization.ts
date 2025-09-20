@@ -16,14 +16,15 @@ export const organizationRouter = router({
 
       try {
         // Get all organization members from Clerk
-        const memberships = await clerkClient.organizations.getOrganizationMembershipList({
+        const clerk = await clerkClient()
+        const memberships = await clerk.organizations.getOrganizationMembershipList({
           organizationId: ctx.orgId,
           limit: 100
         })
 
         // Transform to a simpler format
         const members = await Promise.all(memberships.data.map(async (membership) => {
-          const user = await clerkClient.users.getUser(membership.publicUserData?.userId || '')
+          const user = await clerk.users.getUser(membership.publicUserData?.userId || '')
           return {
             id: user.id,
             email: user.emailAddresses[0]?.emailAddress || '',
@@ -56,7 +57,8 @@ export const organizationRouter = router({
       }
 
       try {
-        const user = await clerkClient.users.getUser(ctx.userId)
+        const clerk = await clerkClient()
+        const user = await clerk.users.getUser(ctx.userId)
         return {
           id: user.id,
           email: user.emailAddresses[0]?.emailAddress || '',
