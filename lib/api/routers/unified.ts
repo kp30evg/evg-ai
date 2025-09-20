@@ -1704,4 +1704,150 @@ export const unifiedRouter = router({
         recentActivity: recentEntities,
       };
     }),
+  
+  // Get upcoming activities for an entity
+  getUpcomingActivities: protectedProcedure
+    .input(z.object({
+      entityId: z.string().uuid(),
+      limit: z.number().min(1).max(100).default(10),
+    }))
+    .query(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      try {
+        // Get tasks and meetings related to this entity
+        const tasks = await entityService.find({
+          workspaceId,
+          type: 'task',
+          limit: input.limit,
+        });
+        
+        const meetings = await entityService.find({
+          workspaceId,
+          type: 'calendar_event',
+          limit: input.limit,
+        });
+        
+        // Filter for upcoming items linked to this entity
+        const upcoming = [...tasks, ...meetings]
+          .filter(item => {
+            const isLinked = item.relationships?.contacts?.includes(input.entityId) ||
+                            item.relationships?.deals?.includes(input.entityId) ||
+                            item.relationships?.companies?.includes(input.entityId);
+            const dueDate = item.data?.dueDate || item.data?.startTime;
+            const isFuture = dueDate && new Date(dueDate) > new Date();
+            return isLinked && isFuture;
+          })
+          .sort((a, b) => {
+            const dateA = new Date(a.data?.dueDate || a.data?.startTime || 0);
+            const dateB = new Date(b.data?.dueDate || b.data?.startTime || 0);
+            return dateA.getTime() - dateB.getTime();
+          })
+          .slice(0, input.limit)
+          .map(item => ({
+            id: item.id,
+            type: item.type,
+            title: item.data?.title || item.data?.name || 'Untitled',
+            dueDate: item.data?.dueDate || item.data?.startTime,
+            status: item.data?.status,
+          }));
+        
+        return upcoming;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to get upcoming activities',
+        });
+      }
+    }),
+  
+  // Create a note for an entity
+  createNote: protectedProcedure
+    .input(z.object({
+      entityId: z.string().uuid(),
+      content: z.string().min(1),
+      type: z.literal('note'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Get user info
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, ctx.userId))
+        .limit(1);
+      
+      try {
+        // Create the note as an activity
+        const { activityService } = await import('@/lib/services/activity-service');
+        
+        const activity = await activityService.logActivity(
+          workspaceId,
+          input.entityId,
+          'note',
+          'evercore',
+          {
+            content: input.content,
+            createdAt: new Date(),
+          },
+          {
+            userId: dbUser?.id,
+          }
+        );
+        
+        return activity;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to create note',
+        });
+      }
+    }),
+  
+  // Log a call for an entity
+  logCall: protectedProcedure
+    .input(z.object({
+      entityId: z.string().uuid(),
+      duration: z.string(),
+      notes: z.string(),
+      type: z.literal('call'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const workspaceId = await workspaceService.createWorkspaceIfNotExists(ctx.orgId, `Workspace ${ctx.orgId}`);
+      
+      // Get user info
+      const [dbUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkUserId, ctx.userId))
+        .limit(1);
+      
+      try {
+        // Log the call as an activity
+        const { activityService } = await import('@/lib/services/activity-service');
+        
+        const activity = await activityService.logActivity(
+          workspaceId,
+          input.entityId,
+          'call',
+          'evercore',
+          {
+            duration: input.duration,
+            notes: input.notes,
+            createdAt: new Date(),
+          },
+          {
+            userId: dbUser?.id,
+          }
+        );
+        
+        return activity;
+      } catch (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to log call',
+        });
+      }
+    }),
 });
